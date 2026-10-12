@@ -237,7 +237,9 @@ function isShown(element: Element): boolean {
  * page lists many jobs and its hidden data can describe a different one, but
  * the Apply button belongs to the job the user is looking at.
  */
-function byApplyButton(doc: Document): { title: string; company: string | null } | null {
+function byApplyButton(
+  doc: Document,
+): { title: string; company: string | null; pane: Element | null } | null {
   let button: Element | null = null;
   for (const control of doc.querySelectorAll(CONTROLS)) {
     if (isApplyControl(control) && isShown(control) && !control.closest('rolesetu-root')) {
@@ -272,9 +274,32 @@ function byApplyButton(doc: Document): { title: string; company: string | null }
       company = label;
       break;
     }
-    return { title: best.label, company };
+    return { title: best.label, company, pane: paneAround(button) };
   }
   return null;
+}
+
+/**
+ * The part of the page that is about this one job: the smallest block around
+ * its Apply button that holds a job description.
+ *
+ * On a results page the whole page also "reads like a job", because it lists
+ * many of them. Taking that as the description would score every job against
+ * all the listings at once, so each one would show the same requirements.
+ */
+function paneAround(button: Element): Element | null {
+  let scope = button.parentElement;
+  for (let depth = 0; scope && depth < 14; depth += 1, scope = scope.parentElement) {
+    if (scope === scope.ownerDocument.body) return null;
+    const words = visibleText(scope);
+    if (words.length >= MIN_DESCRIPTION * 2 && JOB_CUE.test(words)) return scope;
+  }
+  return null;
+}
+
+function sameTitle(first: string, second: string): boolean {
+  const plain = (value: string) => value.replace(TITLE_EXTRA, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return plain(first) === plain(second);
 }
 
 /** Whether these words can be read somewhere on the page. */
@@ -292,6 +317,14 @@ function fromKnownSite(doc: Document, host: string): Omit<DetectedJob, 'url'> | 
 }
 
 /** Last resort: the block of the page that reads most like a job description. */
+/** The job's own block of the page, when its Apply button showed where that is. */
+function fromPane(pane: Element | null, strict: boolean): Omit<DetectedJob, 'url'> | null {
+  if (!pane) return null;
+  const words = visibleText(pane);
+  if (strict && JOB_CUES.filter((cue) => cue.test(words)).length < 2) return null;
+  return { title: null, company: null, description: words };
+}
+
 function fromPageText(
   doc: Document,
   host: string,
@@ -329,19 +362,25 @@ function fromPageText(
 export function detectJob(doc: Document, url: string, strict = false): DetectedJob | null {
   const host = new URL(url).hostname.replace(/^www\./, '');
 
-  // A site's hidden job data is the best source when it describes the job on
-  // screen. On a results page it can be left over from another listing, and
-  // then its title is nowhere to be seen: that data is ignored.
-  let structured = fromStructuredData(doc);
-  if (structured?.title && !appearsOnPage(doc, structured.title)) structured = null;
+  const seen = byApplyButton(doc);
 
-  const found = structured ?? fromKnownSite(doc, host) ?? fromPageText(doc, host, strict);
+  // A site's hidden job data is the best source when it describes the job on
+  // screen. On a results page it can be left over from another listing: then
+  // its title is not the one above the Apply button (or is nowhere to be
+  // seen), and that data is ignored.
+  let structured = fromStructuredData(doc);
+  if (structured?.title) {
+    const stale = seen ? !sameTitle(structured.title, seen.title) : !appearsOnPage(doc, structured.title);
+    if (stale) structured = null;
+  }
+
+  const found =
+    structured ?? fromKnownSite(doc, host) ?? fromPane(seen?.pane ?? null, strict) ?? fromPageText(doc, host, strict);
   if (!found) return null;
 
   // What is shown above the Apply button is what the user reads as the job's
   // title, so it is used word for word. Hidden data only fills in when the
   // page shows nothing there.
-  const seen = byApplyButton(doc);
   const title = (structured?.title ?? seen?.title ?? found.title)?.replace(TITLE_EXTRA, '') ?? null;
   return {
     ...found,
