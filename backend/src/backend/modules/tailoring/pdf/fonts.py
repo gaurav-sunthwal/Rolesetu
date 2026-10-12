@@ -5,8 +5,9 @@ Three cases, best first:
     stored in the file. The same standard font is used: an exact match.
  2. The resume carries its own font. It is reused when it contains every
     letter needed. (A PDF usually stores only the letters it already uses.)
- 3. A letter is missing. A full copy of the same typeface, or an open typeface
-    drawn to the same widths, is looked up on this machine.
+ 3. A letter is missing. A full copy of the same typeface is looked up on this
+    machine; failing that, an open typeface drawn to the same widths, shipped
+    in `backend/assets/fonts`, is used.
 """
 
 import re
@@ -53,6 +54,8 @@ _FAMILIES: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (re.compile(r"verdana|dejavu ?sans", re.I), ("Verdana{}.ttf", "DejaVuSans{}.ttf")),
     (re.compile(r"courier|liberation ?mono", re.I), ("Courier New{}.ttf", "LiberationMono-{}.ttf")),
 ]
+# Shipped with the backend, so a server with no fonts installed still has these.
+_BUNDLED_FONT_DIR = Path(__file__).resolve().parents[3] / "assets" / "fonts"
 _SYSTEM_FONT_DIRS = (
     "/System/Library/Fonts/Supplemental",
     "/Library/Fonts",
@@ -100,7 +103,9 @@ class LineFont:
 @lru_cache(maxsize=1)
 def _font_files() -> dict[str, Path]:
     """Every font file on this machine, by lower-cased file name."""
-    folders = [get_settings().font_dir, *_SYSTEM_FONT_DIRS]
+    # Earlier folders win: a real copy of a font on this machine is preferred
+    # to the look-alike shipped with the backend.
+    folders = [get_settings().font_dir, *_SYSTEM_FONT_DIRS, str(_BUNDLED_FONT_DIR)]
     found: dict[str, Path] = {}
     for folder in folders:
         if not folder or not Path(folder).is_dir():

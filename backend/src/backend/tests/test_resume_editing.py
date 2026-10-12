@@ -269,3 +269,28 @@ def test_an_edited_resume_can_be_edited_again() -> None:
     # ...and the next one goes after it, not on top of it.
     row = next(line for line in lines_of(again.pdf) if line.startswith("Languages"))
     assert row.endswith("Kotlin, Rust")
+
+
+def test_a_server_with_no_fonts_installed_can_still_add_any_skill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fonts shipped with the backend cover what the resume's own font lacks.
+    Without them, a skill needing a new letter was refused on a bare server.
+    """
+    from backend.modules.tailoring.pdf import fonts
+
+    monkeypatch.setattr(fonts, "_SYSTEM_FONT_DIRS", ())
+    fonts._font_files.cache_clear()
+    try:
+        assert fonts._BUNDLED_FONT_DIR.is_dir()
+        # classic.pdf is set in Helvetica and carries only the letters it uses.
+        result = editor.add_skills(pdf("classic"), ["Kubernetes", "Zig", "Qwik"])
+        assert [(item.skill, item.reason) for item in result.skipped] == []
+        assert {item.skill for item in result.added} == {"Kubernetes", "Zig", "Qwik"}
+        text = text_of(result.pdf)
+        assert all(editor.contains_skill(text, name) for name in ("Kubernetes", "Zig", "Qwik"))
+        # The same for a serif resume.
+        serif = editor.add_skills(pdf("jake"), ["Zig", "Qwik & XState"])
+        assert serif.skipped == []
+    finally:
+        fonts._font_files.cache_clear()
