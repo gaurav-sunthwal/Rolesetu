@@ -78,6 +78,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .verdict i { width: 6px; height: 6px; border-radius: 50%; }
 .gaps { display: flex; flex-wrap: wrap; gap: 6px; }
 .hint { margin: 0 0 8px; }
+.titlenote { margin: 8px 0 0; }
 .group { margin: 12px 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .retitle { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
 .retitle label { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; cursor: pointer; }

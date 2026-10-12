@@ -237,6 +237,19 @@ def test_headline_suggestions_stay_honest() -> None:
     assert clean_title("Software Engineer II - Payments (Remote)") == "Software Engineer II"
 
 
+def test_titles_are_cleaned_of_job_site_wording() -> None:
+    from backend.modules.tailoring.keywords import clean_title, is_a_title, suggest_headline
+
+    listing = "react native developer jobs in Pune, Maharashtra"
+    assert clean_title(listing) == "react native developer"
+    assert suggest_headline("FULL STACK DEVELOPER", listing) == "REACT NATIVE DEVELOPER"
+    assert clean_title("Walk-in || Acquisition Manager - CC/PL/BL") == "Acquisition Manager"
+    assert clean_title("Hiring for Backend Engineer") == "Backend Engineer"
+    # A page heading mistaken for the title is not offered as a headline at all.
+    assert not is_a_title("Full job description")
+    assert is_a_title("Senior Software Engineer (Mobile)")
+
+
 def test_keyword_check_tells_spelling_from_absence() -> None:
     from backend.modules.tailoring.keywords import check_skill
 

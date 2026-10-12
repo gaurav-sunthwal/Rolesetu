@@ -136,7 +136,7 @@ function visibleText(element: Element | null): string {
 }
 
 const SECTION_HEADING =
-  /^(?:about|job description|description|responsibilit|requirement|qualification|overview|skills|benefits|meet the|how you match|your profile|people you can|show match|get personali[sz]ed)/i;
+  /^(?:about|full job description|job description|job details|job highlights|profile insights|description|responsibilit|requirement|qualification|overview|skills|benefits|meet the|how you match|your profile|people you can|show match|get personali[sz]ed)/i;
 
 function firstLine(element: Element): string {
   return visibleText(element).split('\n')[0] ?? '';

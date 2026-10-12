@@ -215,7 +215,7 @@ def _compare(
             section_text = ""
 
     title = None
-    if job_title and keywords.clean_title(job_title):
+    if job_title and keywords.is_a_title(job_title):
         headline = keywords.find_headline(first_page)
         present = keywords.title_present(job_title, resume_text)
         title = TitleCheck(

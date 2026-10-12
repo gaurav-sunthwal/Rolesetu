@@ -815,7 +815,15 @@ function ResumeMatcher({
       <>
         {card}
         <h3>Match your resume to this job</h3>
-        <p className="muted small">Your resume already uses this job&apos;s wording.</p>
+        <p className="muted small">
+          {title?.present
+            ? `Your resume already uses this job's wording, including the title “${title.wanted}”.`
+            : title && title.current === null
+              ? `Your resume has the job's skills. It has no role line under your name for the title “${title.wanted}”.`
+              : title
+                ? `Your resume has the job's skills. “${title.wanted}” is a different kind of role from your “${title.current}”, so no title change is suggested.`
+                : "Your resume already uses this job's wording."}
+        </p>
       </>
     );
   }
@@ -834,9 +842,7 @@ function ResumeMatcher({
               checked={useHeadline}
               onChange={(event) => setUseHeadline(event.target.checked)}
             />
-            <span>
-              Job title: change “{title.current}” under my name to
-            </span>
+            <span>Job title: change “{title.current}” under my name to</span>
           </label>
           <input
             type="text"
@@ -849,6 +855,15 @@ function ResumeMatcher({
             onChange={(event) => setHeadline(event.target.value)}
           />
         </div>
+      ) : title ? (
+        // Always say where the title stands, so a missing option is explained.
+        <p className="muted small titlenote">
+          {title.present
+            ? `✓ Job title: your resume already says “${title.wanted}”.`
+            : title.current === null
+              ? `Job title: “${title.wanted}”. Your resume has no role line under your name to put it in.`
+              : `Job title: “${title.wanted}” is a different kind of role from your “${title.current}”, so no change is suggested.`}
+        </p>
       ) : null}
 
       {missing.length > 0 ? (

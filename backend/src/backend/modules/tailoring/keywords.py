@@ -94,9 +94,22 @@ def find_headline(lines: list[Line]) -> Headline | None:
     return None
 
 
+# What job sites wrap around a title: "Walk-in || ...", "Hiring for ...", "... jobs in Pune".
+_TITLE_LEAD_IN = re.compile(
+    r"^(?:walk[- ]?in(?: drive| interview)?|urgent(?:ly)?(?: hiring| requirement| opening)?|"
+    r"(?:we are |now )?hiring(?: for)?|(?:job )?opening(?: for)?|vacancy(?: for)?|"
+    r"immediate (?:joiner|opening)s?)\s*(?:for\b|[:|!-]|–)*\s*",
+    re.IGNORECASE,
+)
+_TITLE_TAIL = re.compile(r"\s+(?:jobs?|vacanc(?:y|ies)|openings?)(?:\s+in\b.*)?$", re.IGNORECASE)
+
+
 def clean_title(title: str) -> str:
-    """A job title without what does not belong in a headline: "(Remote)", a city, a job code."""
+    """A job title without what does not belong in a headline: "(Remote)", a
+    city, a job code, or a job site's own wording around it.
+    """
     text = re.sub(r"\s*[\[(].*?[\])]", "", title)
+    text = _TITLE_TAIL.sub("", _TITLE_LEAD_IN.sub("", text.strip()))
     text = re.split(r"\s+[-–—|@,/]\s+|\s+at\s+", text)[0]
     return _flat(text)[:_MAX_TITLE]
 
@@ -124,6 +137,13 @@ def suggest_headline(current: str, job_title: str) -> str | None:
     if current.isupper():
         wanted = wanted.upper()
     return None if _flat(wanted).lower() == _flat(current).lower() else wanted
+
+
+def is_a_title(job_title: str) -> bool:
+    """False for text that was taken for a title but is not one, such as a
+    page heading ("Full job description").
+    """
+    return _ROLE.search(clean_title(job_title)) is not None
 
 
 def title_present(job_title: str, resume_text: str) -> bool:
