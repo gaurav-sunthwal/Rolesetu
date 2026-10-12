@@ -9,6 +9,7 @@
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
     "build:live": "WXT_LIVE=1 wxt build",
+    "test": "vitest run",
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
@@ -24,6 +25,7 @@
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
     "typescript": "^5.9.3",
+    "vitest": "^5.0.3",
     "web-ext": "^10.5.0",
     "wxt": "^0.21.3"
   }

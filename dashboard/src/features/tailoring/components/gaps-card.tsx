@@ -131,6 +131,10 @@ function Checklist({
     });
   }
 
+  const plain = [...missing.filter((skill) => !skill.one_of).map((skill) => skill.name), ...extra];
+  const choices = [...new Set(missing.map((skill) => skill.one_of ?? ''))]
+    .filter(Boolean)
+    .map((wording) => [wording, missing.filter((skill) => skill.one_of === wording)] as const);
   const headlineChosen = useHeadline && headline.trim().length >= 3;
   const count = skills.length + respell.length + (headlineChosen ? 1 : 0);
   const nothingToDo =
@@ -184,15 +188,35 @@ function Checklist({
 
       {missing.length + extra.length > 0 ? (
         <Group label="Not in your resume" hint="Tick only the skills you really have.">
-          <ul className="flex flex-wrap gap-2">
-            {[...missing.map((skill) => skill.name), ...extra].map((name) => (
-              <li key={name}>
-                <Chip on={skills.includes(name)} onClick={() => setSkills(toggle(skills, name))}>
-                  {name}
-                </Chip>
-              </li>
-            ))}
-          </ul>
+          {plain.length > 0 ? (
+            <ul className="flex flex-wrap gap-2">
+              {plain.map((name) => (
+                <li key={name}>
+                  <Chip on={skills.includes(name)} onClick={() => setSkills(toggle(skills, name))}>
+                    {name}
+                  </Chip>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {/* A requirement the job lets you meet with any one of several skills. */}
+          {choices.map(([wording, options]) => (
+            <div key={wording} className="mt-3">
+              <p className="text-muted-foreground text-xs">The job accepts any one of these:</p>
+              <ul className="mt-1.5 flex flex-wrap gap-2">
+                {options.map((skill) => (
+                  <li key={skill.name}>
+                    <Chip
+                      on={skills.includes(skill.name)}
+                      onClick={() => setSkills(toggle(skills, skill.name))}
+                    >
+                      {skill.name}
+                    </Chip>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </Group>
       ) : null}
 

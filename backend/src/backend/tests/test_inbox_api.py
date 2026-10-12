@@ -254,3 +254,21 @@ async def test_an_interview_mail_becomes_a_scheduled_interview(make_client: Clie
 
     assert (await owner.delete(path)).status_code == 204
     assert (await owner.get(f"{BASE}/interviews")).json() == []
+
+
+async def test_the_same_mail_listed_twice_does_not_break_the_sync(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two syncs can overlap, and Gmail can list a mail twice. Either way the
+    second copy is skipped; the sync must finish and report no error.
+    """
+
+    async def list_twice(self: FakeMailbox, query: str, limit: int) -> list[str]:
+        return [item.id for item in MAILS] * 2
+
+    monkeypatch.setattr(FakeMailbox, "list_ids", list_twice)
+    await connect(client)
+
+    status = (await client.get(f"{BASE}/status")).json()
+    assert (status["sync_status"], status["last_error"]) == ("idle", None)
+    assert len((await client.get(f"{BASE}/messages")).json()["items"]) == 4

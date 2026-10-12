@@ -865,7 +865,15 @@ function ResumeMatcher({
           >
             Upload my resume
           </button>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            className="btn wide"
+            onClick={() => setResumeVersion((version) => version + 1)}
+          >
+            Try again
+          </button>
+        )}
       </>
     );
   }
@@ -892,6 +900,29 @@ function ResumeMatcher({
     // until the user saves it.
     setTailoring({ name: 'done', result: result.data, changes });
   }
+
+  // A requirement the job lets you meet with any one of several skills is
+  // shown as that choice, under the job's own wording.
+  const plain = missing.filter((skill) => !skill.one_of);
+  const choices = [...new Set(missing.map((skill) => skill.one_of ?? ''))]
+    .filter(Boolean)
+    .map((wording) => [wording, missing.filter((skill) => skill.one_of === wording)] as const);
+  const chip = (skill: (typeof missing)[number]) => {
+    const on = skills.includes(skill.name);
+    return (
+      <li key={`${skill.one_of ?? ''}-${skill.name}`}>
+        <button
+          type="button"
+          className={on ? 'chip on' : 'chip'}
+          aria-pressed={on}
+          disabled={tailoring.name === 'working'}
+          onClick={() => setSkills(toggled(skills, skill.name))}
+        >
+          {on ? '✓' : '+'} {skill.name}
+        </button>
+      </li>
+    );
+  };
 
   if (missing.length === 0 && respellable.length === 0 && !canRetitle) {
     return (
@@ -956,23 +987,13 @@ function ResumeMatcher({
       {missing.length > 0 ? (
         <>
           <p className="group">Not in your resume (tick only what you really have)</p>
-          <ul className="gaps">
-            {missing.map((skill) => {
-              const on = skills.includes(skill.name);
-              return (
-                <li key={skill.name}>
-                  <button
-                    type="button"
-                    className={on ? 'chip on' : 'chip'}
-                    aria-pressed={on}
-                    onClick={() => setSkills(toggled(skills, skill.name))}
-                  >
-                    {on ? '✓' : '+'} {skill.name}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          {plain.length > 0 ? <ul className="gaps">{plain.map(chip)}</ul> : null}
+          {choices.map(([wording, options]) => (
+            <div key={wording} className="choice">
+              <p className="muted small">The job accepts any one of these:</p>
+              <ul className="gaps">{options.map(chip)}</ul>
+            </div>
+          ))}
         </>
       ) : null}
 
@@ -1015,7 +1036,7 @@ function ResumeMatcher({
       ) : null}
       {tailoring.name === 'failed' ? (
         <p className="problem" role="alert">
-          {tailoring.message}
+          {tailoring.message} Your ticks are kept: press the button to try again.
         </p>
       ) : null}
     </>

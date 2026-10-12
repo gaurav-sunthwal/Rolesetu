@@ -1355,6 +1355,8 @@ export interface components {
       written_as: string | null;
       /** On Profile */
       on_profile: boolean;
+      /** One Of */
+      one_of?: string | null;
     };
     /** SkillResult */
     SkillResult: {

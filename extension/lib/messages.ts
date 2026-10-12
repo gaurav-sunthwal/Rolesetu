@@ -56,7 +56,14 @@ export type Responses = {
 
 export async function ask<T extends Request>(request: T): Promise<Responses[T['type']]> {
   try {
-    return (await browser.runtime.sendMessage(request)) as Responses[T['type']];
+    const reply = (await browser.runtime.sendMessage(request)) as Responses[T['type']] | undefined;
+    // No reply at all means the background worker was not there to answer.
+    if (reply && typeof reply === 'object' && 'ok' in reply) return reply;
+    return {
+      ok: false,
+      status: null,
+      message: 'Rolesetu did not answer. Reload this page and try again.',
+    } as Responses[T['type']];
   } catch {
     return {
       ok: false,

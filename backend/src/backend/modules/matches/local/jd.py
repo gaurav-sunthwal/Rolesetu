@@ -53,6 +53,7 @@ _UNKNOWN_TOOL = re.compile(
     r"(?<![A-Za-z0-9.])(?:[A-Z][a-z]+(?:[A-Z][a-z0-9]+)+|[A-Za-z][A-Za-z0-9]*\.(?:js|io|ai|py))"
     r"(?![A-Za-z0-9])"
 )
+_MAX_TOOL_NAME = 24
 _NOT_A_TOOL = frozenset(
     {
         "linkedin", "youtube", "whatsapp", "iphone", "ipad", "macos", "devops", "ecommerce",
@@ -130,6 +131,9 @@ def _unknown_tools(sentence: str, mentions: list[Mention]) -> list[Skill]:
         if any(start < match.end() and match.start() < end for start, end in taken):
             continue
         word = match.group(0)
+        # Longer than any real tool name: page text with its spaces lost.
+        if len(word) > _MAX_TOOL_NAME:
+            continue
         if word.lower() in _NOT_A_TOOL:
             continue
         found.append(Skill(name=word))

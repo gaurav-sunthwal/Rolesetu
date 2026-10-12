@@ -41,7 +41,9 @@ export function projectedScore(
   let possible = 0;
   for (const skill of match.skill_results) {
     const table = skill.required ? POINTS.required : POINTS.niceToHave;
-    earned += table[ticked.includes(skill.name) ? 'strong' : skill.verdict];
+    // "React or Angular or Vue" is one requirement: ticking any one of them meets it.
+    const met = skill.name.split(' or ').some((option) => ticked.includes(option));
+    earned += table[met ? 'strong' : skill.verdict];
     possible += table.strong;
   }
   const fromSkills = possible === 0 ? 0 : roundHalfEven((earned / possible) * 100);

@@ -212,3 +212,43 @@ async def test_keyword_check_is_scoped_to_the_user(make_client: ClientFactory) -
 
     assert (await owner.get(f"{BASE}/keywords", params=params)).status_code == 200
     assert (await stranger.get(f"{BASE}/keywords", params=params)).status_code == 404
+
+
+EITHER_JOB = """Frontend Developer - Bengaluru
+
+About the role: we are looking for a frontend developer to build the web app our customers
+use every day, working closely with design and backend teams.
+
+Requirements:
+- 2+ years with React or Angular or Vue
+- Experience with one of GraphQL or gRPC
+- Strong JavaScript fundamentals"""
+
+
+async def test_alternatives_are_offered_one_by_one(client: AsyncClient) -> None:
+    """ "React or Angular or Vue" is one requirement, not a skill called that."""
+    await _upload_to_profile(client, CLASSIC)
+    match = await client.post(
+        "/api/v1/matches", json={"jd_text": EITHER_JOB, "role": "Frontend Developer"}
+    )
+    assert match.is_success, match.text
+    grouped = [s["name"] for s in match.json()["skill_results"] if " or " in s["name"]]
+    assert grouped, "this job should have at least one any-of requirement"
+
+    check = (await client.get(f"{BASE}/keywords", params={"match_id": match.json()["id"]})).json()
+    names = [skill["name"] for skill in check["skills"]]
+    # Nothing offered to the user is a phrase with "or" in it, or too long to add.
+    assert all(" or " not in name and len(name) <= 60 for name in names)
+    by_name = {skill["name"]: skill for skill in check["skills"]}
+    # The resume has React, so that choice is met and the others are not listed.
+    assert by_name["React"]["status"] == "present"
+    assert "Angular" not in by_name and "Vue" not in by_name
+    # It has neither GraphQL nor gRPC: both are offered, marked as a choice.
+    assert by_name["GraphQL"]["status"] == by_name["gRPC"]["status"] == "missing"
+    assert by_name["GraphQL"]["one_of"] == by_name["gRPC"]["one_of"]
+    assert " or " in by_name["GraphQL"]["one_of"]
+
+    # Ticking one of them works (this is what used to be refused).
+    added = await client.post(BASE, json={"skills": [{"name": "GraphQL"}]})
+    assert added.status_code == 200, added.text
+    assert [item["skill"] for item in added.json()["added"]] == ["GraphQL"]

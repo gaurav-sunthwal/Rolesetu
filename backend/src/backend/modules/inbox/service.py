@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
 from cryptography.fernet import InvalidToken
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import get_settings
@@ -234,7 +235,14 @@ async def _place(
         role=found.role,
         state="review",
     )
-    db.add(record)
+    try:
+        # Its own savepoint: if another sync recorded this mail a moment ago, only
+        # this insert is undone and the rest of the batch carries on.
+        async with db.begin_nested():
+            db.add(record)
+            await db.flush()
+    except IntegrityError:
+        return
     result.kept += 1
 
     target = find_application(

@@ -1,3 +1,4 @@
+import { fitJob, fitUrl, messageFor, UNREACHABLE } from '@/lib/api-errors';
 import { API_BASE_URL, DASHBOARD_URL } from '@/lib/config';
 import type {
   AutofillData,
@@ -52,12 +53,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
     if (!STARTING_UP.has(response.status)) break;
   }
   if (response === null) {
-    return {
-      ok: false,
-      status: null,
-      message:
-        'Could not reach Rolesetu. It may be starting up: wait a few seconds and try again. If it keeps happening, check your connection.',
-    };
+    return { ok: false, status: null, message: UNREACHABLE };
   }
 
   if (response.status === 401) {
@@ -67,10 +63,11 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
   }
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = (body as { detail?: unknown } | null)?.detail;
-    const message =
-      typeof detail === 'string' ? detail : 'Rolesetu could not complete that. Please try again.';
-    return { ok: false, status: response.status, message };
+    return { ok: false, status: response.status, message: messageFor(response.status, body) };
+  }
+  if (body === null) {
+    // A success with nothing readable in it: treat it as the server's fault.
+    return { ok: false, status: response.status, message: messageFor(502, null) };
   }
   return { ok: true, data: body as T };
 }
@@ -92,7 +89,7 @@ async function recordApplication(
     body: JSON.stringify({
       role: job.role,
       company: job.company,
-      url: job.url,
+      url: fitUrl(job.url),
       status,
       match_id: job.matchId,
       source: 'extension',
@@ -151,16 +148,11 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
     case 'connection':
       return { ok: true, data: { connected: (await accessKey.getValue()) !== null } };
 
-    case 'check-job':
-      return api<Match>('/matches', {
-        method: 'POST',
-        body: JSON.stringify({
-          jd_text: request.job.description,
-          url: request.job.url,
-          role: request.job.title,
-          company: request.job.company,
-        }),
-      });
+    case 'check-job': {
+      const job = fitJob(request.job);
+      if ('problem' in job) return { ok: false, status: 422, message: job.problem };
+      return api<Match>('/matches', { method: 'POST', body: JSON.stringify(job) });
+    }
 
     case 'record-application':
       return recordApplication(request.job, request.status);
@@ -178,7 +170,18 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((request: Request, sender, sendResponse) => {
-    void handle(request, sender).then(sendResponse);
+    // Whatever happens in here, the page gets an answer. Without one it would
+    // wait forever, or crash trying to read a reply that never came.
+    handle(request, sender)
+      .catch((error: unknown) => {
+        console.error('Rolesetu: request failed', request.type, error);
+        return {
+          ok: false,
+          status: null,
+          message: 'Rolesetu ran into a problem. Reload this page and try again.',
+        } satisfies Failure;
+      })
+      .then(sendResponse);
     return true; // the reply is sent asynchronously
   });
 });

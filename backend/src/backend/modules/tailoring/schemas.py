@@ -82,6 +82,9 @@ class SkillKeyword(BaseModel):
     written_as: str | None
     # Whether the user's profile already shows this skill.
     on_profile: bool
+    # Set when the job accepts any one of several skills ("React or Angular or Vue")
+    # and this is one of them: the job's own wording for the whole choice.
+    one_of: str | None = None
 
 
 class KeywordCheck(BaseModel):

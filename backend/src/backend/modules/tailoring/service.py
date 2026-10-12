@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import logging
 import uuid
 
 import pymupdf
@@ -33,8 +34,12 @@ from backend.modules.tailoring.schemas import (
     TitleCheck,
 )
 
+logger = logging.getLogger(__name__)
+
 # The profile's own cap on skills (see ProfileWrite.skills).
 MAX_PROFILE_SKILLS = 100
+# How the job reader joins skills when a job accepts any one of them.
+ALTERNATIVES = " or "
 
 _CANNOT_EDIT = {
     "no_skills_section": (
@@ -113,6 +118,29 @@ async def _remember_skills(db: AsyncSession, user_id: uuid.UUID, skills: list[st
     await profiles_service.save_profile(db, user_id=user_id, payload=payload)
 
 
+async def _edit_safely(
+    pdf: bytes, payload: TailorRequest
+) -> tuple[editor.EditResult, list[bytes], list[bytes], str, list[str]]:
+    """Runs the edit off the event loop and turns any failure into words.
+
+    Resumes come from every tool there is, and one built in a way the editor
+    has not met can make it fail in a way nobody planned for. The user's file
+    is untouched when that happens (edits are made on a copy), so they are
+    told exactly that, and the real error is logged to be fixed.
+    """
+    try:
+        return await asyncio.to_thread(_edit, pdf, payload)
+    except editor.ResumeEditError as exc:
+        raise ValidationFailedError(_CANNOT_EDIT[exc.reason]) from exc
+    except Exception as exc:
+        logger.exception("Editing a resume failed unexpectedly")
+        raise ValidationFailedError(
+            "We could not make these changes to your resume automatically. Your resume has "
+            "not been changed. Try fewer changes at once; if it keeps failing, this resume's "
+            "layout is one we cannot edit yet."
+        ) from exc
+
+
 def _encode(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
@@ -126,12 +154,7 @@ async def create(db: AsyncSession, *, user_id: uuid.UUID, payload: TailorRequest
         raise NotFoundError("Upload your resume first, then we can add skills to it.")
 
     original = await storage.get_file(resume.storage_key)
-    try:
-        result, before, after, readable_text, labels = await asyncio.to_thread(
-            _edit, original, payload
-        )
-    except editor.ResumeEditError as exc:
-        raise ValidationFailedError(_CANNOT_EDIT[exc.reason]) from exc
+    result, before, after, readable_text, labels = await _edit_safely(original, payload)
 
     if not result.added and not any(change.applied for change in result.changes):
         reasons = [f"{item.skill}: {_SKIPPED[item.reason]}" for item in result.skipped] + [
@@ -186,10 +209,7 @@ async def keep(db: AsyncSession, *, user_id: uuid.UUID, payload: TailorRequest) 
     if resume is None:
         raise NotFoundError("Upload your resume first, then we can add skills to it.")
     original = await storage.get_file(resume.storage_key)
-    try:
-        result, _before, _after, _text, _labels = await asyncio.to_thread(_edit, original, payload)
-    except editor.ResumeEditError as exc:
-        raise ValidationFailedError(_CANNOT_EDIT[exc.reason]) from exc
+    result, _before, _after, _text, _labels = await _edit_safely(original, payload)
     if not result.added and not any(change.applied for change in result.changes):
         raise ValidationFailedError("Nothing could be changed on your resume, so it was not saved.")
 
@@ -229,8 +249,7 @@ def _compare(
             ),
         )
 
-    checked: list[SkillKeyword] = []
-    for name, required, on_profile in skills:
+    def look_up(name: str) -> tuple[str, str | None]:
         found = keywords.check_skill(name, resume_text)
         status, written_as = found.status, None
         if status == "different_spelling":
@@ -241,15 +260,27 @@ def _compare(
                 written_as = in_section.written_as
             else:
                 status = "missing"
-        checked.append(
-            SkillKeyword(
-                name=name,
-                required=required,
-                status=status,
-                written_as=written_as,
-                on_profile=on_profile,
+        return status, written_as
+
+    checked: list[SkillKeyword] = []
+    for name, required, on_profile in skills:
+        # "React or Angular or Vue" is one requirement met by any one of them.
+        # Each is looked up on its own: the phrase as a whole is not a skill
+        # and must never be offered as something to add to a resume.
+        options = [option.strip() for option in name.split(ALTERNATIVES) if option.strip()]
+        results = [(option, *look_up(option)) for option in options]
+        met = [item for item in results if item[1] != "missing"]
+        for option, status, written_as in met[:1] or results:
+            checked.append(
+                SkillKeyword(
+                    name=option,
+                    required=required,
+                    status=status,  # type: ignore[arg-type]
+                    written_as=written_as,
+                    on_profile=on_profile,
+                    one_of=name if len(options) > 1 else None,
+                )
             )
-        )
     return KeywordCheck(title=title, skills=checked)
 
 
