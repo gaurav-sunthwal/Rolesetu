@@ -62,12 +62,15 @@ To use it, create a free account at rolesetu.vercel.app, upload your resume, the
 Settings and press "Connect extension".
 ```
 
-**Images you have to make** (the store will not accept the listing without the first two)
+**Images** (the store will not accept the listing without the first two)
 
 - Store icon, 128×128: `extension/public/icon/128.png`.
-- At least one screenshot, 1280×800 or 640×400, PNG or JPEG. Suggested set: the score on
-  a job page, the open panel with skills and gaps, the Autofill card on a form.
-- Small promo tile, 440×280. Optional, but listings without one rank lower.
+- Screenshots, 1280×800: the four files in
+  [extension/store/screenshots/](../../extension/store/screenshots/), uploaded in their
+  numbered order. They show the real extension on a made-up careers page with a made-up
+  candidate, so no real person or company appears in the listing. Retake them when the
+  score pill, the panel or the autofill card changes.
+- Small promo tile, 440×280. Not made yet. Optional, but listings without one rank lower.
 
 ## Privacy tab
 
