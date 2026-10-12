@@ -4,6 +4,7 @@ import type { ContentScriptContext } from '#imports';
 import { hasApplicationForm } from '@/lib/autofill/fields';
 import { fill, planAutofill } from '@/lib/autofill/fill';
 import { detectJob } from '@/lib/job-detect';
+import { projectedScore } from '@/lib/projected-score';
 import {
   ask,
   type AutofillData,
@@ -604,7 +605,10 @@ function Result({
   onRescore: () => void;
 }) {
   const [tracking, setTracking] = useState<'idle' | 'saving' | 'done' | 'failed'>('idle');
-  const score = match.score ?? 0;
+  // Skills ticked below. The ring shows where the score would land with them.
+  const [ticked, setTicked] = useState<string[]>([]);
+  const current = match.score ?? 0;
+  const { score, heldBack } = projectedScore(match, ticked);
   const band = bandOf(score);
   // What the page itself calls the job always wins; a title worked out by the
   // server is only a stand-in for when the page gave none.
@@ -636,6 +640,20 @@ function Result({
             <span className="muted small">{company}</span>
           </div>
         </div>
+        {score > current ? (
+          <p className="gain" role="status">
+            <b>
+              {current} → {score}
+            </b>
+            <span className="up">+{score - current}</span>
+            <span className="muted">with the skills you ticked, once saved</span>
+          </p>
+        ) : heldBack ? (
+          <p className="muted small">
+            The skills you ticked will not raise this score: it is held at {match.score_cap} by the
+            experience this job asks for.
+          </p>
+        ) : null}
         {match.experience ? (
           <section className={`note ${match.experience.status}`} aria-label="Experience">
             <strong>{EXPERIENCE_TITLE[match.experience.status]}</strong>
@@ -664,6 +682,7 @@ function Result({
           matchId={match.id}
           tailoring={tailoring}
           setTailoring={setTailoring}
+          onTicked={setTicked}
           onChanged={onRescore}
         />
 
@@ -707,15 +726,19 @@ function ResumeMatcher({
   matchId,
   tailoring,
   setTailoring,
+  onTicked,
   onChanged,
 }: {
   matchId: string;
   tailoring: Tailoring;
   setTailoring: (next: Tailoring) => void;
+  /** Told which skills are ticked, so the score above can show where it would land. */
+  onTicked: (skills: string[]) => void;
   onChanged: () => void;
 }) {
   const [keywords, setKeywords] = useState<Keywords>({ name: 'loading' });
   const [skills, setSkills] = useState<string[]>([]);
+  useEffect(() => onTicked(skills), [skills, onTicked]);
   const [respell, setRespell] = useState<string[]>([]);
   const [useHeadline, setUseHeadline] = useState(false);
   const [headline, setHeadline] = useState('');

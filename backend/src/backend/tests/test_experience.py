@@ -3,7 +3,7 @@
 import pytest
 
 from backend.modules.matches.local.experience import read_experience
-from backend.modules.matches.scoring import check_experience
+from backend.modules.matches.scoring import check_experience, score_cap
 
 
 @pytest.mark.parametrize(
@@ -95,3 +95,17 @@ def test_a_guess_from_the_title_is_softer_than_a_stated_number() -> None:
     )
     assert (score, guessed.status) == (75, "well_short")
     assert "“Senior”" in guessed.summary and "gives no number" in guessed.summary
+
+
+def test_the_stated_cap_is_the_one_applied() -> None:
+    """The app shows what more skills would do to a score using this cap, so it
+    has to be the very limit the score itself was held to.
+    """
+    for source, years_short in [("stated", 4), ("stated", 0.5), ("title", 4), ("preferred", 4)]:
+        score, verdict = check_experience(
+            100, required_min=5, source=source, quote="Senior", candidate_years=5 - years_short
+        )
+        assert score == score_cap(verdict.status, source)
+    assert score_cap("meets", "stated") is None
+    assert score_cap("not_stated", None) is None
+    assert score_cap("open_to_freshers", "fresher") is None

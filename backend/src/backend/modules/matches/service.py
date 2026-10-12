@@ -97,6 +97,11 @@ def to_read(match: Match, now: datetime) -> MatchRead:
         raw_score=match.raw_score,
         seniority_note=match.seniority_note,
         experience=(ExperienceCheck.model_validate(match.experience) if match.experience else None),
+        score_cap=(
+            scoring.score_cap(match.experience["status"], match.experience.get("source"))
+            if match.experience
+            else None
+        ),
         role=match.job.role,
         company=match.job.company,
         url=match.job.url,

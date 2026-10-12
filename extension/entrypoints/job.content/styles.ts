@@ -55,6 +55,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline
 .summary { display: flex; align-items: center; gap: 14px; }
 .summary h2 { margin: 2px 0 0; font-size: 16px; line-height: 1.3; }
 .band { font-size: 12px; font-weight: 600; }
+.ring circle { transition: stroke-dashoffset .5s ease, stroke .3s ease; }
+@media (prefers-reduced-motion: reduce) { .ring circle { transition: none; } }
+.gain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 0; padding: 7px 12px;
+  border-radius: 12px; background: color-mix(in srgb, var(--good) 14%, transparent); font-size: 13px; }
+.gain .up { color: var(--good); font-weight: 700; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .note { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--soft); font-size: 13px;

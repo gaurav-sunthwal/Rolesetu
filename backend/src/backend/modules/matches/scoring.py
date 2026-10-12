@@ -111,6 +111,18 @@ def _years(value: float) -> str:
     return f"{value:g} year{'s' if value != 1 else ''}"
 
 
+def score_cap(status: str, source: str | None) -> int | None:
+    """The highest score a job check may show for this experience verdict, or
+    None when experience does not limit it. Also used to tell the app what the
+    limit is, so it can show what ticking more skills would do to the score.
+    """
+    if status == "well_short":
+        return _WELL_SHORT_CAP if source == "stated" else _SLIGHTLY_SHORT_CAP
+    if status == "short":
+        return _SLIGHTLY_SHORT_CAP
+    return None
+
+
 def check_experience(
     score: int,
     *,
@@ -179,9 +191,9 @@ def check_experience(
     shortfall = required_min - candidate_years
     # A number worked out from the title, or one the posting only prefers, is
     # softer than a stated requirement: it never caps harder than "slightly short".
-    firm = source == "stated"
     well_short = shortfall > _SLIGHTLY_SHORT_YEARS
-    cap = _WELL_SHORT_CAP if (well_short and firm) else _SLIGHTLY_SHORT_CAP
+    cap = score_cap("well_short" if well_short else "short", source)
+    assert cap is not None  # both of those statuses carry a cap
     capped = min(score, cap)
     cap_note = (
         f" Your score is capped at {cap} because of this (your skills alone scored {score})."

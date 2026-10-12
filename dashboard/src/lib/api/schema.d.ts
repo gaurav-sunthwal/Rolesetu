@@ -1135,6 +1135,8 @@ export interface components {
       /** Seniority Note */
       seniority_note: string | null;
       experience: components['schemas']['ExperienceCheck'] | null;
+      /** Score Cap */
+      score_cap?: number | null;
       /** Role */
       role: string | null;
       /** Company */

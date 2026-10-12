@@ -2,7 +2,7 @@
 
 import { ArrowRight, Check, CircleCheck, FileText, Loader2, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
 import { SectionCard } from '@/components/app/section-card';
 import { InlineError } from '@/components/app/states';
@@ -24,7 +24,14 @@ const MAX_SKILLS = 12;
  * resume. Anything missing can be ticked, and one button makes a copy of the
  * resume with those changes in the same style.
  */
-export function GapsCard({ match }: { match: Match }) {
+export function GapsCard({
+  match,
+  onTicked,
+}: {
+  match: Match;
+  /** Told which skills are ticked, so the score above can show where it would land. */
+  onTicked?: (skills: string[]) => void;
+}) {
   const check = useKeywordCheck(match.id);
 
   return (
@@ -52,13 +59,19 @@ export function GapsCard({ match }: { match: Match }) {
           )}
         </div>
       ) : (
-        <Checklist keywords={check.data} />
+        <Checklist keywords={check.data} onTicked={onTicked} />
       )}
     </SectionCard>
   );
 }
 
-function Checklist({ keywords }: { keywords: KeywordCheck }) {
+function Checklist({
+  keywords,
+  onTicked,
+}: {
+  keywords: KeywordCheck;
+  onTicked?: (skills: string[]) => void;
+}) {
   const title = keywords.title;
   const missing = keywords.skills.filter((skill) => skill.status === 'missing');
   const respellable = keywords.skills.filter((skill) => skill.status === 'different_spelling');
@@ -66,6 +79,7 @@ function Checklist({ keywords }: { keywords: KeywordCheck }) {
 
   const [extra, setExtra] = useState<string[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
+  useEffect(() => onTicked?.(skills), [skills, onTicked]);
   const [respell, setRespell] = useState<string[]>([]);
   const [useHeadline, setUseHeadline] = useState(false);
   const [headline, setHeadline] = useState(title?.suggested ?? '');

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { AddApplicationDialog } from '@/features/applications/components/add-application-dialog';
 import { ExperienceNote } from '@/features/matches/components/experience-note';
 import { ScoreRing } from '@/features/matches/components/score-ring';
-import { bandOf, VERDICT_META } from '@/features/matches/score';
+import { bandOf, projectedScore, VERDICT_META } from '@/features/matches/score';
 import { GapsCard } from '@/features/tailoring/components/gaps-card';
 import type { Match, SkillResult } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,10 @@ export function MatchResult({
   onCheckAnother: () => void;
 }) {
   const [tracking, setTracking] = useState(false);
-  const score = match.score ?? 0;
+  // Skills ticked in the resume card. The ring shows where the score would land with them.
+  const [ticked, setTicked] = useState<string[]>([]);
+  const current = match.score ?? 0;
+  const { score, heldBack } = projectedScore(match, ticked);
   const band = bandOf(score);
   const required = match.skill_results.filter((skill) => skill.required);
   const niceToHave = match.skill_results.filter((skill) => !skill.required);
@@ -37,6 +40,22 @@ export function MatchResult({
         <ScoreRing score={score} />
         <div className="min-w-0 flex-1">
           <p className={cn('text-sm font-semibold', band.text)}>{band.label}</p>
+          {score > current ? (
+            <p className="bg-success/15 text-foreground mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium">
+              <span className="tabular-nums">
+                {current} → {score}
+              </span>
+              <span className="text-success font-semibold">+{score - current}</span>
+              <span className="text-muted-foreground font-normal">
+                with the skills you ticked, once saved
+              </span>
+            </p>
+          ) : heldBack ? (
+            <p className="text-muted-foreground mt-2 text-sm">
+              The skills you ticked will not raise this score: it is held at {match.score_cap} by
+              the experience this job asks for.
+            </p>
+          ) : null}
           <h2 className="mt-1 text-xl font-bold tracking-tight text-balance sm:text-2xl">
             {title}
           </h2>
@@ -93,7 +112,7 @@ export function MatchResult({
           <SkillGroup label="Nice to have" skills={niceToHave} />
         </SectionCard>
 
-        <GapsCard key={match.id} match={match} />
+        <GapsCard key={match.id} match={match} onTicked={setTicked} />
       </div>
 
       <AddApplicationDialog

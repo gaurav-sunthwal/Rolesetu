@@ -69,6 +69,9 @@ class MatchRead(BaseModel):
     raw_score: int | None
     seniority_note: str | None
     experience: ExperienceCheck | None
+    # The most this job's score can be while the user is short on experience,
+    # or None when experience does not limit it.
+    score_cap: int | None = None
     role: str | None
     company: str | None
     url: str | None
