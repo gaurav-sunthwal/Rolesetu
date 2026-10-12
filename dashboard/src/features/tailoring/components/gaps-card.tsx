@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { KeywordCheck, TailoredResume, TailorRequest } from '@/features/tailoring/api';
 import { TailorPreviewDialog } from '@/features/tailoring/components/tailor-preview-dialog';
+import { UpdateProgress } from '@/features/tailoring/components/update-progress';
 import { useKeywordCheck, useTailorResume } from '@/features/tailoring/hooks';
 import { ApiError, errorMessage } from '@/lib/api/client';
 import type { Match } from '@/lib/api/types';
@@ -244,6 +245,11 @@ function Checklist({ keywords }: { keywords: KeywordCheck }) {
               ? 'Tick what to change'
               : `Update my resume (${count} ${count === 1 ? 'change' : 'changes'})`}
         </Button>
+        {tailor.isPending ? (
+          <div className="mt-3">
+            <UpdateProgress />
+          </div>
+        ) : null}
         {tailor.isError && !result ? (
           <div className="mt-3">
             <InlineError>{errorMessage(tailor.error)}</InlineError>

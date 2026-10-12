@@ -98,6 +98,23 @@ ul { list-style: none; margin: 0; padding: 0; }
 .tailored strong { display: block; padding-right: 28px; }
 .tailored p { margin: 8px 0 0; }
 .added { margin-top: 6px; font-size: 13px; }
+.anchor { scroll-margin-top: 8px; }
+.tailored.done { border-color: var(--good); }
+.actions { position: sticky; bottom: -16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin: 12px -14px 0; padding: 12px 14px; background: var(--soft); border-top: 1px solid var(--line); }
+.actions .btn.wide { margin-top: 0; }
+.actions .confirm, .actions .saved { grid-column: 1 / -1; margin: 0; }
+.tailored .ok { color: var(--good); }
+.bar { height: 8px; margin-top: 12px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 999px; background: var(--brand); transition: width .2s linear; }
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+.tabs { display: inline-flex; gap: 2px; margin-top: 12px; padding: 3px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+.tab { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font-size: 13px; font-weight: 600; color: var(--muted); }
+.tab.on { background: var(--brand); color: #fff; }
+.previewbtn { position: relative; display: block; width: 100%; margin-top: 10px; padding: 0; border: 0; background: transparent; text-align: left; }
+.previewbtn .preview { margin-top: 0; }
+.previewbtn .zoom { position: absolute; right: 8px; bottom: 8px; padding: 3px 9px; border-radius: 999px;
+  background: rgba(20, 21, 26, .78); color: #fff; font-size: 12px; font-weight: 600; }
 .saved { color: var(--good); font-weight: 600; font-size: 13px; }
 .confirm { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
 .confirm p { margin: 0; }

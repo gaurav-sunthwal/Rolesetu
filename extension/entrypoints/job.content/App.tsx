@@ -745,8 +745,21 @@ function ResumeMatcher({
     };
   }, [matchId, resumeVersion]);
 
-  const card =
-    tailoring.name === 'done' ? (
+  // Where the progress and the finished resume appear. The button that starts
+  // an update sits further down, so this is scrolled into view each time:
+  // otherwise the result arrives above the part of the panel being looked at.
+  const resultTop = useRef<HTMLDivElement>(null);
+  const showing = tailoring.name === 'working' || tailoring.name === 'done';
+  useEffect(() => {
+    if (!showing) return;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    resultTop.current?.scrollIntoView({ block: 'start', behavior: calm ? 'auto' : 'smooth' });
+  }, [showing, tailoring]);
+
+  const resumeBlock =
+    tailoring.name === 'working' ? (
+      <UpdateProgress />
+    ) : tailoring.name === 'done' ? (
       <TailoredCard
         tailored={tailoring.result}
         changes={tailoring.changes}
@@ -758,12 +771,20 @@ function ResumeMatcher({
         onClose={() => setTailoring({ name: 'idle' })}
       />
     ) : null;
+  const card = (
+    <>
+      <div ref={resultTop} className="anchor" />
+      {resumeBlock}
+    </>
+  );
+  // Once a copy exists, the checklist below is for changing it further.
+  const heading = tailoring.name === 'done' ? 'Change something else' : 'Match your resume to this job';
 
   if (keywords.name === 'loading') {
     return (
       <>
         {card}
-        <h3>Match your resume to this job</h3>
+        <h3>{heading}</h3>
         <p className="muted small">Comparing this job with your resume…</p>
       </>
     );
@@ -772,7 +793,7 @@ function ResumeMatcher({
     return (
       <>
         {card}
-        <h3>Match your resume to this job</h3>
+        <h3>{heading}</h3>
         <p className="muted small hint">{keywords.message}</p>
         {keywords.noResume ? (
           <button
@@ -814,7 +835,7 @@ function ResumeMatcher({
     return (
       <>
         {card}
-        <h3>Match your resume to this job</h3>
+        <h3>{heading}</h3>
         <p className="muted small">
           {title?.present
             ? `Your resume already uses this job's wording, including the title “${title.wanted}”.`
@@ -831,8 +852,12 @@ function ResumeMatcher({
   return (
     <>
       {card}
-      <h3>Match your resume to this job</h3>
-      <p className="muted small hint">Tick what to change. You get a copy in the same style.</p>
+      <h3>{heading}</h3>
+      <p className="muted small hint">
+        {tailoring.name === 'done'
+          ? 'Tick more or untick some, then update again. You get a fresh copy with everything ticked.'
+          : 'Tick what to change. You get a copy in the same style.'}
+      </p>
 
       {canRetitle && title ? (
         <div className="retitle">
@@ -923,7 +948,7 @@ function ResumeMatcher({
           {tailoring.name === 'working' ? <Spinner /> : null}
           {tailoring.name === 'working'
             ? 'Updating your resume…'
-            : `Update my resume (${count} ${count === 1 ? 'change' : 'changes'})`}
+            : `${tailoring.name === 'done' ? 'Update again' : 'Update my resume'} (${count} ${count === 1 ? 'change' : 'changes'})`}
         </button>
       ) : null}
       {tailoring.name === 'failed' ? (
@@ -942,6 +967,59 @@ type Keeping =
   | { name: 'saved' }
   | { name: 'failed'; message: string };
 
+/**
+ * Shown while the resume is being updated. The server does this in one step
+ * and reports nothing along the way, so the bar is an estimate from how long
+ * the work usually takes: quick at first, slowing down, and never reaching the
+ * end until the result is really in.
+ */
+function UpdateProgress() {
+  const [percent, setPercent] = useState(5);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const seconds = (Date.now() - started) / 1000;
+      setPercent(Math.min(95, Math.round(5 + 90 * (1 - Math.exp(-seconds / 2.2)))));
+    }, 150);
+    return () => clearInterval(timer);
+  }, []);
+  const step =
+    percent < 35
+      ? 'Reading your resume'
+      : percent < 65
+        ? 'Making your changes'
+        : percent < 88
+          ? 'Checking a job site can still read it'
+          : 'Preparing the preview';
+
+  return (
+    <section className="tailored" aria-live="polite">
+      <strong>Updating your resume</strong>
+      <div
+        className="bar"
+        role="progressbar"
+        aria-label="Updating your resume"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+      >
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <p className="muted small">
+        {step}… {percent}%
+      </p>
+    </section>
+  );
+}
+
+function openImage(base64: string) {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+  window.open(url, '_blank', 'noopener');
+  // Long enough for the new tab to load it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function TailoredCard({
   tailored,
   changes,
@@ -954,7 +1032,10 @@ function TailoredCard({
   onClose: () => void;
 }) {
   const [keeping, setKeeping] = useState<Keeping>({ name: 'idle' });
+  const [view, setView] = useState<'after' | 'before'>('after');
   const count = tailored.added.length + tailored.changes.filter((change) => change.applied).length;
+  const pages = view === 'after' ? tailored.after : tailored.before;
+  const page = pages[0];
 
   async function save() {
     setKeeping({ name: 'saving' });
@@ -965,16 +1046,56 @@ function TailoredCard({
   }
 
   return (
-    <section className="tailored" aria-label="Your updated resume">
+    <section className="tailored done" aria-label="Your updated resume">
       <button type="button" className="icon close" aria-label="Dismiss" onClick={onClose}>
         ×
       </button>
-      <strong>
-        {count} {count === 1 ? 'change' : 'changes'} ready for your resume
+      <strong className="ok">
+        ✓ Your resume is updated ({count} {count === 1 ? 'change' : 'changes'})
       </strong>
+      <p className="muted small">
+        Look it over, then download it or save it. Nothing is kept until you do.
+      </p>
+
+      {/* The resume first: seeing it is how the user knows it really changed. */}
+      <div className="tabs" role="tablist" aria-label="Which version to show">
+        {(['after', 'before'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="tab"
+            aria-selected={view === option}
+            className={view === option ? 'tab on' : 'tab'}
+            onClick={() => setView(option)}
+          >
+            {option === 'after' ? 'Updated' : 'Original'}
+          </button>
+        ))}
+      </div>
+      {page ? (
+        <button
+          type="button"
+          className="previewbtn"
+          title="Open full size in a new tab"
+          onClick={() => openImage(page)}
+        >
+          <img
+            className="preview"
+            src={`data:image/png;base64,${page}`}
+            alt={`${view === 'after' ? 'Updated' : 'Original'} resume, page 1`}
+          />
+          <span className="zoom">Open full size</span>
+        </button>
+      ) : null}
+      {pages.length > 1 ? (
+        <p className="muted small">Page 1 of {pages.length} is shown. The download has them all.</p>
+      ) : null}
+
+      <p className="group">What changed</p>
       <ul className="added">
         {tailored.changes.map((change) => (
           <li key={`${change.kind}-${change.after}`} className={change.applied ? '' : 'muted'}>
+            {change.applied ? '✓ ' : '✕ '}
             {change.kind === 'headline' ? 'Headline: ' : 'Respelled: '}
             {change.before ? `${change.before} → ` : ''}
             <b>{change.after}</b>
@@ -983,64 +1104,60 @@ function TailoredCard({
         ))}
         {tailored.added.map((item) => (
           <li key={item.skill}>
-            Added <b>{item.skill}</b>
+            ✓ Added <b>{item.skill}</b>
             {item.row ? <span className="muted"> in {item.row}</span> : null}
             {item.exact_font ? null : <span className="muted"> (look-alike font, check it)</span>}
           </li>
         ))}
         {tailored.skipped.map((item) => (
           <li key={item.skill} className="muted">
-            <b>{item.skill}</b> not added. {item.message}
+            ✕ <b>{item.skill}</b> not added. {item.message}
           </li>
         ))}
       </ul>
-      {tailored.after[0] ? (
-        <img
-          className="preview"
-          src={`data:image/png;base64,${tailored.after[0]}`}
-          alt="Your updated resume, page 1"
-        />
-      ) : null}
 
-      <button type="button" className="btn primary wide" onClick={() => downloadPdf(tailored)}>
-        Download PDF
-      </button>
-
-      {keeping.name === 'saved' ? (
-        <p className="saved" role="status">
-          ✓ Saved as your resume. Every job check now counts these skills.
-        </p>
-      ) : keeping.name === 'asking' || keeping.name === 'saving' ? (
-        <div className="confirm">
-          <p className="small">
-            Replace the resume saved in Rolesetu with this one? New skills are added to your
-            profile too.
-          </p>
-          <div className="row">
-            <button
-              type="button"
-              className="btn"
-              disabled={keeping.name === 'saving'}
-              onClick={() => setKeeping({ name: 'idle' })}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={keeping.name === 'saving'}
-              onClick={() => void save()}
-            >
-              {keeping.name === 'saving' ? <Spinner /> : null}
-              {keeping.name === 'saving' ? 'Saving…' : 'Replace'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="btn wide" onClick={() => setKeeping({ name: 'asking' })}>
-          Save as my resume
+      {/* Kept in view while the card is on screen, so the next step is never below the fold. */}
+      <div className="actions">
+        <button type="button" className="btn primary wide" onClick={() => downloadPdf(tailored)}>
+          Download PDF
         </button>
-      )}
+
+        {keeping.name === 'saved' ? (
+          <p className="saved" role="status">
+            ✓ Saved as your resume. Every job check now counts these skills.
+          </p>
+        ) : keeping.name === 'asking' || keeping.name === 'saving' ? (
+          <div className="confirm">
+            <p className="small">
+              Replace the resume saved in Rolesetu with this one? New skills are added to your
+              profile too.
+            </p>
+            <div className="row">
+              <button
+                type="button"
+                className="btn"
+                disabled={keeping.name === 'saving'}
+                onClick={() => setKeeping({ name: 'idle' })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={keeping.name === 'saving'}
+                onClick={() => void save()}
+              >
+                {keeping.name === 'saving' ? <Spinner /> : null}
+                {keeping.name === 'saving' ? 'Saving…' : 'Replace'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="btn wide" onClick={() => setKeeping({ name: 'asking' })}>
+            Save as my resume
+          </button>
+        )}
+      </div>
       {keeping.name === 'failed' ? (
         <p className="problem" role="alert">
           {keeping.message}
@@ -1048,8 +1165,8 @@ function TailoredCard({
       ) : null}
 
       <p className="muted small">
-        Same style as your original; only the words listed here changed. Download it for this
-        job only, or save it so these skills count in every job check from now on.
+        Download it to use for this job only. Save it and these skills count in every job check
+        from now on.
       </p>
     </section>
   );
