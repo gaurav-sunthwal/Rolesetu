@@ -85,6 +85,18 @@ const EXPERIENCE_TITLE = {
   not_stated: 'Experience: not stated',
 } as const;
 
+const SETTLE_MS = 700;
+const LOOK_EVERY_MS = 2000;
+
+/**
+ * Enough of a job to tell it from another one. Only the start of the
+ * description is used: pages often load the rest a moment later, and that must
+ * not look like a different job.
+ */
+function signatureOf(job: DetectedJob): string {
+  return `${job.title ?? ''}|${job.company ?? ''}|${job.description.slice(0, 300)}`;
+}
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Pages often fill in after load, so look a few times before giving up. */
@@ -278,8 +290,10 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // floating badge is shown instead.
   const [pills, setPills] = useState(0);
   const run = useRef(0);
-  // The address the panel's contents belong to.
-  const shownFor = useRef(window.location.href);
+  // What the job on screen looked like when it was last read: the way to tell
+  // that the page is now showing a different one.
+  const shown = useRef<string | null>(null);
+  const busy = useRef(false);
   // Kept here, above the panel, so closing and reopening the panel does not lose
   // an updated resume the user has not downloaded or saved yet.
   const [tailoring, setTailoring] = useState<Tailoring>({ name: 'idle' });
@@ -287,11 +301,14 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   const check = useCallback(async () => {
     const id = (run.current += 1);
     const stale = () => id !== run.current || ctx.isInvalid;
+    busy.current = true;
     setPhase({ name: 'looking' });
 
     // Asked for by the user: take the page's word. Found by ourselves: be sure.
     const job = await findJob(!manual);
     if (stale()) return;
+    shown.current = job ? signatureOf(job) : null;
+    busy.current = false;
     if (!job) return setPhase({ name: 'no-job' });
 
     const connection = await ask({ type: 'connection' });
@@ -316,26 +333,48 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
 
   useEffect(() => {
     void check();
-    // Job sites swap listings without reloading the page; score the new one.
-    ctx.addEventListener(window, 'wxt:locationchange', () => {
-      // The browser also reports a file download as a navigation. The page
-      // has not changed then, and closing the panel would throw away the
-      // resume the user just asked to download.
-      if (window.location.href === shownFor.current) return;
-      shownFor.current = window.location.href;
-      setOpen(false);
+
+    // Job sites swap the listing on screen without loading a new page: a click
+    // in a results list replaces the job beside it, sometimes without even
+    // changing the address. So the page itself is watched. Whenever it settles,
+    // the job on it is read again, and if it is not the one already scored,
+    // everything starts over for the new one.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastLook = 0;
+    const look = () => {
+      if (ctx.isInvalid || busy.current) return;
+      if (document.hidden) return;
+      lastLook = Date.now();
+      const job = detectJob(document, window.location.href, !manual);
+      if ((job ? signatureOf(job) : null) === shown.current) return;
+      // An updated resume was for the previous job: it does not carry over.
       setTailoring({ name: 'idle' });
       void check();
-    });
+    };
+    const lookSoon = () => {
+      clearTimeout(timer);
+      // Wait for the page to finish redrawing, and never read it more than once every two seconds.
+      timer = setTimeout(look, Math.max(SETTLE_MS, LOOK_EVERY_MS - (Date.now() - lastLook)));
+    };
+    const observer = new MutationObserver(lookSoon);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    // A change of address is the same signal, usually arriving before the page has redrawn.
+    ctx.addEventListener(window, 'wxt:locationchange', lookSoon);
+    const onVisible = () => !document.hidden && lookSoon();
+    document.addEventListener('visibilitychange', onVisible);
+
     const reopen = () => setOpen(true);
     window.addEventListener('rolesetu:open', reopen);
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
     window.addEventListener('keydown', onKey);
     return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('rolesetu:open', reopen);
       window.removeEventListener('keydown', onKey);
     };
-  }, [check, ctx]);
+  }, [check, ctx, manual]);
 
   const tracking = useApplyTracking(
     phase.name === 'ready' ? trackedJobOf(phase.job, phase.match) : null,
