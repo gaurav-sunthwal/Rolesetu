@@ -15,7 +15,9 @@ const projectId = z
 export function Clarity() {
   if (!projectId) return null;
   return (
-    <Script id="clarity" strategy="afterInteractive">
+    // Not id="clarity": a browser exposes an element's id as a global of the same
+    // name, which would put this <script> where Clarity expects its own function.
+    <Script id="ms-clarity-loader" strategy="afterInteractive">
       {`(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${projectId}");`}
     </Script>
   );
