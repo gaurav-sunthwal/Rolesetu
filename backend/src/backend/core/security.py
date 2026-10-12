@@ -3,36 +3,17 @@ and sends its ID token; the browser extension sends a key issued from Settings.
 """
 
 from dataclasses import dataclass
-from functools import lru_cache
 
-import firebase_admin
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from firebase_admin import auth as firebase_auth
-from firebase_admin import credentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.config import get_settings
 from backend.core.exceptions import ForbiddenError, UnauthorizedError
+from backend.core.firebase_tokens import InvalidTokenError, verify_id_token
 from backend.db.session import get_db
 from backend.modules.extension import service as extension_service
 
 _bearer_scheme = HTTPBearer(auto_error=False)
-
-
-@lru_cache
-def _init_firebase_app() -> None:
-    settings = get_settings()
-    if firebase_admin._apps:
-        return
-    if settings.firebase_service_account_path:
-        cred = credentials.Certificate(settings.firebase_service_account_path)
-        firebase_admin.initialize_app(cred)
-    else:
-        options = (
-            {"projectId": settings.firebase_project_id} if settings.firebase_project_id else None
-        )
-        firebase_admin.initialize_app(options=options)
 
 
 @dataclass(frozen=True)
@@ -63,10 +44,9 @@ async def get_current_user(
             )
         return CurrentUser(uid=user.firebase_uid, email=user.email, via_extension=True)
 
-    _init_firebase_app()
     try:
-        decoded = firebase_auth.verify_id_token(token)
-    except Exception as exc:
+        decoded = await verify_id_token(token)
+    except InvalidTokenError as exc:
         raise UnauthorizedError("Invalid or expired token") from exc
 
     return CurrentUser(uid=decoded["uid"], email=decoded.get("email"))
