@@ -321,11 +321,10 @@ const FEATURES: Feature[] = [
     id: 'inbox',
     icon: Inbox,
     title: 'Inbox updates',
-    body: 'Read-only Gmail access moves a status when a recruiter replies.',
+    body: 'Read-only Gmail access moves a status when a recruiter replies and lists your interviews.',
     windowTitle: 'gmail sync',
-    meta: 'coming soon',
+    meta: 'read-only',
     panel: <InboxPanel />,
-    soon: true,
   },
   {
     id: 'claude',

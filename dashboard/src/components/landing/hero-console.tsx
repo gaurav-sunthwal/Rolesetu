@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, FileText, ListChecks, Mail, ScanSearch } from 'lucide-react';
+import { ArrowRight, FileText, ListChecks, ScanSearch } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 const MODES = [
   { id: 'check', label: 'Check a job', icon: ScanSearch, action: 'Score this job' },
   { id: 'tailor', label: 'Tailor resume', icon: FileText, action: 'Tailor my resume' },
-  { id: 'email', label: 'Draft email', icon: Mail, action: 'Draft the email' },
   { id: 'track', label: 'Track', icon: ListChecks, action: 'Add to tracker' },
 ] as const;
 

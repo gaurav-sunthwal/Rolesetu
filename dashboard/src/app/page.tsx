@@ -1,23 +1,31 @@
 import { ArrowRight, ShieldCheck } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { FaqList } from '@/components/landing/faq';
 import { FeatureShowcase } from '@/components/landing/feature-showcase';
 import { HeroConsole } from '@/components/landing/hero-console';
-import { LandingCta, LandingLoginLink } from '@/components/landing/landing-cta';
+import { JsonLd } from '@/components/landing/json-ld';
+import { LandingCta } from '@/components/landing/landing-cta';
 import { ResumeEditDemo } from '@/components/landing/resume-edit-demo';
 import { Display, Eyebrow, Texture } from '@/components/brand/primitives';
 import { SampleMatch } from '@/components/landing/sample-match';
-import { ThemeToggle } from '@/components/layout/theme-toggle';
-import { Logo } from '@/components/logo';
+import { SiteFooter } from '@/components/landing/site-footer';
+import { SiteHeader } from '@/components/landing/site-header';
+import {
+  applicationData,
+  faqData,
+  graph,
+  organisationData,
+  websiteData,
+} from '@/components/landing/structured-data';
 import { buttonVariants } from '@/components/ui/button';
+import { FEATURE_PAGES, featurePath, HOME_FAQS } from '@/content/marketing';
 import { cn } from '@/lib/utils';
 
-const NAV_LINKS = [
-  { href: '#resume', label: 'Resume match' },
-  { href: '#features', label: 'Features' },
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#control', label: 'Your control' },
-] as const;
+export const metadata: Metadata = { alternates: { canonical: '/' } };
+
+const JOB_SITES = ['LinkedIn', 'Naukri', 'Indeed', 'Company career pages'] as const;
 
 const SCORE_FACTS = [
   { title: 'Judged per skill', body: 'Strong, partial or missing.' },
@@ -50,6 +58,10 @@ const STEPS = [
     title: 'Tracked for you',
     body: 'The job is saved when you press Apply and marked as applied when the site confirms it.',
   },
+  {
+    title: 'Replies move it forward',
+    body: 'Connect Gmail with read-only access and interview invites, rejections and offers update the application for you.',
+  },
 ] as const;
 
 const PROMISES = [
@@ -59,6 +71,10 @@ const PROMISES = [
   { label: 'Never', body: 'Changes a job title, employer or date on your resume.' },
   { label: 'Never', body: 'Overwrites what you typed into a form.' },
   { label: 'Not stored', body: 'A tailored resume is kept only if you choose to keep it.' },
+  {
+    label: 'Read-only',
+    body: 'Gmail access cannot send or delete, and mail bodies are never stored.',
+  },
   { label: 'Anytime', body: 'Download everything we hold about you as one file.' },
 ] as const;
 
@@ -68,29 +84,15 @@ const GUTTER = 'px-5 sm:px-10 lg:px-16';
 export default function LandingPage() {
   return (
     <div className="bg-background text-foreground flex min-h-svh flex-col overflow-x-clip">
-      <header className="bg-background/85 sticky top-0 z-40 backdrop-blur-lg">
-        <div className="relative mx-auto flex h-16 w-full max-w-6xl items-center px-5">
-          <Link href="/" aria-label="Rolesetu home">
-            <Logo />
-          </Link>
-          <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 text-sm font-medium md:flex">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-foreground/70 hover:text-foreground transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <LandingLoginLink />
-            <LandingCta size="nav" />
-          </div>
-        </div>
-      </header>
+      <JsonLd
+        data={graph(
+          organisationData(),
+          websiteData(),
+          applicationData(FEATURE_PAGES.map((page) => page.summary)),
+          faqData(HOME_FAQS),
+        )}
+      />
+      <SiteHeader />
 
       <main className="flex-1">
         <section className="relative isolate overflow-hidden">
@@ -102,14 +104,15 @@ export default function LandingPage() {
 
           <div className="mx-auto w-full max-w-6xl px-5 pt-20 pb-48 text-center sm:pt-28 sm:pb-64">
             <p className="text-foreground/70 text-sm font-medium">
-              Score it. Match your resume. Apply. Track it.
+              Job match score · Resume tailoring · Autofill · Application tracker
             </p>
             <Display as="h1" className="mx-auto mt-5 max-w-4xl sm:text-6xl lg:text-7xl">
               Know your fit <span className="text-primary">before you apply</span>
             </Display>
             <p className="text-foreground/75 mx-auto mt-6 max-w-xl text-lg text-pretty">
-              Rolesetu scores any job against your real experience, puts its wording into your own
-              resume, fills the application, and tracks where each one stands.
+              Rolesetu scores any job description against your resume, puts the job&apos;s keywords
+              into your own resume PDF, fills the application form, and tracks where each
+              application stands.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <LandingCta />
@@ -130,7 +133,51 @@ export default function LandingPage() {
         </section>
 
         <div className={RAILS}>
-          <section className={cn(GUTTER, 'py-20 sm:py-28')}>
+          <section id="what" className={cn(GUTTER, 'scroll-mt-16 py-20 sm:py-28')}>
+            <div className="max-w-3xl">
+              <Eyebrow>What Rolesetu is</Eyebrow>
+              <Display className="mt-6">
+                <span className="block">One assistant for</span>
+                <span className="text-primary block">the whole job application.</span>
+              </Display>
+              <p className="text-muted-foreground mt-6 text-lg text-pretty">
+                Rolesetu is a web app and browser extension for people applying to jobs. Upload your
+                resume once. For every job after that it tells you how well you fit and why, helps
+                you put the job&apos;s wording into your resume, fills the application form, and
+                keeps a record of what you applied to and what came back. It prepares the work; you
+                decide what gets sent.
+              </p>
+            </div>
+
+            <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURE_PAGES.map((page) => (
+                <li key={page.slug}>
+                  <Link
+                    href={featurePath(page.slug)}
+                    className="group bg-card hover:border-foreground/30 focus-visible:ring-ring/60 flex h-full flex-col rounded-2xl border p-5 transition-colors outline-none focus-visible:ring-2"
+                  >
+                    <h3 className="flex items-center justify-between gap-3 font-medium">
+                      {page.name}
+                      <ArrowRight className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                    </h3>
+                    <p className="text-muted-foreground mt-2 text-sm">{page.summary}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-12 flex flex-wrap items-center gap-x-3 gap-y-3 border-t pt-6 text-sm">
+              <p className="text-muted-foreground mr-2">Reads jobs on</p>
+              {JOB_SITES.map((site) => (
+                <span key={site} className="bg-muted rounded-full px-3 py-1 font-medium">
+                  {site}
+                </span>
+              ))}
+              <p className="text-muted-foreground">or paste a link from anywhere else.</p>
+            </div>
+          </section>
+
+          <section className={cn(GUTTER, 'border-t border-dashed py-20 sm:py-28')}>
             <div className="grid items-center gap-12 lg:grid-cols-[5fr_7fr] lg:gap-16">
               <div>
                 <Display>
@@ -142,13 +189,13 @@ export default function LandingPage() {
                   partial or missing. The number is worked out from those verdicts, so you can see
                   exactly where it came from.
                 </p>
-                <a
-                  href="#how-it-works"
+                <Link
+                  href={featurePath('job-match-score')}
                   className="text-primary mt-7 inline-flex items-center gap-2 text-sm font-medium hover:underline"
                 >
                   See how a job gets scored
                   <ArrowRight className="size-4" />
-                </a>
+                </Link>
               </div>
               <div className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.5_0.24_292)] p-4 sm:p-8">
                 <Texture className="-z-10 opacity-25" />
@@ -172,7 +219,7 @@ export default function LandingPage() {
           >
             <div className="grid items-center gap-12 lg:grid-cols-[7fr_5fr] lg:gap-16">
               <div className="lg:order-last">
-                <Eyebrow>New</Eyebrow>
+                <Eyebrow>Resume match</Eyebrow>
                 <Display className="mt-6">
                   <span className="block">Still your resume.</span>
                   <span className="text-primary block">Now in the job&apos;s words.</span>
@@ -182,6 +229,13 @@ export default function LandingPage() {
                   written differently. Tick what is true and the PDF you uploaded is edited in
                   place, not rebuilt from a template.
                 </p>
+                <Link
+                  href={featurePath('resume-keyword-match')}
+                  className="text-primary mt-7 inline-flex items-center gap-2 text-sm font-medium hover:underline"
+                >
+                  See how resume tailoring works
+                  <ArrowRight className="size-4" />
+                </Link>
               </div>
               <div className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.43_0.11_155)] p-4 sm:p-8">
                 <Texture className="-z-10 opacity-20" />
@@ -227,7 +281,7 @@ export default function LandingPage() {
               <div className="lg:sticky lg:top-28 lg:self-start">
                 <Display>
                   <span className="block">From resume to reply</span>
-                  <span className="text-primary block">in four steps.</span>
+                  <span className="text-primary block">in five steps.</span>
                 </Display>
                 <p className="text-muted-foreground mt-6 max-w-md text-lg">
                   Set up once. After that, each job takes a few seconds to check and a few clicks to
@@ -268,7 +322,7 @@ export default function LandingPage() {
                   </p>
                 </li>
               ))}
-              <li className="relative isolate flex min-h-40 flex-col overflow-hidden bg-[oklch(0.5_0.14_155)] p-6 lg:col-span-2">
+              <li className="relative isolate flex min-h-40 flex-col overflow-hidden bg-[oklch(0.5_0.14_155)] p-6 sm:col-span-2 lg:col-span-1">
                 <Texture className="-z-10 opacity-20" />
                 <ShieldCheck className="size-5" />
                 <p className="mt-auto pt-8 text-lg leading-snug font-medium tracking-tight">
@@ -280,7 +334,17 @@ export default function LandingPage() {
         </section>
 
         <div className={RAILS}>
-          <section className={cn(GUTTER, 'py-24 sm:py-32')}>
+          <section id="faq" className={cn(GUTTER, 'scroll-mt-16 py-20 sm:py-28')}>
+            <div className="grid gap-12 lg:grid-cols-[5fr_7fr] lg:gap-16">
+              <Display>
+                <span className="block">Questions,</span>
+                <span className="text-primary block">answered plainly.</span>
+              </Display>
+              <FaqList faqs={HOME_FAQS} />
+            </div>
+          </section>
+
+          <section className={cn(GUTTER, 'border-t border-dashed py-24 sm:py-32')}>
             <Display className="sm:text-6xl">
               <span className="block">Stop guessing which jobs</span>
               <span className="text-primary block">are worth your time.</span>
@@ -295,33 +359,7 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <footer className="overflow-hidden border-t">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 pt-10 md:flex-row md:items-center md:justify-between">
-          <div>
-            <Logo />
-            <p className="text-muted-foreground mt-3 max-w-xs text-sm">
-              Built for job seekers who would rather apply well than apply often.
-            </p>
-          </div>
-          <nav className="flex flex-wrap gap-x-8 gap-y-2 text-sm font-medium">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-foreground/70 hover:text-foreground transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-        </div>
-        <p
-          aria-hidden
-          className="text-foreground/6 mt-6 -mb-[4vw] text-center text-[17vw] leading-none font-semibold tracking-[-0.06em] select-none"
-        >
-          Rolesetu
-        </p>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
