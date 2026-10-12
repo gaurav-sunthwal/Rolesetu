@@ -5,6 +5,9 @@ import { hasApplicationForm } from '@/lib/autofill/fields';
 import { fill, planAutofill } from '@/lib/autofill/fill';
 import { detectJob } from '@/lib/job-detect';
 import { projectedScore } from '@/lib/projected-score';
+import { sameJob } from '@/lib/same-job';
+import { whenSettled } from '@/lib/settled';
+import { Mark } from '@/lib/mark';
 import {
   ask,
   type AutofillData,
@@ -87,15 +90,6 @@ const EXPERIENCE_TITLE = {
 
 const SETTLE_MS = 700;
 const LOOK_EVERY_MS = 2000;
-
-/**
- * Enough of a job to tell it from another one. Only the start of the
- * description is used: pages often load the rest a moment later, and that must
- * not look like a different job.
- */
-function signatureOf(job: DetectedJob): string {
-  return `${job.title ?? ''}|${job.company ?? ''}|${job.description.slice(0, 300)}`;
-}
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -218,6 +212,7 @@ type Autofill =
   | { name: 'failed'; message: string };
 
 const RESCAN_AFTER_MS = 800;
+const RESCAN_AT_MOST_MS = 3000;
 
 /**
  * Offers to fill an application form from the user's profile. The form is
@@ -249,15 +244,12 @@ function useAutofill(ctx: ContentScriptContext) {
 
   useEffect(() => {
     void scan();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const observer = new MutationObserver(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => void scan(), RESCAN_AFTER_MS);
-    });
+    const rescan = whenSettled(() => void scan(), RESCAN_AFTER_MS, RESCAN_AT_MOST_MS);
+    const observer = new MutationObserver(rescan);
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
-      clearTimeout(timer);
+      rescan.cancel();
     };
   }, [scan]);
 
@@ -290,9 +282,9 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // floating badge is shown instead.
   const [pills, setPills] = useState(0);
   const run = useRef(0);
-  // What the job on screen looked like when it was last read: the way to tell
-  // that the page is now showing a different one.
-  const shown = useRef<string | null>(null);
+  // The job on screen when it was last read: the way to tell that the page is
+  // now showing a different one.
+  const shown = useRef<DetectedJob | null>(null);
   const busy = useRef(false);
   // Kept here, above the panel, so closing and reopening the panel does not lose
   // an updated resume the user has not downloaded or saved yet.
@@ -307,7 +299,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     // Asked for by the user: take the page's word. Found by ourselves: be sure.
     const job = await findJob(!manual);
     if (stale()) return;
-    shown.current = job ? signatureOf(job) : null;
+    shown.current = job;
     busy.current = false;
     if (!job) return setPhase({ name: 'no-job' });
 
@@ -326,9 +318,17 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // The profile changed (skills were added), so the same job is scored again
   // in the background. The panel stays as it is until the new score arrives.
   const rescore = useCallback(async (job: DetectedJob) => {
+    // A save that finishes after the page moved on must not put the old job back.
+    if (shown.current !== job) return;
     const id = run.current;
     const result = await ask({ type: 'check-job', job });
     if (result.ok && id === run.current) setPhase({ name: 'ready', job, match: result.data });
+  }, []);
+
+  // An update takes a few seconds, and the page can move on to another job
+  // meanwhile. The finished resume is then dropped: it is not that job's.
+  const setTailoringFor = useCallback((job: DetectedJob, next: Tailoring) => {
+    if (shown.current === job) setTailoring(next);
   }, []);
 
   useEffect(() => {
@@ -339,23 +339,24 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     // changing the address. So the page itself is watched. Whenever it settles,
     // the job on it is read again, and if it is not the one already scored,
     // everything starts over for the new one.
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let lastLook = 0;
     const look = () => {
-      if (ctx.isInvalid || busy.current) return;
-      if (document.hidden) return;
+      if (ctx.isInvalid || document.hidden) return;
+      // Still reading the page, or read it a moment ago: come back, so a job
+      // that changed in the meantime is not missed.
+      if (busy.current || Date.now() - lastLook < LOOK_EVERY_MS) return lookSoon();
       lastLook = Date.now();
       const job = detectJob(document, window.location.href, !manual);
-      if ((job ? signatureOf(job) : null) === shown.current) return;
-      // An updated resume was for the previous job: it does not carry over.
+      if (sameJob(shown.current, job)) return;
+      // An updated resume was for the previous job: it does not carry over,
+      // and neither does one still being made for it.
+      shown.current = job;
       setTailoring({ name: 'idle' });
       void check();
     };
-    const lookSoon = () => {
-      clearTimeout(timer);
-      // Wait for the page to finish redrawing, and never read it more than once every two seconds.
-      timer = setTimeout(look, Math.max(SETTLE_MS, LOOK_EVERY_MS - (Date.now() - lastLook)));
-    };
+    // Wait for the page to finish redrawing, but not forever: a page that never
+    // stops changing is still read every two seconds.
+    const lookSoon = whenSettled(look, SETTLE_MS, LOOK_EVERY_MS);
     const observer = new MutationObserver(lookSoon);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     // A change of address is the same signal, usually arriving before the page has redrawn.
@@ -369,7 +370,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     window.addEventListener('keydown', onKey);
     return () => {
       observer.disconnect();
-      clearTimeout(timer);
+      lookSoon.cancel();
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('rolesetu:open', reopen);
       window.removeEventListener('keydown', onKey);
@@ -392,7 +393,13 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     const place = () => setPills(showApplyPills(state, () => setOpen(true)));
     place();
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const replace = whenSettled(
+      () => {
+        if (document.querySelector('[data-rolesetu-pill]') === null) place();
+      },
+      400,
+      1500,
+    );
     const observer = new MutationObserver((changes) => {
       // Our own pills being added or removed must not trigger another pass.
       const external = changes.some((change) =>
@@ -400,16 +407,12 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
           (node) => !(node instanceof Element && node.hasAttribute('data-rolesetu-pill')),
         ),
       );
-      if (!external) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (document.querySelector('[data-rolesetu-pill]') === null) place();
-      }, 400);
+      if (external) replace();
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
-      clearTimeout(timer);
+      replace.cancel();
       removeApplyPills();
     };
   }, [phase]);
@@ -448,7 +451,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
         <Panel
           phase={phase}
           tailoring={tailoring}
-          setTailoring={setTailoring}
+          setTailoring={setTailoringFor}
           onClose={() => setOpen(false)}
           onRetry={check}
           onRescore={rescore}
@@ -507,7 +510,7 @@ function Badge({ phase, onOpen }: { phase: Phase; onOpen: () => void }) {
         : 'Could not score this job';
   return (
     <button type="button" className="badge" onClick={onOpen}>
-      {phase.name === 'scoring' ? <span className="spin" /> : <span className="dot">R</span>}
+      {phase.name === 'scoring' ? <span className="spin" /> : <Mark />}
       <span className="label">{label}</span>
     </button>
   );
@@ -523,7 +526,7 @@ function Panel({
 }: {
   phase: Phase;
   tailoring: Tailoring;
-  setTailoring: (next: Tailoring) => void;
+  setTailoring: (job: DetectedJob, next: Tailoring) => void;
   onClose: () => void;
   onRetry: () => void;
   onRescore: (job: DetectedJob) => void;
@@ -531,9 +534,7 @@ function Panel({
   return (
     <section className="panel" role="dialog" aria-label="Rolesetu match score">
       <header className="head">
-        <span className="dot" style={{ marginLeft: 0 }}>
-          R
-        </span>
+        <Mark style={{ marginLeft: 0 }} />
         <strong>Rolesetu</strong>
         <button type="button" className="icon" aria-label="Close" onClick={onClose}>
           ×
@@ -545,7 +546,7 @@ function Panel({
           job={phase.job}
           match={phase.match}
           tailoring={tailoring}
-          setTailoring={setTailoring}
+          setTailoring={(next) => setTailoring(phase.job, next)}
           onRescore={() => onRescore(phase.job)}
         />
       ) : (

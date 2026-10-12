@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { Mark } from '@/lib/mark';
 import { ask } from '@/lib/messages';
 
 export function App() {
@@ -40,7 +41,7 @@ export function App() {
   return (
     <>
       <header>
-        <span className="dot">R</span>
+        <Mark />
         Rolesetu
       </header>
 

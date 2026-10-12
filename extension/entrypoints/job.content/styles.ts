@@ -33,8 +33,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline
 .ring span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
 .ring.big { width: 84px; height: 84px; }
 .ring.big span { font-size: 26px; }
-.dot { width: 22px; height: 22px; border-radius: 50%; background: var(--brand); color: #fff;
-  display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; margin-left: 4px; }
+.mark { width: 22px; height: 22px; flex: none; margin-left: 4px; }
 .spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line);
   border-top-color: var(--brand); animation: aa-spin .8s linear infinite; margin-left: 6px; }
 @keyframes aa-spin { to { transform: rotate(360deg); } }

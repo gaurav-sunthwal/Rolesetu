@@ -9,6 +9,7 @@
  */
 
 import { APPLY, CONTROLS, labelOf } from '@/lib/apply-controls';
+import { whenSettled } from '@/lib/settled';
 
 const SUBMIT = /^(?:submit|send)(?: (?:my |your |the )?application)?$|^submit$|^apply and submit$/i;
 // What a site says once an application has gone through.
@@ -21,10 +22,10 @@ export const PENDING_FOR_MS = 45 * 60 * 1000;
 /** Which kind of button a click landed on, if it was one that starts or sends an application. */
 export function applyActionOf(target: EventTarget | null): 'apply' | 'submit' | null {
   if (!(target instanceof Element)) return null;
+  // Our own score pill and panel are never the site's Apply button.
+  if (target.closest('[data-rolesetu-pill], rolesetu-root')) return null;
   const control = target.closest(CONTROLS);
-  if (!control || control.hasAttribute('data-rolesetu-pill') || control.closest('rolesetu-root')) {
-    return null;
-  }
+  if (!control) return null;
   const label = labelOf(control);
   if (label.length > 40) return null;
   if (APPLY.test(label)) return 'apply';
@@ -53,24 +54,25 @@ export function watchForConfirmation(onConfirmed: () => void, ignoreExisting: bo
     return () => {};
   }
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
   let done = false;
   const stop = () => {
     done = true;
     observer.disconnect();
-    clearTimeout(timer);
+    read.cancel();
     clearTimeout(giveUp);
   };
-  const observer = new MutationObserver(() => {
-    clearTimeout(timer);
-    // Reading the whole page's text is not free, so wait for it to settle.
-    timer = setTimeout(() => {
+  // Reading the whole page's text is not free, so wait for it to settle.
+  const read = whenSettled(
+    () => {
       if (!done && pageConfirmsApplication()) {
         stop();
         onConfirmed();
       }
-    }, 700);
-  });
+    },
+    700,
+    3000,
+  );
+  const observer = new MutationObserver(read);
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   const giveUp = setTimeout(stop, PENDING_FOR_MS);
   return stop;

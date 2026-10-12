@@ -32,17 +32,23 @@ function findApplyButtons(): HTMLElement[] {
   return found;
 }
 
-function buildPill(state: NonNullable<PillState>, onClick: () => void): HTMLButtonElement {
-  const pill = document.createElement('button');
-  pill.type = 'button';
+function buildPill(state: NonNullable<PillState>, onClick: () => void): HTMLElement {
+  const pill = document.createElement('span');
   pill.setAttribute(MARK, '');
-  pill.setAttribute('aria-label', `Rolesetu: ${state.text}. Show details.`);
-  pill.style.cssText = [
+  pill.style.cssText = 'all: initial; display: inline-block; margin: 6px 10px; vertical-align: middle';
+
+  // The words go in a shadow root, which keeps them out of the page's own
+  // text. Left in it, they are read back as part of the job description: the
+  // job then looks like a different one, and is scored again without end.
+  const shadow = pill.attachShadow({ mode: 'closed' });
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.setAttribute('aria-label', `Rolesetu: ${state.text}. Show details.`);
+  button.style.cssText = [
     'all: initial',
     'display: inline-flex',
     'align-items: center',
     'gap: 7px',
-    'margin: 6px 10px',
     'padding: 7px 13px',
     'border-radius: 999px',
     `border: 1.5px solid ${state.color}`,
@@ -51,7 +57,6 @@ function buildPill(state: NonNullable<PillState>, onClick: () => void): HTMLButt
     'font: 600 13px/1 Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
     'white-space: nowrap',
     'cursor: pointer',
-    'vertical-align: middle',
     'box-shadow: 0 2px 10px rgba(15, 20, 40, .12)',
   ].join(';');
 
@@ -59,7 +64,8 @@ function buildPill(state: NonNullable<PillState>, onClick: () => void): HTMLButt
   dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${state.color};flex:none`;
   const text = document.createElement('span');
   text.textContent = state.text;
-  pill.append(dot, text);
+  button.append(dot, text);
+  shadow.append(button);
 
   pill.addEventListener('click', (event) => {
     // Never let this trigger the site's own Apply action or a surrounding link.

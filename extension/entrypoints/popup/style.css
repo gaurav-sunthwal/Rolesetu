@@ -5,8 +5,7 @@ body {
   background: Canvas; color: CanvasText;
 }
 header { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
-.dot { width: 24px; height: 24px; border-radius: 50%; background: #2f5fe0; color: #fff;
-  display: grid; place-items: center; font-size: 12px; }
+.mark { width: 24px; height: 24px; flex: none; }
 p { margin: 12px 0; color: GrayText; }
 .status { display: flex; align-items: center; gap: 8px; margin: 14px 0; font-weight: 600; }
 .status i { width: 8px; height: 8px; border-radius: 50%; background: #1f9d55; }
