@@ -2,7 +2,7 @@
   "name": "rolesetu-extension",
   "description": "Rolesetu browser extension: match score on job pages",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -12,6 +12,7 @@
     "test": "vitest run",
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
+    "zip:live": "WXT_LIVE=1 wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "postinstall": "wxt prepare",
     "typecheck": "tsc --noEmit"

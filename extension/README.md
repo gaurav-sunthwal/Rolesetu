@@ -50,3 +50,9 @@ been found. Autofill never presses Submit and never replaces what you have typed
 `pnpm build` makes a build for local development (`dist/chrome-mv3`). `pnpm build:live` makes one
 for the live site, using the addresses in `.env.live` (`dist/chrome-mv3-live`). Each build only
 accepts an access key from its own dashboard address.
+
+## Publishing
+
+`pnpm zip:live` builds the live extension and zips it for the Chrome Web Store. The listing
+text, permission justifications and reviewer steps are in
+[docs/runbooks/chrome-web-store.md](../docs/runbooks/chrome-web-store.md).

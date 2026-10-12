@@ -22,7 +22,8 @@ export default defineConfig({
     : '{{browser}}-mv{{manifestVersion}}',
   manifest: {
     name: 'Rolesetu',
-    description: 'See how well you fit a job, right on the job page.',
+    description:
+      'See your match score on any job page, fill application forms from your profile, and track the jobs you apply to.',
     permissions: ['storage', 'scripting'],
     // Every site: a job can be on any company's own pages. This also covers the API.
     host_permissions: ['http://*/*', 'https://*/*'],
