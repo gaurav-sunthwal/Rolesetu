@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: backend-ruff
+        name: backend ruff check
+        entry: bash -c 'cd backend && uv run ruff check --fix .'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+
+      - id: backend-ruff-format
+        name: backend ruff format
+        entry: bash -c 'cd backend && uv run ruff format .'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+
+      - id: dashboard-lint-staged
+        name: dashboard lint-staged
+        entry: bash -c 'cd dashboard && pnpm exec lint-staged'
+        language: system
+        files: ^dashboard/
+        pass_filenames: false
