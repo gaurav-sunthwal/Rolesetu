@@ -277,6 +277,11 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // floating badge is shown instead.
   const [pills, setPills] = useState(0);
   const run = useRef(0);
+  // The address the panel's contents belong to.
+  const shownFor = useRef(window.location.href);
+  // Kept here, above the panel, so closing and reopening the panel does not lose
+  // an updated resume the user has not downloaded or saved yet.
+  const [tailoring, setTailoring] = useState<Tailoring>({ name: 'idle' });
 
   const check = useCallback(async () => {
     const id = (run.current += 1);
@@ -312,7 +317,13 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     void check();
     // Job sites swap listings without reloading the page; score the new one.
     ctx.addEventListener(window, 'wxt:locationchange', () => {
+      // The browser also reports a file download as a navigation. The page
+      // has not changed then, and closing the panel would throw away the
+      // resume the user just asked to download.
+      if (window.location.href === shownFor.current) return;
+      shownFor.current = window.location.href;
       setOpen(false);
+      setTailoring({ name: 'idle' });
       void check();
     });
     const reopen = () => setOpen(true);
@@ -394,7 +405,14 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       {notice}
       {autofillCard}
       {open ? (
-        <Panel phase={phase} onClose={() => setOpen(false)} onRetry={check} onRescore={rescore} />
+        <Panel
+          phase={phase}
+          tailoring={tailoring}
+          setTailoring={setTailoring}
+          onClose={() => setOpen(false)}
+          onRetry={check}
+          onRescore={rescore}
+        />
       ) : pills > 0 ? null : (
         // No Apply button to attach to (or nothing to show there): float instead.
         <Badge phase={phase} onOpen={() => setOpen(true)} />
@@ -457,11 +475,15 @@ function Badge({ phase, onOpen }: { phase: Phase; onOpen: () => void }) {
 
 function Panel({
   phase,
+  tailoring,
+  setTailoring,
   onClose,
   onRetry,
   onRescore,
 }: {
   phase: Phase;
+  tailoring: Tailoring;
+  setTailoring: (next: Tailoring) => void;
   onClose: () => void;
   onRetry: () => void;
   onRescore: (job: DetectedJob) => void;
@@ -479,7 +501,13 @@ function Panel({
       </header>
 
       {phase.name === 'ready' ? (
-        <Result job={phase.job} match={phase.match} onRescore={() => onRescore(phase.job)} />
+        <Result
+          job={phase.job}
+          match={phase.match}
+          tailoring={tailoring}
+          setTailoring={setTailoring}
+          onRescore={() => onRescore(phase.job)}
+        />
       ) : (
         <div className="body">
           <div className="center">
@@ -565,10 +593,14 @@ function toggled(list: string[], name: string): string[] {
 function Result({
   job,
   match,
+  tailoring,
+  setTailoring,
   onRescore,
 }: {
   job: DetectedJob;
   match: Match;
+  tailoring: Tailoring;
+  setTailoring: (next: Tailoring) => void;
   onRescore: () => void;
 }) {
   const [tracking, setTracking] = useState<'idle' | 'saving' | 'done' | 'failed'>('idle');
@@ -628,7 +660,12 @@ function Result({
           <p className="note">{match.seniority_note}</p>
         ) : null}
 
-        <ResumeMatcher matchId={match.id} onChanged={onRescore} />
+        <ResumeMatcher
+          matchId={match.id}
+          tailoring={tailoring}
+          setTailoring={setTailoring}
+          onChanged={onRescore}
+        />
 
         <Skills title="Required" skills={required} />
         <Skills title="Nice to have" skills={niceToHave} />
@@ -666,13 +703,22 @@ function Result({
  * resume. Anything missing can be ticked, and one button returns a copy of the
  * resume with those words changed, in the same style.
  */
-function ResumeMatcher({ matchId, onChanged }: { matchId: string; onChanged: () => void }) {
+function ResumeMatcher({
+  matchId,
+  tailoring,
+  setTailoring,
+  onChanged,
+}: {
+  matchId: string;
+  tailoring: Tailoring;
+  setTailoring: (next: Tailoring) => void;
+  onChanged: () => void;
+}) {
   const [keywords, setKeywords] = useState<Keywords>({ name: 'loading' });
   const [skills, setSkills] = useState<string[]>([]);
   const [respell, setRespell] = useState<string[]>([]);
   const [useHeadline, setUseHeadline] = useState(false);
   const [headline, setHeadline] = useState('');
-  const [tailoring, setTailoring] = useState<Tailoring>({ name: 'idle' });
   // Bumped when the saved resume changes, so the comparison is made again.
   const [resumeVersion, setResumeVersion] = useState(0);
 

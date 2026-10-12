@@ -47,5 +47,6 @@ been found. Autofill never presses Submit and never replaces what you have typed
 | `WXT_API_BASE_URL` | `http://localhost:8000` | Where the API is. Also the only host the extension may call. |
 | `WXT_DASHBOARD_URL` | `http://localhost:3000` | Where "Open dashboard" goes. |
 
-Before publishing, add the production dashboard address to `DASHBOARD_MATCHES` in `lib/config.ts`.
-Only pages on that list can hand the extension an access key.
+`pnpm build` makes a build for local development (`dist/chrome-mv3`). `pnpm build:live` makes one
+for the live site, using the addresses in `.env.live` (`dist/chrome-mv3-live`). Each build only
+accepts an access key from its own dashboard address.

@@ -7,10 +7,12 @@ export const DASHBOARD_URL = (
 ).replace(/\/$/, '');
 
 /**
- * Pages allowed to hand the extension its key. Only the local dashboard for
- * now: add the production address here once the dashboard has one.
+ * Pages allowed to hand the extension its key: only the dashboard this build
+ * was made for. A local build trusts localhost; a live build trusts the live
+ * site. Never both, so a page on someone's localhost cannot talk to a published
+ * extension.
  */
-export const DASHBOARD_MATCHES = ['http://localhost:3000/*'];
+export const DASHBOARD_MATCHES = [`${DASHBOARD_URL}/*`];
 
 /**
  * The page detector runs on every website, because a job can be posted on any
