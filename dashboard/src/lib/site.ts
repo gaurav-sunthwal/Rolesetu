@@ -12,6 +12,8 @@ export const SITE = {
   url,
   title: 'Rolesetu: job match score, resume tailoring and application tracker',
   tagline: 'Know your fit before you apply',
+  // Published on the privacy policy and the Chrome Web Store listing.
+  contactEmail: 'gauravsunthwalwork@gmail.com',
   description:
     'Rolesetu scores any job description against your resume skill by skill, adds the job’s keywords to your own resume PDF, autofills application forms and tracks every application, including replies in Gmail.',
   keywords: [

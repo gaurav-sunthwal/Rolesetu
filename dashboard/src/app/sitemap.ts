@@ -12,5 +12,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.8,
     })),
+    {
+      url: absoluteUrl('/privacy'),
+      lastModified: SITE.updated,
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
   ];
 }

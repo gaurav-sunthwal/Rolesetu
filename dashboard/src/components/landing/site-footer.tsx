@@ -40,6 +40,11 @@ export function SiteFooter() {
               </li>
             ))}
             <li>
+              <Link href="/privacy" className={LINK}>
+                Privacy
+              </Link>
+            </li>
+            <li>
               <Link href="/login" className={LINK}>
                 Log in
               </Link>
