@@ -18,24 +18,46 @@ const NOT_CONNECTED: Failure = {
   message: 'Connect Rolesetu to your account to see your match score.',
 };
 
+// First try at once, then again after a short and a longer pause.
+const RETRY_AFTER_MS = [0, 1500, 4000];
+// What a host answers while the server behind it is still coming up.
+const STARTING_UP = new Set([502, 503, 504]);
+
 /** Calls the API as the connected user. Never throws: failures come back as data. */
 async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
   const key = await accessKey.getValue();
   if (!key) return NOT_CONNECTED;
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-        ...init.headers,
-      },
-      signal: AbortSignal.timeout(25_000),
-    });
-  } catch {
-    return { ok: false, status: null, message: 'Could not reach Rolesetu. Check your connection.' };
+  // The server can be asleep or mid-restart, and then the first call fails or
+  // gets a "starting up" reply. Waiting briefly and trying again is usually all
+  // it takes. Every call here is safe to repeat: reads, a job check (the server
+  // reuses the result) and tracker writes (which carry a retry key).
+  let response: Response | null = null;
+  for (const wait of RETRY_AFTER_MS) {
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    try {
+      response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+          ...init.headers,
+        },
+        signal: AbortSignal.timeout(25_000),
+      });
+    } catch {
+      response = null;
+      continue;
+    }
+    if (!STARTING_UP.has(response.status)) break;
+  }
+  if (response === null) {
+    return {
+      ok: false,
+      status: null,
+      message:
+        'Could not reach Rolesetu. It may be starting up: wait a few seconds and try again. If it keeps happening, check your connection.',
+    };
   }
 
   if (response.status === 401) {
