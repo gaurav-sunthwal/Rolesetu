@@ -1,4 +1,4 @@
-import { hasApplyControl } from './apply-controls';
+import { CONTROLS, hasApplyControl, isApplyControl } from './apply-controls';
 import type { DetectedJob } from './messages';
 
 const MIN_DESCRIPTION = 200;
@@ -219,6 +219,70 @@ function describe(
   return { title, company, description: visibleText(element) };
 }
 
+// Text some sites add to a title for screen readers only ("React.js Developer - job post").
+const TITLE_EXTRA = /\s*[-–|]\s*job post\s*$/i;
+const NOT_A_COMPANY = /^(?:apply|save|share|report|follow|view|see|show|back|next|sign|log)\b/i;
+
+function isShown(element: Element): boolean {
+  if (!(element instanceof HTMLElement)) return false;
+  const box = element.getBoundingClientRect();
+  return box.width > 0 && box.height > 0;
+}
+
+/**
+ * The job as the user sees it: the heading right above the page's Apply
+ * button, and the company named between the two.
+ *
+ * This is what makes the title word for word what the page shows. A results
+ * page lists many jobs and its hidden data can describe a different one, but
+ * the Apply button belongs to the job the user is looking at.
+ */
+function byApplyButton(doc: Document): { title: string; company: string | null } | null {
+  let button: Element | null = null;
+  for (const control of doc.querySelectorAll(CONTROLS)) {
+    if (isApplyControl(control) && isShown(control) && !control.closest('rolesetu-root')) {
+      button = control;
+      break;
+    }
+  }
+  if (!button) return null;
+
+  let scope = button.parentElement;
+  for (let depth = 0; scope && depth < 10; depth += 1, scope = scope.parentElement) {
+    let best: { element: Element; label: string; size: number } | null = null;
+    for (const heading of scope.querySelectorAll('h1, h2, h3, [role="heading"]')) {
+      if (!comesBefore(heading, button) || !isShown(heading)) continue;
+      const label = firstLine(heading).replace(TITLE_EXTRA, '').trim();
+      if (label.length < 3 || label.length > 140 || SECTION_HEADING.test(label)) continue;
+      const size = Number.parseFloat(getComputedStyle(heading).fontSize);
+      // The largest heading wins; between equals, the one nearest the button.
+      if (size >= 16 && (best === null || size >= best.size)) best = { element: heading, label, size };
+    }
+    if (!best) continue;
+
+    let company: string | null = null;
+    const title = best.element;
+    for (const candidate of scope.querySelectorAll(
+      'a, [class*="company" i], [data-company-name], [data-testid*="company" i]',
+    )) {
+      if (!comesBefore(title, candidate) || !comesBefore(candidate, button)) continue;
+      if (!isShown(candidate) || candidate.hasAttribute('data-rolesetu-pill')) continue;
+      const label = firstLine(candidate);
+      if (label.length < 2 || label.length > 80 || NOT_A_COMPANY.test(label)) continue;
+      company = label;
+      break;
+    }
+    return { title: best.label, company };
+  }
+  return null;
+}
+
+/** Whether these words can be read somewhere on the page. */
+function appearsOnPage(doc: Document, words: string): boolean {
+  const page = (doc.body?.innerText ?? '').replace(/\s+/g, ' ').toLowerCase();
+  return page.includes(words.replace(/\s+/g, ' ').trim().toLowerCase());
+}
+
 function fromKnownSite(doc: Document, host: string): Omit<DetectedJob, 'url'> | null {
   const site = SITE_SELECTORS.find((entry) => entry.host.test(host));
   if (!site) return null;
@@ -264,8 +328,26 @@ function fromPageText(
  */
 export function detectJob(doc: Document, url: string, strict = false): DetectedJob | null {
   const host = new URL(url).hostname.replace(/^www\./, '');
-  const found =
-    fromStructuredData(doc) ?? fromKnownSite(doc, host) ?? fromPageText(doc, host, strict);
+
+  // A site's hidden job data is the best source when it describes the job on
+  // screen. On a results page it can be left over from another listing, and
+  // then its title is nowhere to be seen: that data is ignored.
+  let structured = fromStructuredData(doc);
+  if (structured?.title && !appearsOnPage(doc, structured.title)) structured = null;
+
+  const found = structured ?? fromKnownSite(doc, host) ?? fromPageText(doc, host, strict);
   if (!found) return null;
-  return { ...found, description: found.description.slice(0, MAX_DESCRIPTION), url };
+
+  // What is shown above the Apply button is what the user reads as the job's
+  // title, so it is used word for word. Hidden data only fills in when the
+  // page shows nothing there.
+  const seen = byApplyButton(doc);
+  const title = (structured?.title ?? seen?.title ?? found.title)?.replace(TITLE_EXTRA, '') ?? null;
+  return {
+    ...found,
+    title,
+    company: structured?.company ?? seen?.company ?? found.company,
+    description: found.description.slice(0, MAX_DESCRIPTION),
+    url,
+  };
 }
