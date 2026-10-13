@@ -15,9 +15,13 @@ export const SITE = {
   // Published on the privacy policy and the Chrome Web Store listing.
   contactEmail: 'gauravsunthwalwork@gmail.com',
   description:
-    'Rolesetu scores any job description against your resume skill by skill, adds the job’s keywords to your own resume PDF, autofills application forms and tracks every application, including replies in Gmail.',
+    'Paste a job link to see the skills it asks for, free. Rolesetu scores it against your resume, tailors your resume PDF, autofills forms and tracks applications.',
   keywords: [
+    'Rolesetu',
     'job match score',
+    'free job description checker',
+    'job description skills checker',
+    'check job fit before applying',
     'resume match score',
     'resume job description match',
     'resume checker for job description',

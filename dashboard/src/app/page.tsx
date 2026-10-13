@@ -112,7 +112,7 @@ export default function LandingPage() {
               </Display>
               <p className="text-foreground/75 mx-auto mt-5 max-w-xl text-lg text-pretty lg:mx-0">
                 Paste a job link. We read the page and list every skill it asks for. Add your resume
-                to get an honest match score, with the evidence behind each skill.
+                to get an honest job match score, with the evidence behind each skill.
               </p>
             </HeroJobCheck>
           </div>

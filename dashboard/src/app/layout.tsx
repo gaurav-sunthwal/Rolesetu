@@ -3,7 +3,7 @@ import { Inter, JetBrains_Mono } from 'next/font/google';
 
 import { Clarity } from '@/components/clarity';
 import { Providers } from '@/components/providers';
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from '@/lib/site';
+import { SITE, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from '@/lib/site';
 
 import './globals.css';
 
@@ -27,15 +27,10 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   category: 'Careers',
-  keywords: [
-    'job match score',
-    'resume match checker',
-    'tailor resume to job description',
-    'ATS resume keywords',
-    'job application autofill',
-    'job application tracker',
-    'resume skill gap analysis',
-  ],
+  keywords: [...SITE.keywords],
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,

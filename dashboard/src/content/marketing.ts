@@ -383,6 +383,11 @@ export const HOME_FAQS: Faq[] = [
       'Rolesetu is a job application assistant. It scores a job description against your resume skill by skill, adds the job’s keywords to your own resume PDF, autofills application forms from your profile, and tracks every application, including the replies that arrive in Gmail.',
   },
   {
+    question: 'Can I check a job without creating an account?',
+    answer:
+      'Yes. Paste a job link on the Rolesetu home page and it reads the listing and shows the role, the pay and every skill the job asks for, free and without signing in. To get your own match score you sign in and add your resume, because the score compares the job with your experience.',
+  },
+  {
     question: 'How is the job match score calculated?',
     answer:
       'Each skill the job asks for is marked strong, partial or missing against your profile, with the line that proves it. Required skills count double and a partial match earns half. The score out of 100 is plain arithmetic on those verdicts, and it is capped when the job asks for more years of experience than you have.',

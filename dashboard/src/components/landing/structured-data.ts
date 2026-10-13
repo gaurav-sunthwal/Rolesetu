@@ -20,6 +20,7 @@ export function websiteData() {
     '@type': 'WebSite',
     '@id': WEBSITE_ID,
     name: SITE.name,
+    alternateName: ['Role Setu', SITE.tagline],
     url: SITE.url,
     description: SITE.description,
     inLanguage: 'en',
@@ -38,6 +39,7 @@ export function applicationData(features: string[]) {
     applicationSubCategory: 'Job search',
     operatingSystem: 'Web, Chrome',
     featureList: features,
+    isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@id': ORGANISATION_ID },
   };
