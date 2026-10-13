@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Verifying ID tokens only needs the project id (Google's public keys do the rest).
     firebase_project_id: str | None = None
 
+    # Google accounts allowed into the admin panel (verified emails). Empty: nobody.
+    admin_emails: list[str] = []
+
     # CORS — dashboard origin(s)
     cors_origins: list[str] = ["http://localhost:3000"]
 

@@ -8,7 +8,7 @@ model: the page is fetched and its skills are read with the local dictionary.
 import dataclasses
 import hashlib
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urldefrag
+from urllib.parse import urldefrag, urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +36,11 @@ def _hash(value: str) -> str:
 
 def _url_hash(url: str) -> str:
     return _hash(urldefrag(url.strip()).url)
+
+
+def _host(url: str) -> str | None:
+    host = urlsplit(url.strip()).hostname
+    return host.removeprefix("www.").lower()[:120] if host else None
 
 
 def _to_read(url: str, page: JobPage) -> JobPreviewRead:
@@ -73,7 +78,7 @@ async def preview_job(db: AsyncSession, *, url: str, client_ip: str) -> JobPrevi
             "Sign in to keep going, or try again a little later."
         )
 
-    attempt = JobPreview(url_hash=_url_hash(url), client_hash=client_hash)
+    attempt = JobPreview(url_hash=_url_hash(url), client_hash=client_hash, host=_host(url))
 
     async def within_budget() -> bool:
         used = await repository.count_rendered(db, now - timedelta(days=1))

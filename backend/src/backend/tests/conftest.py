@@ -55,7 +55,9 @@ async def make_client() -> AsyncGenerator[ClientFactory]:
 
     async def current_user_from_header(request: Request) -> CurrentUser:
         uid = request.headers["x-test-uid"]
-        return CurrentUser(uid=uid, email=f"{uid}@example.com")
+        # A test that needs a verified sign-in (the admin routes) says so in a header.
+        verified = request.headers.get("x-test-verified") == "1"
+        return CurrentUser(uid=uid, email=f"{uid}@example.com", email_verified=verified)
 
     app.dependency_overrides[get_current_user] = current_user_from_header
     try:

@@ -23,6 +23,9 @@ class CurrentUser:
     # True when the request was signed with a browser-extension key, not a
     # dashboard sign-in. Such requests are only allowed on a few routes.
     via_extension: bool = False
+    # Whether the sign-in provider vouches for the email address. Only that
+    # makes an address safe to check against the admin list.
+    email_verified: bool = False
 
 
 async def get_current_user(
@@ -49,7 +52,11 @@ async def get_current_user(
     except InvalidTokenError as exc:
         raise UnauthorizedError("Invalid or expired token") from exc
 
-    return CurrentUser(uid=decoded["uid"], email=decoded.get("email"))
+    return CurrentUser(
+        uid=decoded["uid"],
+        email=decoded.get("email"),
+        email_verified=decoded.get("email_verified") is True,
+    )
 
 
 async def require_dashboard_session(

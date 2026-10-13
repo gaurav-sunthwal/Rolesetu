@@ -38,7 +38,7 @@ export const SITE = {
     'skill gap analysis for jobs',
   ],
   // The day the public pages last changed. Bump it when their content does.
-  updated: '2026-10-13',
+  updated: '2026-10-14',
 } as const;
 
 export function absoluteUrl(path: string): string {

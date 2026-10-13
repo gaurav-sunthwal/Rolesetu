@@ -84,7 +84,8 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
       'All traffic between your browser, the extension and Rolesetu is encrypted in transit.',
       'Gmail tokens and API keys are encrypted before they are stored.',
       'Only a hash of the extension’s access key is kept on the server.',
-      'Every record is tied to your account and can be read only by you.',
+      'Every record is tied to your account, and no other user can read it.',
+      'Rolesetu staff can open an account’s profile, job checks and applications when that is needed to give support or to act on a deletion request. Each time is recorded. Staff cannot open your resume file through this, and nothing read from your Gmail is shown to them.',
     ],
   },
   {

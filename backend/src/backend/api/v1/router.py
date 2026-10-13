@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from backend.modules.admin.router import router as admin_router
 from backend.modules.applications.router import router as applications_router
 from backend.modules.extension.router import router as extension_router
 from backend.modules.inbox.router import router as inbox_router
@@ -26,3 +27,4 @@ api_router.include_router(tailoring_router)
 api_router.include_router(inbox_router)
 api_router.include_router(previews_router)
 api_router.include_router(waitlist_router)
+api_router.include_router(admin_router)

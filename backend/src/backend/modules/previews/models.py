@@ -23,6 +23,9 @@ class JobPreview(IdMixin, TimestampMixin, Base):
     )
 
     url_hash: Mapped[str]
+    # The site the link is on (e.g. "naukri.com"), so we can see which sites fail.
+    # None on rows written before this was recorded.
+    host: Mapped[str | None] = mapped_column(default=None)
     # sha256 of the visitor's IP address; the address itself is never stored.
     client_hash: Mapped[str]
     # "direct" or "rendered" (the paid reader was called). None if the link was never fetched.
