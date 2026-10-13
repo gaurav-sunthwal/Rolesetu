@@ -2,6 +2,7 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { ExtensionBanner } from '@/components/landing/extension-banner';
 import { FaqList } from '@/components/landing/faq';
 import { FeatureShowcase } from '@/components/landing/feature-showcase';
 import { HeroJobCheck } from '@/components/landing/hero-job-check';
@@ -117,6 +118,8 @@ export default function LandingPage() {
             </HeroJobCheck>
           </div>
         </section>
+
+        <ExtensionBanner />
 
         <div className={RAILS}>
           <section id="what" className={cn(GUTTER, 'scroll-mt-16 py-20 sm:py-28')}>

@@ -66,7 +66,7 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
       'Google Firebase, for sign-in.',
       'Railway, which hosts the API, and a managed PostgreSQL database, which holds your account data.',
       'Cloudflare R2, which stores resume files privately. They are served only through short-lived links.',
-      'Vercel, which hosts this website.',
+      'Vercel, which hosts this website and counts page visits for us (Vercel Analytics). It uses no cookies and does not identify you.',
       'Google Gemini, when a job check is read by an AI model. The job description and the parts of your profile needed to judge it are sent for that purpose. If you add your own Gemini key in Settings, it is stored encrypted.',
       'Context.dev, which loads a job page for us when the site does not let our own reader in. Only the job’s link is sent, never anything about you.',
       'Microsoft Clarity, which records visits to this website to show us where pages are confusing. The signed-in area that shows your resume, profile and emails is masked from those recordings.',
