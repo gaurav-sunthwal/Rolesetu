@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Puzzle } from 'lucide-react';
+import { ExternalLink, Puzzle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { SectionCard } from '@/components/app/section-card';
@@ -13,6 +13,7 @@ import {
   findExtension,
   giveKeyToExtension,
 } from '@/features/settings/extension-bridge';
+import { extensionStoreUrl } from '@/features/settings/extension-store';
 import { errorMessage } from '@/lib/api/client';
 import { formatDate, timeAgo } from '@/lib/format';
 
@@ -66,6 +67,8 @@ export function ExtensionCard() {
   const connectedHere = status.data?.connected === true && browser.data?.connected === true;
   const connectedElsewhere = status.data?.connected === true && !connectedHere;
   const busy = connect.isPending || disconnect.isPending;
+  // Read only once the browser has answered, so the server never renders it.
+  const storeUrl = browser.data ? extensionStoreUrl(navigator.userAgent) : null;
 
   return (
     <SectionCard>
@@ -91,7 +94,7 @@ export function ExtensionCard() {
           ) : !installed ? (
             <p className="text-muted-foreground mt-0.5 text-sm">
               Shows your match score on job pages as you browse. It is not installed in this browser
-              yet. Install it, then reload this page to connect it.
+              yet. Install the Rolesetu extension, then press Reload to connect it.
             </p>
           ) : connectedElsewhere ? (
             <p className="text-muted-foreground mt-0.5 text-sm">
@@ -116,9 +119,27 @@ export function ExtensionCard() {
                 Disconnect
               </Button>
             ) : null}
-            <Button onClick={() => connect.mutate()} disabled={busy || !installed}>
-              {connect.isPending ? 'Connecting…' : 'Connect extension'}
-            </Button>
+            {installed ? (
+              <Button onClick={() => connect.mutate()} disabled={busy}>
+                {connect.isPending ? 'Connecting…' : 'Connect extension'}
+              </Button>
+            ) : (
+              <>
+                {/* A page that was open before the install cannot see the extension. */}
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Reload
+                </Button>
+                {storeUrl ? (
+                  <Button
+                    nativeButton={false}
+                    render={<a href={storeUrl} target="_blank" rel="noreferrer" />}
+                  >
+                    Install extension
+                    <ExternalLink data-icon="inline-end" />
+                  </Button>
+                ) : null}
+              </>
+            )}
           </div>
         )}
       </div>
