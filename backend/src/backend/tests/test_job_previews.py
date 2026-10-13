@@ -7,12 +7,12 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
+from backend.core.client_ip import hash_ip
 from backend.core.config import get_settings
 from backend.db.session import get_sessionmaker
 from backend.main import app
 from backend.modules.previews import service as previews_service
 from backend.modules.previews.models import JobPreview
-from backend.modules.previews.service import _hash
 from backend.tests.test_job_link import BLOCKED, POSTING, PROFILE, page_with, use_readers
 
 PREVIEWS = "/api/v1/public/job-previews"
@@ -31,7 +31,7 @@ async def visitor() -> AsyncGenerator[AsyncClient]:
     ) as client:
         yield client
     async with get_sessionmaker()() as db:
-        await db.execute(delete(JobPreview).where(JobPreview.client_hash == _hash(ip)))
+        await db.execute(delete(JobPreview).where(JobPreview.client_hash == hash_ip(ip)))
         await db.commit()
 
 

@@ -11,6 +11,7 @@ from backend.modules.resumes.router import router as resumes_router
 from backend.modules.saved_answers.router import router as saved_answers_router
 from backend.modules.tailoring.router import router as tailoring_router
 from backend.modules.users.router import router as users_router
+from backend.modules.waitlist.router import router as waitlist_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(users_router)
@@ -24,3 +25,4 @@ api_router.include_router(extension_router)
 api_router.include_router(tailoring_router)
 api_router.include_router(inbox_router)
 api_router.include_router(previews_router)
+api_router.include_router(waitlist_router)

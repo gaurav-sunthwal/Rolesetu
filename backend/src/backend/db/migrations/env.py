@@ -21,6 +21,7 @@ from backend.modules.profiles import models as profiles_models  # noqa: F401
 from backend.modules.resumes import models as resumes_models  # noqa: F401
 from backend.modules.saved_answers import models as saved_answers_models  # noqa: F401
 from backend.modules.users import models as users_models  # noqa: F401
+from backend.modules.waitlist import models as waitlist_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

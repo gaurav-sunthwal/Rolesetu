@@ -12,6 +12,7 @@ from urllib.parse import urldefrag
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.core.client_ip import hash_ip
 from backend.core.config import get_settings
 from backend.core.exceptions import RateLimitedError
 from backend.modules.matches.fetching.job_page import JobPage
@@ -64,7 +65,7 @@ async def preview_job(db: AsyncSession, *, url: str, client_ip: str) -> JobPrevi
     if known is not None:
         return _to_read(url, known)
 
-    client_hash = _hash(client_ip)
+    client_hash = hash_ip(client_ip)
     recent = await repository.count_by_client(db, client_hash, now - timedelta(hours=1))
     if recent >= MAX_PREVIEWS_PER_HOUR:
         raise RateLimitedError(
