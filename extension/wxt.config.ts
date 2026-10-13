@@ -20,7 +20,7 @@ export default defineConfig({
   outDirTemplate: live
     ? '{{browser}}-mv{{manifestVersion}}-live'
     : '{{browser}}-mv{{manifestVersion}}',
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Rolesetu',
     description:
       'See your match score on any job page, fill application forms from your profile, and track the jobs you apply to.',
@@ -28,5 +28,23 @@ export default defineConfig({
     // Every site: a job can be on any company's own pages. This also covers the API.
     host_permissions: ['http://*/*', 'https://*/*'],
     action: { default_title: 'Rolesetu' },
-  },
+    ...(browser === 'firefox' && {
+      browser_specific_settings: {
+        gecko: {
+          // Permanent once the add-on is listed.
+          id: 'extension@rolesetu.vercel.app',
+          // The first version that shows the data declaration below at install.
+          strict_min_version: '140.0',
+          // What leaves the browser: the job listing's text and address, and the
+          // fact that the user applied. Must match the privacy policy.
+          data_collection_permissions: {
+            required: ['websiteContent', 'browsingActivity', 'websiteActivity'],
+          },
+        },
+      },
+    }),
+  }),
+  // Mozilla's reviewers rebuild the add-on from the sources zip, which needs
+  // the live addresses. Hidden files are left out unless named.
+  zip: { includeSources: ['**', '.env.live'] },
 });

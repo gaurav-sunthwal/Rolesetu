@@ -1,4 +1,4 @@
-# Publishing the extension to the Chrome Web Store
+# Publishing the extension
 
 What to build, upload and type into the Developer Dashboard. The answers below describe
 what the extension does today; if its permissions or the data it sends change, change
@@ -140,3 +140,39 @@ bump the version and upload again.
 
 Once it is published, add the store link to the landing page and to the "install the
 extension" step in the dashboard.
+
+## Firefox (addons.mozilla.org)
+
+Listing on Firefox is free. The listing text, screenshots, privacy policy URL and reviewer
+steps above are reused as they are.
+
+```bash
+cd extension
+pnpm zip:firefox:live
+# dist/rolesetu-extension-<version>-firefox.zip   the add-on to upload
+# dist/rolesetu-extension-<version>-sources.zip   the source code Mozilla asks for
+```
+
+At <https://addons.mozilla.org/developers/> press **Submit a New Add-on**:
+
+1. Distribution: **On this site**.
+2. Upload the `-firefox.zip`. Compatibility: tick **Firefox** only, not Android.
+3. "Do you need to submit source code?" **Yes**, because the code is bundled and minified.
+   Upload the `-sources.zip`.
+4. Categories: Search Tools, or Other. Licence: All Rights Reserved, unless you decide to
+   open the code.
+5. Notes to reviewer: the test account and steps from the section above, then these
+   build instructions:
+
+   ```
+   Built on macOS with Node 24 and pnpm 12.
+   pnpm install
+   pnpm zip:firefox:live
+   The add-on is written to dist/firefox-mv2-live and zipped beside it.
+   The warnings about innerHTML come from the React DOM library, not from our code.
+   ```
+
+The manifest declares what the add-on sends off the device (`websiteContent`,
+`browsingActivity`, `websiteActivity`) in
+[wxt.config.ts](../../extension/wxt.config.ts); Firefox shows this to the user at install.
+Keep it in step with the privacy policy. The add-on id there is permanent once listed.

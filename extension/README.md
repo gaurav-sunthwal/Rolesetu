@@ -53,6 +53,7 @@ accepts an access key from its own dashboard address.
 
 ## Publishing
 
-`pnpm zip:live` builds the live extension and zips it for the Chrome Web Store. The listing
-text, permission justifications and reviewer steps are in
-[docs/runbooks/chrome-web-store.md](../docs/runbooks/chrome-web-store.md).
+`pnpm zip:live` builds the live extension and zips it for the Chrome Web Store, and
+`pnpm zip:firefox:live` does the same for Firefox. The listing text, permission
+justifications and reviewer steps are in
+[docs/runbooks/publishing-the-extension.md](../docs/runbooks/publishing-the-extension.md).

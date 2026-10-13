@@ -14,6 +14,7 @@
     "zip": "wxt zip",
     "zip:live": "WXT_LIVE=1 wxt zip",
     "zip:firefox": "wxt zip -b firefox",
+    "zip:firefox:live": "WXT_LIVE=1 wxt zip -b firefox",
     "postinstall": "wxt prepare",
     "typecheck": "tsc --noEmit"
   },
