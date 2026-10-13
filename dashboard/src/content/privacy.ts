@@ -33,7 +33,7 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
   {
     title: 'The extension waiting list',
     paragraphs: [
-      'If you ask to be told when the browser extension is released, we keep the email address you give us and use it to send that one announcement. It is not added to any other list. To be taken off, write to the address below. A video on the home page is hosted by YouTube; nothing is loaded from YouTube until you press play.',
+      'If you ask to be told when the browser extension is released, we keep the email address you give us. We use it to confirm that you are on the list, and to send that one announcement. It is not added to any other list. To be taken off, write to the address below. A video on the home page is hosted by YouTube; nothing is loaded from YouTube until you press play.',
     ],
   },
   {

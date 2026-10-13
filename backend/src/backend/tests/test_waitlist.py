@@ -7,7 +7,9 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select
 
+from backend.core import email as email_sender
 from backend.core.client_ip import hash_ip
+from backend.core.config import get_settings
 from backend.db.session import get_sessionmaker
 from backend.main import app
 from backend.modules.waitlist import service as waitlist_service
@@ -26,6 +28,18 @@ async def times_listed(email: str) -> int:
             select(func.count()).select_from(WaitlistEntry).where(WaitlistEntry.email == email)
         )
         return found.scalar_one()
+
+
+@pytest.fixture(autouse=True)
+def sent(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, str]]:
+    """The emails these tests would have sent. Nothing really goes out."""
+    outbox: list[dict[str, str]] = []
+
+    async def record(**message: str) -> None:
+        outbox.append(message)
+
+    monkeypatch.setattr(waitlist_service, "send_email", record)
+    return outbox
 
 
 @pytest.fixture
@@ -68,3 +82,36 @@ async def test_one_visitor_cannot_fill_the_list(
     for _ in range(2):
         assert (await visitor.post(WAITLIST, json={"email": address()})).status_code == 200
     assert (await visitor.post(WAITLIST, json={"email": address()})).status_code == 429
+
+
+async def test_a_new_address_is_sent_one_welcome_email(
+    visitor: AsyncClient, sent: list[dict[str, str]]
+) -> None:
+    email = address()
+    await visitor.post(WAITLIST, json={"email": email})
+    # Joining again must not send a second one.
+    await visitor.post(WAITLIST, json={"email": email})
+    assert [message["to"] for message in sent] == [email.lower()]
+    assert "waiting list" in sent[0]["subject"]
+    assert "reply to this email" in sent[0]["text"]
+
+
+async def test_joining_still_works_when_the_email_cannot_be_sent(
+    visitor: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fail(**_message: str) -> None:
+        raise RuntimeError("mail service is down")
+
+    monkeypatch.setattr(waitlist_service, "send_email", fail)
+    email = address()
+    response = await visitor.post(WAITLIST, json={"email": email})
+    assert response.status_code == 200 and response.json() == {"joined": True}
+    assert await times_listed(email.lower()) == 1
+
+
+async def test_nothing_is_sent_when_no_mail_key_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(get_settings(), "resend_api_key", None)
+    # Returns without raising, and without a network call to make.
+    await email_sender.send_email(
+        to="someone@example.com", subject="s", html="h", text="t", idempotency_key="k"
+    )

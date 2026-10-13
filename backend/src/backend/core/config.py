@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     # How far back the first sync of a newly connected inbox looks.
     inbox_lookback_days: int = 15
 
+    # Resend: sends the email that confirms a place on the extension waiting
+    # list. With no key set, nothing is sent and joining still works.
+    resend_api_key: str | None = None
+    # Must be an address on a domain verified in Resend. The default is Resend's
+    # test sender, which only delivers to the Resend account's own address.
+    email_from: str = "Rolesetu <onboarding@resend.dev>"
+    # Where a reply goes (the email asks people to reply to be taken off the list).
+    email_reply_to: str | None = None
+    email_timeout_seconds: float = 10.0
+
     # Extra folder searched for fonts when a resume's own font lacks a letter.
     font_dir: str | None = None
     model_cache_dir: str = ".model_cache"
