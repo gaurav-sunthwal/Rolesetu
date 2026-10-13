@@ -31,6 +31,12 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
     ],
   },
   {
+    title: 'The extension waiting list',
+    paragraphs: [
+      'If you ask to be told when the browser extension is released, we keep the email address you give us and use it to send that one announcement. It is not added to any other list. To be taken off, write to the address below. A video on the home page is hosted by YouTube; nothing is loaded from YouTube until you press play.',
+    ],
+  },
+  {
     title: 'What the browser extension does',
     paragraphs: [
       'The extension asks for access to every website because a job can be posted on any company’s own pages. On each page a small script checks, inside your browser, whether the page is a job listing or an application form. On any other page it does nothing and sends nothing.',

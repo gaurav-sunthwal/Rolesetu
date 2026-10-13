@@ -2,7 +2,7 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { ExtensionBanner } from '@/components/landing/extension-banner';
+import { ExtensionSection } from '@/components/landing/extension-section';
 import { FaqList } from '@/components/landing/faq';
 import { FeatureShowcase } from '@/components/landing/feature-showcase';
 import { HeroJobCheck } from '@/components/landing/hero-job-check';
@@ -119,10 +119,15 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <ExtensionBanner />
-
         <div className={RAILS}>
-          <section id="what" className={cn(GUTTER, 'scroll-mt-16 py-20 sm:py-28')}>
+          <section id="extension" className={cn(GUTTER, 'scroll-mt-16 py-20 sm:py-28')}>
+            <ExtensionSection />
+          </section>
+
+          <section
+            id="what"
+            className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
+          >
             <Reveal className="max-w-3xl">
               <Eyebrow>What Rolesetu is</Eyebrow>
               <Display className="mt-6">

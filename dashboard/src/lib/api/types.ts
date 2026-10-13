@@ -25,5 +25,6 @@ export type SkillResult = Schemas['SkillResult'];
 export type Verdict = SkillResult['verdict'];
 
 export type JobPreview = Schemas['JobPreviewRead'];
+export type WaitlistJoin = Schemas['WaitlistJoin'];
 
 export type LlmKeyStatus = Schemas['LlmKeyStatus'];

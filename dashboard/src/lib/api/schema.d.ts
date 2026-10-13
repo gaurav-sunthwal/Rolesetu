@@ -604,6 +604,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/public/extension-waitlist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Join Waitlist
+     * @description No sign-in needed: asks to be emailed when the extension is released.
+     */
+    post: operations['join_waitlist_api_v1_public_extension_waitlist_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -1527,6 +1547,26 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
+    };
+    /** WaitlistJoin */
+    WaitlistJoin: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string;
+    };
+    /**
+     * WaitlistJoined
+     * @description The same answer whether or not the address was already on the list, so
+     *     the endpoint cannot be used to find out who has signed up.
+     */
+    WaitlistJoined: {
+      /**
+       * Joined
+       * @default true
+       */
+      joined: boolean;
     };
   };
   responses: never;
@@ -2670,6 +2710,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['JobPreviewRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  join_waitlist_api_v1_public_extension_waitlist_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WaitlistJoin'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WaitlistJoined'];
         };
       };
       /** @description Validation Error */
