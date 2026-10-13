@@ -21,13 +21,14 @@ from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.db.session import get_sessionmaker
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches import repository, scoring
-from backend.modules.matches.fetching.job_page import is_job_list, read_job_page
-from backend.modules.matches.fetching.safe_fetch import PASTE_INSTEAD, PageFetchError, fetch_page
+from backend.modules.matches.fetching.job_page import JobPage
+from backend.modules.matches.fetching.reader import load_job_page
 from backend.modules.matches.local.engine import ENGINE_VERSION, LocalMatch, score_locally
 from backend.modules.matches.local.experience import ExperienceAsk, read_experience
 from backend.modules.matches.local.semantic import get_matcher
 from backend.modules.matches.models import Job, Match
 from backend.modules.matches.schemas import ExperienceCheck, MatchCreate, MatchRead, SkillResult
+from backend.modules.previews import service as previews_service
 from backend.modules.profiles import service as profiles_service
 from backend.modules.profiles.schemas import ProfileRead
 
@@ -42,6 +43,9 @@ MAX_NICE_TO_HAVE_SKILLS = 10
 STALE_AFTER = timedelta(minutes=5)
 # A listing read from a link is reused for this long before the page is fetched again.
 PAGE_FRESH_FOR = timedelta(hours=24)
+# Each read through Context.dev spends a paid credit, so one person cannot use up
+# the month's allowance in an afternoon.
+MAX_RENDERED_READS_PER_DAY = 25
 _EVIDENCE_TEXT_LIMIT = 280
 
 
@@ -226,22 +230,35 @@ async def _read_link(
     if known is not None and (listing := _listing_of(known)) is not None:
         return known.jd_text, role or known.role, company or known.company, listing
 
-    _, markup = await fetch_page(url)
-    page = read_job_page(markup)
-    if page is None:
-        if is_job_list(markup):
-            raise PageFetchError(
-                "That link is a list of jobs, not one job. Open the job you want and use its link."
-            )
-        raise PageFetchError(f"We could not find a job description on that page. {PASTE_INSTEAD}")
+    page, reader = await _load_job_page(db, user_id, url, now)
     listing = {
         "location": page.location,
         "employment_type": page.employment_type,
         "salary": page.salary,
         "posted_on": page.posted_on,
         "source": page.source,
+        "reader": reader,
     }
     return page.as_text()[:20000], role or page.title, company or page.company, listing
+
+
+async def _load_job_page(
+    db: AsyncSession, user_id: uuid.UUID, url: str, now: datetime
+) -> tuple[JobPage, str]:
+    """Reads the job at a link: (job, how it was fetched)."""
+    # Someone may have just previewed this job on the landing page before
+    # signing in; that read is reused instead of fetching the page again.
+    previewed = await previews_service.fresh_page(db, url, now)
+    if previewed is not None:
+        return previewed, "preview"
+
+    async def within_allowance() -> bool:
+        used = await repository.count_rendered_reads(db, user_id, now - timedelta(days=1))
+        if used >= MAX_RENDERED_READS_PER_DAY:
+            logger.info("rendered fetch skipped: daily allowance used user=%s", user_id)
+        return used < MAX_RENDERED_READS_PER_DAY
+
+    return await load_job_page(url, within_allowance)
 
 
 def _listing_of(job: Job) -> dict[str, str | None] | None:

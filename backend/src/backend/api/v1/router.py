@@ -5,6 +5,7 @@ from backend.modules.extension.router import router as extension_router
 from backend.modules.inbox.router import router as inbox_router
 from backend.modules.llm_keys.router import router as llm_keys_router
 from backend.modules.matches.router import router as matches_router
+from backend.modules.previews.router import router as previews_router
 from backend.modules.profiles.router import router as profiles_router
 from backend.modules.resumes.router import router as resumes_router
 from backend.modules.saved_answers.router import router as saved_answers_router
@@ -22,3 +23,4 @@ api_router.include_router(resumes_router)
 api_router.include_router(extension_router)
 api_router.include_router(tailoring_router)
 api_router.include_router(inbox_router)
+api_router.include_router(previews_router)

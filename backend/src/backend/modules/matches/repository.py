@@ -50,6 +50,20 @@ async def find_job_by_url(
     return result.scalar_one_or_none()
 
 
+async def count_rendered_reads(db: AsyncSession, user_id: uuid.UUID, since: datetime) -> int:
+    """How many of this user's jobs were read through the paid page reader."""
+    result = await db.execute(
+        select(func.count())
+        .select_from(Job)
+        .where(
+            Job.user_id == user_id,
+            Job.created_at > since,
+            Job.job_json["listing"]["reader"].astext == "rendered",
+        )
+    )
+    return result.scalar_one()
+
+
 async def find_reusable(
     db: AsyncSession,
     user_id: uuid.UUID,

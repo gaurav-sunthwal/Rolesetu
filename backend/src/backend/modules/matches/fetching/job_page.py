@@ -149,12 +149,20 @@ def _location(posting: dict[str, Any]) -> str | None:
             label = ", ".join(part for part in parts if part)
         else:
             label = _text(address) or ""
-        if label and label not in places:
+        # Some sites fill an unknown location with a placeholder such as "-".
+        if re.search(r"[^\W\d_]", label) and label not in places:
             places.append(label)
     where = " / ".join(places[:3]) or None
     if str(posting.get("jobLocationType", "")).upper() == "TELECOMMUTE":
         return f"Remote ({where})" if where else "Remote"
     return where
+
+
+def _amount(value: Any) -> str:
+    """230000.0 reads as "230,000"; anything that is not a number is left alone."""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return f"{value:,}" if isinstance(value, int | float) else str(value)
 
 
 def _salary(posting: dict[str, Any]) -> str | None:
@@ -168,14 +176,17 @@ def _salary(posting: dict[str, Any]) -> str | None:
         amount = value.get("value")
         unit = str(value.get("unitText", "")).lower()
         if low is not None and high is not None and low != high:
-            figure = f"{low:,} to {high:,}" if isinstance(low, int | float) else f"{low} to {high}"
+            figure = f"{_amount(low)} to {_amount(high)}"
         else:
             single = low if low is not None else (high if high is not None else amount)
             if single is None:
                 return None
-            figure = f"{single:,}" if isinstance(single, int | float) else str(single)
+            figure = _amount(single)
+        # "Not disclosed" in the amount field is not a salary.
+        if not re.search(r"\d", figure):
+            return None
         return " ".join(part for part in (currency, figure, f"per {unit}" if unit else "") if part)
-    if isinstance(value, int | float | str):
+    if isinstance(value, int | float) or (isinstance(value, str) and re.search(r"\d", value)):
         return f"{currency} {value}".strip()
     return None
 

@@ -27,7 +27,14 @@ class PageFetchError(ValidationFailedError):
     """The link could not be read. The message says why, in plain words."""
 
 
-async def _assert_public(url: str) -> None:
+class PageBlockedError(PageFetchError):
+    """The site refused us or did not answer, though the page may well exist.
+
+    Worth a second attempt through a real browser (see rendered_fetch).
+    """
+
+
+async def assert_public(url: str) -> None:
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise PageFetchError("That does not look like a web link. It should start with https://")
@@ -43,15 +50,16 @@ async def _assert_public(url: str) -> None:
             raise PageFetchError("That link points to a private address and cannot be opened.")
 
 
-def _message_for_status(status: int) -> str:
+def _error_for_status(status: int) -> PageFetchError:
     if status in (401, 403, 429, 999):
-        return (
+        return PageBlockedError(
             "This site does not let us read the page (it may need you to be signed in). "
             f"{PASTE_INSTEAD}"
         )
     if status in (404, 410):
-        return "That job page no longer exists. The listing may have been removed."
-    return f"The site returned an error ({status}) for that link. {PASTE_INSTEAD}"
+        return PageFetchError("That job page no longer exists. The listing may have been removed.")
+    message = f"The site returned an error ({status}) for that link. {PASTE_INSTEAD}"
+    return PageBlockedError(message) if status >= 500 else PageFetchError(message)
 
 
 async def fetch_page(url: str) -> tuple[str, str]:
@@ -64,14 +72,14 @@ async def fetch_page(url: str) -> tuple[str, str]:
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=False) as client:
             for _ in range(MAX_REDIRECTS + 1):
-                await _assert_public(url)
+                await assert_public(url)
                 async with client.stream("GET", url, headers=headers) as response:
                     if response.is_redirect and "location" in response.headers:
                         # Followed by hand, so every hop is checked like the first.
                         url = urljoin(url, response.headers["location"])
                         continue
                     if response.status_code >= 400:
-                        raise PageFetchError(_message_for_status(response.status_code))
+                        raise _error_for_status(response.status_code)
                     content_type = response.headers.get("content-type", "")
                     if "html" not in content_type and "xml" not in content_type:
                         raise PageFetchError(
@@ -86,6 +94,6 @@ async def fetch_page(url: str) -> tuple[str, str]:
                     return url, bytes(body[:MAX_BYTES]).decode(encoding, errors="replace")
             raise PageFetchError("That link redirects too many times to follow.")
     except httpx.TimeoutException as exc:
-        raise PageFetchError(f"The site took too long to respond. {PASTE_INSTEAD}") from exc
+        raise PageBlockedError(f"The site took too long to respond. {PASTE_INSTEAD}") from exc
     except httpx.HTTPError as exc:
-        raise PageFetchError(f"We could not reach that site. {PASTE_INSTEAD}") from exc
+        raise PageBlockedError(f"We could not reach that site. {PASTE_INSTEAD}") from exc

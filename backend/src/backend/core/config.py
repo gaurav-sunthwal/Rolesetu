@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     # Off for now: on the jobs measured it changed almost no verdicts while
     # costing about 220 MB of memory. Set SEMANTIC_MATCHING=true to turn it on.
     semantic_matching: bool = False
+
+    # Context.dev: reads job pages our own fetch cannot (sites that block bots or
+    # need JavaScript). Paid per call, so it is only tried after our fetch fails.
+    # Keys are tried in order; with none set, the fallback is simply off.
+    context_api_keys: list[str] = []
+    context_timeout_seconds: float = 25.0
+    # Paid reads a day the landing page's job preview may use, across all visitors.
+    # Signed-in users have their own allowance, so this cannot starve them.
+    preview_rendered_reads_per_day: int = 20
+
     # Gmail (read-only). Created in Google Cloud Console; without them the
     # "Connect Gmail" button reports that Gmail is not set up.
     google_client_id: str | None = None

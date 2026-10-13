@@ -16,6 +16,7 @@ from backend.modules.extension import models as extension_models  # noqa: F401
 from backend.modules.inbox import models as inbox_models  # noqa: F401
 from backend.modules.llm_keys import models as llm_keys_models  # noqa: F401
 from backend.modules.matches import models as matches_models  # noqa: F401
+from backend.modules.previews import models as previews_models  # noqa: F401
 from backend.modules.profiles import models as profiles_models  # noqa: F401
 from backend.modules.resumes import models as resumes_models  # noqa: F401
 from backend.modules.saved_answers import models as saved_answers_models  # noqa: F401
