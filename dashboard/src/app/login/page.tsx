@@ -19,6 +19,7 @@ import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { readPendingJob } from '@/features/preview/pending-job';
 import { useAuth } from '@/lib/auth-context';
 import { firebaseAuth } from '@/lib/firebase';
 
@@ -60,7 +61,8 @@ export default function LoginPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
-    if (!loading && user) router.replace('/app');
+    // A visitor who looked up a job on the landing page goes straight to its score.
+    if (!loading && user) router.replace(readPendingJob() ? '/app/check' : '/app');
   }, [loading, user, router]);
 
   async function onSubmit({ email, password }: FormValues) {

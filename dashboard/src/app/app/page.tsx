@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
-import { Texture } from '@/components/brand/primitives';
+import { LiquidTexture } from '@/components/brand/liquid-texture';
 import { Greeting } from '@/components/layout/greeting';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +19,7 @@ export default function OverviewPage() {
       <Greeting />
 
       <section className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.42_0.22_268)] p-8 text-white sm:p-12">
-        <Texture className="-z-10 [mask-image:linear-gradient(to_right,transparent_25%,black)] opacity-35" />
+        <LiquidTexture className="-z-10 [mask-image:linear-gradient(to_right,transparent_25%,black)] opacity-35" />
         <div className="max-w-lg">
           <h3 className="text-3xl leading-[1.1] font-medium tracking-[-0.035em] text-balance sm:text-4xl">
             Found a job you like? See how you fit in seconds.

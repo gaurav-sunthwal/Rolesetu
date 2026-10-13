@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useState, type ComponentType, type ReactNode } from 'react';
 
-import { Texture } from '@/components/brand/primitives';
+import { LiquidTexture } from '@/components/brand/liquid-texture';
 import { cn } from '@/lib/utils';
 
 const MONO = 'font-mono text-xs';
@@ -396,7 +396,7 @@ export function FeatureShowcase() {
         aria-labelledby={`feature-tab-${active.id}`}
         className="relative isolate flex min-h-[26rem] items-center justify-center overflow-hidden bg-[oklch(0.42_0.22_268)] p-5 sm:p-10 lg:min-h-[31rem]"
       >
-        <Texture className="-z-10 opacity-30" />
+        <LiquidTexture className="-z-10 opacity-30" />
         <div className="dark bg-background text-foreground w-full max-w-xl overflow-hidden rounded-xl border shadow-2xl shadow-black/40">
           <div className="flex items-center gap-3 border-b px-4 py-3">
             <active.icon className="text-muted-foreground size-3.5 shrink-0" />

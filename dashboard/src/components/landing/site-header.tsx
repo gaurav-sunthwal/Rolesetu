@@ -14,7 +14,7 @@ export const NAV_LINKS = [
 
 export function SiteHeader() {
   return (
-    <header className="bg-background/85 sticky top-0 z-40 backdrop-blur-lg">
+    <header className="header-edge bg-background/85 sticky top-0 z-40 border-b border-transparent backdrop-blur-lg">
       <div className="relative mx-auto flex h-16 w-full max-w-6xl items-center px-5">
         <Link href="/" aria-label="Rolesetu home">
           <Logo />

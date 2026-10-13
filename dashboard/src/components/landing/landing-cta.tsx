@@ -6,16 +6,10 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 
-/** Where the landing page's calls to action lead: the app if signed in, otherwise sign-up. */
-export function useCtaHref() {
-  const { user } = useAuth();
-  return user ? '/app' : '/login';
-}
-
 /** Primary call to action: sends signed-in visitors to the app, everyone else to sign-up. */
 export function LandingCta({ size = 'hero' }: { size?: 'hero' | 'nav' }) {
   const { user } = useAuth();
-  const href = useCtaHref();
+  const href = user ? '/app' : '/login';
 
   return (
     <Button

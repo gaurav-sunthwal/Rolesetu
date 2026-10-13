@@ -1,17 +1,18 @@
 import { Globe } from 'lucide-react';
 
+import { CountUp } from '@/components/landing/count-up';
 import { cn } from '@/lib/utils';
 
-type Verdict = 'strong' | 'partial' | 'missing';
+export type Verdict = 'strong' | 'partial' | 'missing';
 
-type SkillResult = {
+export type SampleSkill = {
   name: string;
   required: boolean;
   verdict: Verdict;
   evidence?: string;
 };
 
-const SAMPLE: SkillResult[] = [
+const SAMPLE: SampleSkill[] = [
   {
     name: 'React',
     required: true,
@@ -34,7 +35,7 @@ const SAMPLE: SkillResult[] = [
 // Same weights the real matcher uses: each skill gets a verdict, code does the math.
 const POINTS: Record<Verdict, number> = { strong: 1, partial: 0.5, missing: 0 };
 
-function tally(skills: SkillResult[]) {
+export function tally(skills: SampleSkill[]) {
   let earned = 0;
   let possible = 0;
   for (const skill of skills) {
@@ -45,7 +46,7 @@ function tally(skills: SkillResult[]) {
   return { earned, possible, score: Math.round((earned / possible) * 100) };
 }
 
-const VERDICT_STYLE: Record<Verdict, { dot: string; text: string }> = {
+export const VERDICT_STYLE: Record<Verdict, { dot: string; text: string }> = {
   strong: { dot: 'bg-success', text: 'text-success' },
   partial: { dot: 'bg-warning', text: 'text-warning' },
   missing: { dot: 'bg-destructive', text: 'text-destructive' },
@@ -77,7 +78,7 @@ export function SampleMatch() {
             className="mt-1 text-5xl leading-none font-medium tracking-[-0.04em] tabular-nums"
             aria-label={`Match score ${score} out of 100`}
           >
-            {score}
+            <CountUp value={score} />
             <span className="text-muted-foreground ml-1 text-lg tracking-normal">/ 100</span>
           </p>
         </div>
@@ -91,7 +92,14 @@ export function SampleMatch() {
         {Array.from({ length: SEGMENTS }, (_, index) => (
           <span
             key={index}
-            className={cn('h-2 flex-1 rounded-[2px]', index < filled ? 'bg-primary' : 'bg-muted')}
+            style={{ transitionDelay: `${300 + index * 30}ms` }}
+            className={cn(
+              'h-2 flex-1 rounded-[2px] transition-colors duration-300 motion-reduce:transition-none',
+              // Empty until the card scrolls into view, then filled one bar at a time.
+              index < filled
+                ? 'bg-primary group-data-[reveal=pending]/reveal:bg-muted'
+                : 'bg-muted',
+            )}
           />
         ))}
       </div>

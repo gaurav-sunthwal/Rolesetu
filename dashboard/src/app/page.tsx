@@ -4,14 +4,17 @@ import Link from 'next/link';
 
 import { FaqList } from '@/components/landing/faq';
 import { FeatureShowcase } from '@/components/landing/feature-showcase';
-import { HeroConsole } from '@/components/landing/hero-console';
+import { HeroJobCheck } from '@/components/landing/hero-job-check';
 import { JsonLd } from '@/components/landing/json-ld';
 import { LandingCta } from '@/components/landing/landing-cta';
 import { ResumeEditDemo } from '@/components/landing/resume-edit-demo';
+import { Reveal } from '@/components/landing/reveal';
+import { LiquidTexture } from '@/components/brand/liquid-texture';
 import { Display, Eyebrow, Texture } from '@/components/brand/primitives';
 import { SampleMatch } from '@/components/landing/sample-match';
 import { SiteFooter } from '@/components/landing/site-footer';
 import { SiteHeader } from '@/components/landing/site-header';
+import { Steps } from '@/components/landing/steps';
 import {
   applicationData,
   faqData,
@@ -19,7 +22,6 @@ import {
   organisationData,
   websiteData,
 } from '@/components/landing/structured-data';
-import { buttonVariants } from '@/components/ui/button';
 import { FEATURE_PAGES, featurePath, HOME_FAQS } from '@/content/marketing';
 import { cn } from '@/lib/utils';
 
@@ -100,41 +102,25 @@ export default function LandingPage() {
             aria-hidden
             className="from-background via-primary/30 to-primary absolute inset-0 -z-20 bg-linear-to-b from-20% via-60%"
           />
-          <Texture className="-z-10 [mask-image:linear-gradient(to_bottom,transparent_50%,black_95%)] opacity-45" />
+          <LiquidTexture className="hero-drift -z-10 [mask-image:linear-gradient(to_bottom,transparent_50%,black_95%)] opacity-45" />
 
-          <div className="mx-auto w-full max-w-6xl px-5 pt-20 pb-48 text-center sm:pt-28 sm:pb-64">
-            <p className="text-foreground/70 text-sm font-medium">
-              Job match score · Resume tailoring · Autofill · Application tracker
-            </p>
-            <Display as="h1" className="mx-auto mt-5 max-w-4xl sm:text-6xl lg:text-7xl">
-              Know your fit <span className="text-primary">before you apply</span>
-            </Display>
-            <p className="text-foreground/75 mx-auto mt-6 max-w-xl text-lg text-pretty">
-              Rolesetu scores any job description against your resume, puts the job&apos;s keywords
-              into your own resume PDF, fills the application form, and tracks where each
-              application stands.
-            </p>
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <LandingCta />
-              <a
-                href="#how-it-works"
-                className={cn(
-                  buttonVariants({ variant: 'outline' }),
-                  'bg-background/70 h-12 px-7 text-base backdrop-blur',
-                )}
-              >
-                See how it works
-              </a>
-            </div>
-            <div className="mt-10">
-              <HeroConsole />
-            </div>
+          <div className="mx-auto flex w-full max-w-6xl flex-col justify-center px-5 pt-12 pb-28 sm:pt-16 lg:min-h-[calc(100svh-4rem)] lg:py-12">
+            <HeroJobCheck>
+              <Eyebrow>Free job check · no sign-in</Eyebrow>
+              <Display as="h1" className="mt-6 sm:text-6xl lg:text-[4.25rem]">
+                Know your fit <span className="text-primary">before you apply</span>
+              </Display>
+              <p className="text-foreground/75 mx-auto mt-5 max-w-xl text-lg text-pretty lg:mx-0">
+                Paste a job link. We read the page and list every skill it asks for. Add your resume
+                to get an honest match score, with the evidence behind each skill.
+              </p>
+            </HeroJobCheck>
           </div>
         </section>
 
         <div className={RAILS}>
           <section id="what" className={cn(GUTTER, 'scroll-mt-16 py-20 sm:py-28')}>
-            <div className="max-w-3xl">
+            <Reveal className="max-w-3xl">
               <Eyebrow>What Rolesetu is</Eyebrow>
               <Display className="mt-6">
                 <span className="block">One assistant for</span>
@@ -147,14 +133,14 @@ export default function LandingPage() {
                 keeps a record of what you applied to and what came back. It prepares the work; you
                 decide what gets sent.
               </p>
-            </div>
+            </Reveal>
 
             <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURE_PAGES.map((page) => (
-                <li key={page.slug}>
+              {FEATURE_PAGES.map((page, index) => (
+                <Reveal as="li" key={page.slug} delay={(index % 3) * 80}>
                   <Link
                     href={featurePath(page.slug)}
-                    className="group bg-card hover:border-foreground/30 focus-visible:ring-ring/60 flex h-full flex-col rounded-2xl border p-5 transition-colors outline-none focus-visible:ring-2"
+                    className="group bg-card hover:border-foreground/30 focus-visible:ring-ring/60 flex h-full flex-col rounded-2xl border p-5 transition-[border-color,box-shadow,translate] duration-200 outline-none hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 focus-visible:ring-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                   >
                     <h3 className="flex items-center justify-between gap-3 font-medium">
                       {page.name}
@@ -162,7 +148,7 @@ export default function LandingPage() {
                     </h3>
                     <p className="text-muted-foreground mt-2 text-sm">{page.summary}</p>
                   </Link>
-                </li>
+                </Reveal>
               ))}
             </ul>
 
@@ -179,7 +165,7 @@ export default function LandingPage() {
 
           <section className={cn(GUTTER, 'border-t border-dashed py-20 sm:py-28')}>
             <div className="grid items-center gap-12 lg:grid-cols-[5fr_7fr] lg:gap-16">
-              <div>
+              <Reveal>
                 <Display>
                   <span className="block">A score you can</span>
                   <span className="text-primary block">check line by line.</span>
@@ -196,19 +182,22 @@ export default function LandingPage() {
                   See how a job gets scored
                   <ArrowRight className="size-4" />
                 </Link>
-              </div>
-              <div className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.5_0.24_292)] p-4 sm:p-8">
-                <Texture className="-z-10 opacity-25" />
+              </Reveal>
+              <Reveal
+                delay={120}
+                className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.5_0.24_292)] p-4 sm:p-8"
+              >
+                <LiquidTexture className="-z-10 opacity-25" />
                 <SampleMatch />
-              </div>
+              </Reveal>
             </div>
 
             <dl className="mt-16 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-              {SCORE_FACTS.map((fact) => (
-                <div key={fact.title} className="border-t pt-4">
+              {SCORE_FACTS.map((fact, index) => (
+                <Reveal key={fact.title} delay={index * 80} className="border-t pt-4">
                   <dt className="text-sm font-medium">{fact.title}</dt>
                   <dd className="text-muted-foreground mt-1.5 text-sm">{fact.body}</dd>
-                </div>
+                </Reveal>
               ))}
             </dl>
           </section>
@@ -218,7 +207,7 @@ export default function LandingPage() {
             className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
           >
             <div className="grid items-center gap-12 lg:grid-cols-[7fr_5fr] lg:gap-16">
-              <div className="lg:order-last">
+              <Reveal className="lg:order-last">
                 <Eyebrow>Resume match</Eyebrow>
                 <Display className="mt-6">
                   <span className="block">Still your resume.</span>
@@ -236,19 +225,22 @@ export default function LandingPage() {
                   See how resume tailoring works
                   <ArrowRight className="size-4" />
                 </Link>
-              </div>
-              <div className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.43_0.11_155)] p-4 sm:p-8">
-                <Texture className="-z-10 opacity-20" />
+              </Reveal>
+              <Reveal
+                delay={120}
+                className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.43_0.11_155)] p-4 sm:p-8"
+              >
+                <LiquidTexture className="-z-10 opacity-20" />
                 <ResumeEditDemo />
-              </div>
+              </Reveal>
             </div>
 
             <dl className="mt-16 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-              {RESUME_FACTS.map((fact) => (
-                <div key={fact.title} className="border-t pt-4">
+              {RESUME_FACTS.map((fact, index) => (
+                <Reveal key={fact.title} delay={index * 80} className="border-t pt-4">
                   <dt className="text-sm font-medium">{fact.title}</dt>
                   <dd className="text-muted-foreground mt-1.5 text-sm">{fact.body}</dd>
-                </div>
+                </Reveal>
               ))}
             </dl>
           </section>
@@ -257,7 +249,7 @@ export default function LandingPage() {
             id="features"
             className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
           >
-            <div className="mx-auto max-w-3xl text-center">
+            <Reveal className="mx-auto max-w-3xl text-center">
               <Eyebrow>One profile, every step</Eyebrow>
               <Display className="mt-6">
                 <span className="block">From finding a job</span>
@@ -267,39 +259,26 @@ export default function LandingPage() {
                 Your resume is read once. After that every tool works from the same profile and the
                 same evidence.
               </p>
-            </div>
-            <div className="mt-14">
+            </Reveal>
+            <Reveal delay={120} className="mt-14">
               <FeatureShowcase />
-            </div>
+            </Reveal>
           </section>
 
           <section
             id="how-it-works"
             className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
           >
-            <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
-              <div className="lg:sticky lg:top-28 lg:self-start">
-                <Display>
-                  <span className="block">From resume to reply</span>
-                  <span className="text-primary block">in five steps.</span>
-                </Display>
-                <p className="text-muted-foreground mt-6 max-w-md text-lg">
-                  Set up once. After that, each job takes a few seconds to check and a few clicks to
-                  apply.
-                </p>
-              </div>
-              <ol>
-                {STEPS.map((step, index) => (
-                  <li key={step.title} className="border-b py-8 first:pt-0 last:border-b-0">
-                    <p className="text-muted-foreground/50 font-mono text-4xl tracking-tight">
-                      0{index + 1}
-                    </p>
-                    <h3 className="mt-5 text-xl font-medium tracking-tight">{step.title}</h3>
-                    <p className="text-muted-foreground mt-2 max-w-md">{step.body}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
+            <Steps steps={STEPS}>
+              <Display>
+                <span className="block">From resume to reply</span>
+                <span className="text-primary block">in five steps.</span>
+              </Display>
+              <p className="text-muted-foreground mt-6 max-w-md text-lg">
+                Set up once. After that, each job takes a few seconds to check and a few clicks to
+                apply.
+              </p>
+            </Steps>
           </section>
         </div>
 
@@ -312,15 +291,20 @@ export default function LandingPage() {
             </Display>
 
             <ul className="bg-border mt-14 grid gap-px overflow-hidden rounded-2xl border sm:grid-cols-2 lg:grid-cols-3">
-              {PROMISES.map((promise) => (
-                <li key={promise.body} className="bg-background flex min-h-40 flex-col p-6">
+              {PROMISES.map((promise, index) => (
+                <Reveal
+                  as="li"
+                  key={promise.body}
+                  delay={(index % 3) * 70}
+                  className="bg-background flex min-h-40 flex-col p-6"
+                >
                   <p className="text-muted-foreground font-mono text-[0.6875rem] tracking-[0.14em] uppercase">
                     {promise.label}
                   </p>
                   <p className="mt-auto pt-8 text-lg leading-snug font-medium tracking-tight">
                     {promise.body}
                   </p>
-                </li>
+                </Reveal>
               ))}
               <li className="relative isolate flex min-h-40 flex-col overflow-hidden bg-[oklch(0.5_0.14_155)] p-6 sm:col-span-2 lg:col-span-1">
                 <Texture className="-z-10 opacity-20" />
@@ -345,16 +329,18 @@ export default function LandingPage() {
           </section>
 
           <section className={cn(GUTTER, 'border-t border-dashed py-24 sm:py-32')}>
-            <Display className="sm:text-6xl">
-              <span className="block">Stop guessing which jobs</span>
-              <span className="text-primary block">are worth your time.</span>
-            </Display>
-            <p className="text-muted-foreground mt-6 max-w-md text-lg">
-              Upload your resume and check your first job in a couple of minutes.
-            </p>
-            <div className="mt-9">
-              <LandingCta />
-            </div>
+            <Reveal>
+              <Display className="sm:text-6xl">
+                <span className="block">Stop guessing which jobs</span>
+                <span className="text-primary block">are worth your time.</span>
+              </Display>
+              <p className="text-muted-foreground mt-6 max-w-md text-lg">
+                Upload your resume and check your first job in a couple of minutes.
+              </p>
+              <div className="mt-9">
+                <LandingCta />
+              </div>
+            </Reveal>
           </section>
         </div>
       </main>

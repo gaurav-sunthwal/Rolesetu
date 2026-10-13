@@ -24,4 +24,6 @@ export type MatchPage = Schemas['Page_MatchRead_'];
 export type SkillResult = Schemas['SkillResult'];
 export type Verdict = SkillResult['verdict'];
 
+export type JobPreview = Schemas['JobPreviewRead'];
+
 export type LlmKeyStatus = Schemas['LlmKeyStatus'];

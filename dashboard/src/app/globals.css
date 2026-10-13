@@ -149,3 +149,56 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Landing page motion. Everything here moves only opacity and transform, and
+ * none of it runs for people who ask for reduced motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  /* Content that fades up the first time it is scrolled to (see Reveal). */
+  [data-reveal] {
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  [data-reveal='pending'] {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+
+  /* A score ring that draws itself: it starts empty and ends at its real value. */
+  @keyframes ring-draw {
+    from {
+      stroke-dashoffset: var(--ring-length);
+    }
+  }
+  .ring-draw {
+    animation: ring-draw 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+  }
+
+  /* Tied to the scroll position itself, where the browser supports it. */
+  @supports (animation-timeline: scroll()) {
+    @keyframes header-edge {
+      to {
+        border-bottom-color: var(--border);
+      }
+    }
+    .header-edge {
+      animation: header-edge linear both;
+      animation-timeline: scroll();
+      animation-range: 0 5rem;
+    }
+
+    @keyframes hero-drift {
+      to {
+        transform: translateY(10%) scale(1.06);
+      }
+    }
+    .hero-drift {
+      animation: hero-drift linear both;
+      animation-timeline: scroll();
+      animation-range: 0 100vh;
+    }
+  }
+}

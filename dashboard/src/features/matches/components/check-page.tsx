@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight, CircleAlert, History, Link2, ScanSearch, UserRound } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { MatchResult } from '@/features/matches/components/match-result';
 import { useCreateMatch, useMatch, useRecentMatches } from '@/features/matches/hooks';
+import { clearPendingJob, readPendingJob } from '@/features/preview/pending-job';
 import { useProfile } from '@/features/profile/hooks';
 import { errorMessage } from '@/lib/api/client';
 import type { Match, MatchCreate } from '@/lib/api/types';
@@ -45,9 +46,30 @@ type PasteValues = z.infer<typeof pasteSchema>;
 export function CheckPage() {
   const profile = useProfile();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [lastRequest, setLastRequest] = useState<MatchCreate | null>(null);
+  // A job looked up on the landing page before signing in is waiting to be scored.
+  const [pendingUrl] = useState(readPendingJob);
+  const [lastRequest, setLastRequest] = useState<MatchCreate | null>(
+    pendingUrl ? { url: pendingUrl } : null,
+  );
   const create = useCreateMatch();
   const match = useMatch(activeId);
+  const startedPending = useRef(false);
+
+  const hasEvidence = profile.data
+    ? profile.data.skills.length +
+        profile.data.experience.length +
+        profile.data.projects.length +
+        profile.data.education.length >
+      0
+    : false;
+
+  const { mutate } = create;
+  useEffect(() => {
+    if (!pendingUrl || !hasEvidence || startedPending.current) return;
+    startedPending.current = true;
+    clearPendingJob();
+    mutate({ url: pendingUrl }, { onSuccess: (created) => setActiveId(created.id) });
+  }, [pendingUrl, hasEvidence, mutate]);
 
   function submit(request: MatchCreate) {
     setLastRequest(request);
@@ -76,20 +98,18 @@ export function CheckPage() {
     );
   }
 
-  const hasEvidence =
-    profile.data.skills.length +
-      profile.data.experience.length +
-      profile.data.projects.length +
-      profile.data.education.length >
-    0;
   if (!hasEvidence) {
     return (
       <Shell>
         <SectionCard>
           <EmptyState
             icon={UserRound}
-            title="Add your experience first"
-            body="A match score compares the job against your profile. Add a few skills, a role or a project, then come back."
+            title={pendingUrl ? 'One step left: add your experience' : 'Add your experience first'}
+            body={
+              pendingUrl
+                ? 'Your job link is saved. A match score compares the job against your profile, so upload your resume or add a few skills, then come back here and it is scored straight away.'
+                : 'A match score compares the job against your profile. Add a few skills, a role or a project, then come back.'
+            }
             action={
               <Button nativeButton={false} render={<Link href="/app/profile" />}>
                 Build your profile

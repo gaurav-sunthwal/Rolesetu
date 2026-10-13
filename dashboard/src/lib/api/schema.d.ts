@@ -584,6 +584,26 @@ export interface paths {
     patch: operations['update_interview_api_v1_inbox_interviews__interview_id__patch'];
     trace?: never;
   };
+  '/api/v1/public/job-previews': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview Job
+     * @description No sign-in needed: this is what the landing page calls.
+     */
+    post: operations['preview_job_api_v1_public_job_previews_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -1058,6 +1078,35 @@ export interface components {
       location?: string | null;
       /** Notes */
       notes?: string | null;
+    };
+    /** JobPreviewCreate */
+    JobPreviewCreate: {
+      /** Url */
+      url: string;
+    };
+    /**
+     * JobPreviewRead
+     * @description What a job asks for, read from its link. No score: that needs a profile.
+     */
+    JobPreviewRead: {
+      /** Url */
+      url: string;
+      /** Title */
+      title: string | null;
+      /** Company */
+      company: string | null;
+      /** Location */
+      location: string | null;
+      /** Employment Type */
+      employment_type: string | null;
+      /** Salary */
+      salary: string | null;
+      /** Min Years Experience */
+      min_years_experience: number | null;
+      /** Required Skills */
+      required_skills: string[];
+      /** Nice To Have Skills */
+      nice_to_have_skills: string[];
     };
     /**
      * KeptRead
@@ -2588,6 +2637,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['InterviewRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  preview_job_api_v1_public_job_previews_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['JobPreviewCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobPreviewRead'];
         };
       };
       /** @description Validation Error */
