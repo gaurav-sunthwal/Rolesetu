@@ -97,14 +97,16 @@ async def _record(request: Request, exc: Exception, *, level: str, status: int) 
     # and this file is imported before either is ready.
     from backend.modules.errors import service as errors_service
 
-    route = request.scope.get("route")
+    # The route as written in the code, so /matches/1 and /matches/2 count as one problem.
+    route = request.url.path
+    for name, value in request.path_params.items():
+        route = route.replace(f"/{value}", f"/{{{name}}}", 1)
     await errors_service.record(
         source="api",
         level=level,
         exc=exc,
         message=str(exc) or type(exc).__name__,
-        # The route as written in the code, so /matches/1 and /matches/2 are one problem.
-        route=getattr(route, "path", None) or request.url.path,
+        route=route,
         method=request.method,
         status=status,
     )
