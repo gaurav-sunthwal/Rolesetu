@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.pagination import Page
@@ -14,6 +14,8 @@ from backend.modules.admin.schemas import (
     AdminStats,
     AdminUserDetail,
     AdminUserRow,
+    ErrorEventRead,
+    ErrorSummary,
     WaitlistRow,
 )
 
@@ -86,3 +88,33 @@ async def list_audit(
     db: AsyncSession = Depends(get_db),
 ) -> Page[AdminActionRead]:
     return await service.list_actions(db, cursor=cursor, limit=limit)
+
+
+@router.get("/errors", response_model=ErrorSummary)
+async def list_errors(
+    hours: Annotated[int, Query(ge=1, le=720)] = 24,
+    source: Annotated[str | None, Query(max_length=20)] = None,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> ErrorSummary:
+    """What went wrong in the period, grouped by problem, most frequent first."""
+    return await service.list_errors(db, hours=hours, source=source)
+
+
+@router.get("/errors/{fingerprint}", response_model=list[ErrorEventRead])
+async def read_error(
+    fingerprint: Annotated[str, Path(max_length=64)],
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[ErrorEventRead]:
+    return await service.error_events(db, fingerprint=fingerprint)
+
+
+@router.delete("/errors/{fingerprint}", status_code=204)
+async def clear_error(
+    fingerprint: Annotated[str, Path(max_length=64)],
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Removes every event of one problem, once it has been dealt with."""
+    await service.clear_errors(db, admin=admin, fingerprint=fingerprint)

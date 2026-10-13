@@ -13,7 +13,7 @@ class AdminAction(IdMixin, TimestampMixin, Base):
     __table_args__ = (Index("ix_admin_actions_created", "created_at", "id"),)
 
     admin_email: Mapped[str]
-    # "user.view" | "user.delete" | "waitlist.view"
+    # "user.view" | "user.delete" | "waitlist.view" | "errors.clear"
     action: Mapped[str]
     target_type: Mapped[str]
     target_id: Mapped[str]

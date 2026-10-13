@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 
 import { Card, Empty, ErrorNote, Loading, PageHeader, td, th } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
@@ -107,6 +108,17 @@ export default function DashboardPage() {
               value={stats.data.paid_reads_today}
               note="Context.dev credits used in the last 24 hours"
             />
+            <Link href="/errors" className="block rounded-xl focus-visible:outline-2">
+              <Stat
+                label="Errors"
+                value={stats.data.errors_today}
+                note={
+                  stats.data.errors_today
+                    ? 'In the last 24 hours. Open to see them'
+                    : 'None in the last 24 hours'
+                }
+              />
+            </Link>
           </div>
           <Daily days={stats.data.daily} />
           <Card>

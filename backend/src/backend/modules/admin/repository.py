@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.modules.admin.models import AdminAction
 from backend.modules.applications.models import Application
+from backend.modules.errors.models import ErrorEvent
 from backend.modules.inbox.models import Integration
 from backend.modules.matches.models import Job, Match
 from backend.modules.previews.models import JobPreview
@@ -45,6 +46,9 @@ async def totals(db: AsyncSession, since: datetime) -> dict[str, int]:
         "applications": await _count(db, select(Application.id)),
         "gmail_connected": await _count(db, select(Integration.id)),
         "waitlist": await _count(db, select(WaitlistEntry.id)),
+        "errors_today": await _count(
+            db, select(ErrorEvent.id).where(ErrorEvent.created_at > since)
+        ),
         "previews_today": await _count(
             db, select(JobPreview.id).where(JobPreview.created_at > since)
         ),

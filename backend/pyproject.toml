@@ -88,3 +88,4 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 pythonpath = ["src"]
+markers = ["records_errors: the test checks error recording, so events are really written"]

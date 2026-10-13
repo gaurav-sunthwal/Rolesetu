@@ -25,9 +25,13 @@ from backend.modules.admin.schemas import (
     AdminUserDetail,
     AdminUserRow,
     DayCount,
+    ErrorEventRead,
+    ErrorGroup,
+    ErrorSummary,
     SiteReads,
     WaitlistRow,
 )
+from backend.modules.errors import repository as errors_repository
 from backend.modules.matches.models import Match
 from backend.modules.profiles import service as profiles_service
 from backend.modules.users.models import User
@@ -184,3 +188,47 @@ async def list_actions(
         items=[AdminActionRead.model_validate(row) for row in rows],
         next_cursor=encode_cursor(rows[-1].created_at, rows[-1].id) if has_more else None,
     )
+
+
+async def list_errors(db: AsyncSession, *, hours: int, source: str | None) -> ErrorSummary:
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    rows = await errors_repository.groups(db, since=since, source=source)
+    # Two events of one problem in the same instant would otherwise list it twice.
+    seen: set[str] = set()
+    groups: list[ErrorGroup] = []
+    for event, events, first_at, last_at in rows:
+        if event.fingerprint in seen:
+            continue
+        seen.add(event.fingerprint)
+        groups.append(
+            ErrorGroup(
+                fingerprint=event.fingerprint,
+                source=event.source,
+                level=event.level,
+                route=event.route,
+                method=event.method,
+                status=event.status,
+                code=event.code,
+                message=event.message,
+                events=events,
+                first_at=first_at,
+                last_at=last_at,
+            )
+        )
+    return ErrorSummary(
+        groups=groups,
+        by_source=await errors_repository.counts_by_source(db, since),
+    )
+
+
+async def error_events(db: AsyncSession, *, fingerprint: str) -> list[ErrorEventRead]:
+    events = await errors_repository.events_for(db, fingerprint, RECENT_ROWS * 2)
+    if not events:
+        raise NotFoundError("No such error. It may have been cleared.")
+    return [ErrorEventRead.model_validate(event) for event in events]
+
+
+async def clear_errors(db: AsyncSession, *, admin: Admin, fingerprint: str) -> None:
+    removed = await errors_repository.delete_group(db, fingerprint)
+    if removed:
+        _record(db, admin, "errors.clear", "error", fingerprint, f"Cleared {removed} events")

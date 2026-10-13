@@ -734,6 +734,47 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/errors': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Errors
+     * @description What went wrong in the period, grouped by problem, most frequent first.
+     */
+    get: operations['list_errors_api_v1_admin_errors_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/errors/{fingerprint}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Error */
+    get: operations['read_error_api_v1_admin_errors__fingerprint__get'];
+    put?: never;
+    post?: never;
+    /**
+     * Clear Error
+     * @description Removes every event of one problem, once it has been dealt with.
+     */
+    delete: operations['clear_error_api_v1_admin_errors__fingerprint__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -873,6 +914,8 @@ export interface components {
       waitlist: number;
       /** Previews Today */
       previews_today: number;
+      /** Errors Today */
+      errors_today: number;
       /** Paid Reads Today */
       paid_reads_today: number;
       /** Daily */
@@ -1232,6 +1275,78 @@ export interface components {
       application_id: string | null;
       /** Gmail Url */
       gmail_url?: string | null;
+    };
+    /** ErrorEventRead */
+    ErrorEventRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Source */
+      source: string;
+      /** Level */
+      level: string;
+      /** Route */
+      route: string | null;
+      /** Method */
+      method: string | null;
+      /** Status */
+      status: number | null;
+      /** Code */
+      code: string | null;
+      /** Message */
+      message: string;
+      /** Stack */
+      stack: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * ErrorGroup
+     * @description One problem: every event with the same cause, counted together.
+     */
+    ErrorGroup: {
+      /** Fingerprint */
+      fingerprint: string;
+      /** Source */
+      source: string;
+      /** Level */
+      level: string;
+      /** Route */
+      route: string | null;
+      /** Method */
+      method: string | null;
+      /** Status */
+      status: number | null;
+      /** Code */
+      code: string | null;
+      /** Message */
+      message: string;
+      /** Events */
+      events: number;
+      /**
+       * First At
+       * Format: date-time
+       */
+      first_at: string;
+      /**
+       * Last At
+       * Format: date-time
+       */
+      last_at: string;
+    };
+    /** ErrorSummary */
+    ErrorSummary: {
+      /** Groups */
+      groups: components['schemas']['ErrorGroup'][];
+      /** By Source */
+      by_source: {
+        [key: string]: number;
+      };
     };
     /**
      * ExperienceCheck
@@ -3276,6 +3391,98 @@ export interface operations {
         content: {
           'application/json': components['schemas']['Page_AdminActionRead_'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_errors_api_v1_admin_errors_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+        source?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorSummary'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_error_api_v1_admin_errors__fingerprint__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEventRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  clear_error_api_v1_admin_errors__fingerprint__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

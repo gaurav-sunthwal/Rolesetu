@@ -1,7 +1,9 @@
 """Reads the job at a link, trying the free way first and the paid way second."""
 
 from collections.abc import Awaitable, Callable
+from urllib.parse import urlsplit
 
+from backend.modules.errors import service as errors_service
 from backend.modules.matches.fetching.job_page import JobPage, is_job_list, read_job_page
 from backend.modules.matches.fetching.rendered_fetch import fetch_rendered, is_configured
 from backend.modules.matches.fetching.safe_fetch import (
@@ -37,6 +39,7 @@ async def load_job_page(
         if rendered is not None:
             markup, page, reader = rendered, read_job_page(rendered), "rendered"
         elif blocked is not None:
+            await _note_failure(url, blocked)
             raise blocked
 
     if page is None:
@@ -44,5 +47,23 @@ async def load_job_page(
             raise PageFetchError(
                 "That link is a list of jobs, not one job. Open the job you want and use its link."
             )
-        raise PageFetchError(f"We could not find a job description on that page. {PASTE_INSTEAD}")
+        unread = PageFetchError(
+            f"We could not find a job description on that page. {PASTE_INSTEAD}"
+        )
+        await _note_failure(url, unread)
+        raise unread
     return page, reader
+
+
+async def _note_failure(url: str, error: PageFetchError) -> None:
+    """A job page we should have been able to read and could not. Recorded by
+    site, so the admin panel shows which sites need work. A link that was simply
+    wrong (not a job, removed, unsafe) is the visitor's mistake and is not kept.
+    """
+    await errors_service.record(
+        source="job-link",
+        level="warning",
+        exc=error,
+        message=error.detail,
+        route=urlsplit(url).hostname,
+    )

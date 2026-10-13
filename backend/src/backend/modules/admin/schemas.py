@@ -33,6 +33,7 @@ class AdminStats(BaseModel):
     gmail_connected: int
     waitlist: int
     previews_today: int
+    errors_today: int
     # Reads through the paid page reader in the last day, by visitors and by users.
     paid_reads_today: int
     daily: list[DayCount]
@@ -116,4 +117,41 @@ class AdminActionRead(BaseModel):
     target_type: str
     target_id: str
     summary: str | None
+    created_at: datetime
+
+
+class ErrorGroup(BaseModel):
+    """One problem: every event with the same cause, counted together."""
+
+    fingerprint: str
+    source: str
+    level: str
+    route: str | None
+    method: str | None
+    status: int | None
+    code: str | None
+    message: str
+    events: int
+    first_at: datetime
+    last_at: datetime
+
+
+class ErrorSummary(BaseModel):
+    groups: list[ErrorGroup]
+    # How many events each source produced in the period, whatever the filter.
+    by_source: dict[str, int]
+
+
+class ErrorEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    source: str
+    level: str
+    route: str | None
+    method: str | None
+    status: int | None
+    code: str | None
+    message: str
+    stack: str | None
     created_at: datetime

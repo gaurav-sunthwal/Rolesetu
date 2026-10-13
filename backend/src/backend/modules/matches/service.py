@@ -19,6 +19,7 @@ from backend.core.exceptions import (
 )
 from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.db.session import get_sessionmaker
+from backend.modules.errors import service as errors_service
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches import repository, scoring
 from backend.modules.matches.fetching.job_page import JobPage
@@ -417,11 +418,15 @@ async def run_match(match_id: uuid.UUID) -> None:
         except AppError as exc:
             await db.rollback()
             await _mark_failed(db, match_id, exc.detail)
+            await errors_service.record(
+                source="job-check", level="warning", exc=exc, message=exc.detail
+            )
             return
-        except Exception:
+        except Exception as exc:
             logger.exception("Match %s failed", match_id)
             await db.rollback()
             await _mark_failed(db, match_id, "Scoring failed unexpectedly. Please try again.")
+            await errors_service.record(source="job-check", exc=exc, message=str(exc))
             return
         await db.commit()
 

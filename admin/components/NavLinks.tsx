@@ -7,6 +7,7 @@ const LINKS = [
   { href: '/', label: 'Dashboard' },
   { href: '/users', label: 'Users' },
   { href: '/waitlist', label: 'Waiting list' },
+  { href: '/errors', label: 'Errors' },
   { href: '/audit', label: 'Audit log' },
 ];
 

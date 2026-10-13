@@ -92,9 +92,31 @@ def describe_validation(errors: list[dict[str, Any]]) -> str:
     return f"{subject} is not valid. Please check it and try again."
 
 
+async def _record(request: Request, exc: Exception, *, level: str, status: int) -> None:
+    # Imported here: the errors module needs the database, which needs settings,
+    # and this file is imported before either is ready.
+    from backend.modules.errors import service as errors_service
+
+    route = request.scope.get("route")
+    await errors_service.record(
+        source="api",
+        level=level,
+        exc=exc,
+        message=str(exc) or type(exc).__name__,
+        # The route as written in the code, so /matches/1 and /matches/2 are one problem.
+        route=getattr(route, "path", None) or request.url.path,
+        method=request.method,
+        status=status,
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
+    async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
+        # A failure we chose to report as our own fault (a service we depend on
+        # is down, say) is worth seeing in the admin panel. A refused request is not.
+        if exc.status_code >= 500:
+            await _record(request, exc, level="warning", status=exc.status_code)
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     @app.exception_handler(RequestValidationError)
@@ -109,6 +131,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         full error goes to the log, where it can be fixed.
         """
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        await _record(request, exc, level="error", status=500)
         return JSONResponse(
             status_code=500,
             content={

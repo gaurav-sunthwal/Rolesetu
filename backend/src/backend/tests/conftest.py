@@ -13,6 +13,7 @@ from sqlalchemy import delete
 from backend.core.security import CurrentUser, get_current_user
 from backend.db.session import get_engine, get_sessionmaker
 from backend.main import app
+from backend.modules.errors import service as errors_service
 from backend.modules.users.models import User
 
 ClientFactory = Callable[[], AsyncClient]
@@ -22,6 +23,20 @@ ClientFactory = Callable[[], AsyncClient]
 async def _dispose_engine() -> AsyncGenerator[None]:
     yield
     await get_engine().dispose()
+
+
+@pytest.fixture(autouse=True)
+def _errors_not_recorded(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests cause failures on purpose. They are kept out of the errors table
+    (which the admin panel shows) unless a test is about recording itself.
+    """
+    if "records_errors" in request.keywords:
+        return
+
+    async def nothing(**_: object) -> None:
+        return None
+
+    monkeypatch.setattr(errors_service, "record", nothing)
 
 
 @pytest.fixture
