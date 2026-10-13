@@ -44,8 +44,10 @@ export function HeroJobCheck({ children }: { children: React.ReactNode }) {
     result.current?.scrollIntoView({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' });
   }
 
+  // The single phone column is told it may shrink; otherwise one long unbroken
+  // line (a link, a web address) makes the whole hero wider than the screen.
   return (
-    <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
       <div className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both text-center duration-700 motion-reduce:animate-none lg:text-left">
         {children}
 
@@ -65,7 +67,7 @@ export function HeroJobCheck({ children }: { children: React.ReactNode }) {
             placeholder="Paste a job link"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            className="placeholder:text-muted-foreground h-12 min-w-0 flex-1 bg-transparent px-3 text-left text-base outline-none sm:px-0"
+            className="placeholder:text-muted-foreground h-12 w-full min-w-0 shrink-0 bg-transparent px-3 text-left text-base outline-none sm:w-auto sm:flex-1 sm:shrink sm:px-0"
           />
           <button
             type="submit"

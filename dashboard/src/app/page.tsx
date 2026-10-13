@@ -177,7 +177,7 @@ export default function LandingPage() {
                 </p>
                 <Link
                   href={featurePath('job-match-score')}
-                  className="text-primary mt-7 inline-flex items-center gap-2 text-sm font-medium hover:underline"
+                  className="text-primary mt-4 inline-flex items-center gap-2 py-3 text-sm font-medium hover:underline"
                 >
                   See how a job gets scored
                   <ArrowRight className="size-4" />
@@ -220,7 +220,7 @@ export default function LandingPage() {
                 </p>
                 <Link
                   href={featurePath('resume-keyword-match')}
-                  className="text-primary mt-7 inline-flex items-center gap-2 text-sm font-medium hover:underline"
+                  className="text-primary mt-4 inline-flex items-center gap-2 py-3 text-sm font-medium hover:underline"
                 >
                   See how resume tailoring works
                   <ArrowRight className="size-4" />

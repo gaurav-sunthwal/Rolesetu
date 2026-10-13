@@ -4,7 +4,8 @@ import { NAV_LINKS } from '@/components/landing/site-header';
 import { Logo } from '@/components/logo';
 import { FEATURE_PAGES, featurePath } from '@/content/marketing';
 
-const LINK = 'text-foreground/70 hover:text-foreground transition-colors';
+// Padded so each link is a comfortable target for a thumb.
+const LINK = 'text-foreground/70 hover:text-foreground inline-block py-2 transition-colors';
 
 export function SiteFooter() {
   return (
@@ -19,7 +20,7 @@ export function SiteFooter() {
         </div>
         <nav aria-label="Product">
           <h2 className="text-sm font-medium">Product</h2>
-          <ul className="mt-4 space-y-2.5 text-sm">
+          <ul className="mt-2 text-sm">
             {FEATURE_PAGES.map((page) => (
               <li key={page.slug}>
                 <Link href={featurePath(page.slug)} className={LINK}>
@@ -31,7 +32,7 @@ export function SiteFooter() {
         </nav>
         <nav aria-label="Rolesetu">
           <h2 className="text-sm font-medium">Rolesetu</h2>
-          <ul className="mt-4 space-y-2.5 text-sm">
+          <ul className="mt-2 text-sm">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <Link href={link.href} className={LINK}>

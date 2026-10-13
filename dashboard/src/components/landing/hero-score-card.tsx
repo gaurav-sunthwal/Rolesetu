@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 
 const CARD =
   'bg-card text-card-foreground w-full overflow-hidden rounded-2xl border text-left shadow-2xl shadow-black/20';
+// On the narrowest phones the ring sits above the list instead of beside it.
+const BODY = 'flex flex-col items-center gap-4 px-5 py-4 min-[380px]:flex-row min-[380px]:gap-5';
 const MAX_ROWS = 6;
 // Rows arrive one after another; the delay is set per row.
 const ROW_ENTER =
@@ -121,9 +123,9 @@ export function ExampleScoreCard() {
   return (
     <div className={CARD}>
       <Header host={EXAMPLE.host} tag="Example" title={EXAMPLE.title} facts={EXAMPLE.facts} />
-      <div className="flex items-center gap-5 px-5 py-4">
+      <div className={BODY}>
         <ScoreRing score={score} className="size-28" draw />
-        <ul className="min-w-0 flex-1">
+        <ul className="w-full min-w-0 flex-1">
           {EXAMPLE.skills.map((skill, index) => {
             const style = VERDICT_STYLE[skill.verdict];
             return (
@@ -165,9 +167,9 @@ export function LoadingScoreCard() {
         <Skeleton className="h-6 w-2/3" />
         <Skeleton className="mt-2 h-4 w-1/2" />
       </div>
-      <div className="flex items-center gap-5 px-5 py-4">
+      <div className={BODY}>
         <Skeleton className="size-28 shrink-0 rounded-full" />
-        <div className="flex-1 space-y-3">
+        <div className="w-full flex-1 space-y-3">
           {HIDDEN_WIDTHS.map((width) => (
             <Skeleton key={width} className="h-4" style={{ width }} />
           ))}
@@ -227,10 +229,10 @@ export function LockedScoreCard({ job }: { job: JobPreview }) {
         title={job.title ?? 'Job posting'}
         facts={facts}
       />
-      <div className="flex items-center gap-5 px-5 py-4">
+      <div className={BODY}>
         <LockedRing />
         {shown.length > 0 ? (
-          <ul className="min-w-0 flex-1" aria-label="Skills this job asks for">
+          <ul className="w-full min-w-0 flex-1" aria-label="Skills this job asks for">
             {shown.map((skill, index) => (
               <li
                 key={skill}
