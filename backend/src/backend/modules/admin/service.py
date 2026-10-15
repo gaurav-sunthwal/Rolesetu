@@ -164,7 +164,7 @@ async def user_detail(db: AsyncSession, *, admin: Admin, user_id: uuid.UUID) -> 
             AdminResume.model_validate(item) for item in await repository.resumes(db, user_id)
         ],
         gmail_last_synced_at=await repository.gmail_last_synced(db, user_id),
-        emails=[
+        panel_emails=[
             OutreachRead.model_validate(item)
             for item in await repository.emails_for(db, user_id, RECENT_ROWS)
         ],

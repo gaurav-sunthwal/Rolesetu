@@ -81,7 +81,7 @@ async def test_an_admin_emails_one_person_by_first_name(
     assert "Hi Asha," in email["text"] and get_settings().extension_store_url in email["html"]
 
     detail = (await admin.get(f"{ADMIN}/users/{target}")).json()
-    assert [item["subject"] for item in detail["emails"]] == ["Hello Asha"]
+    assert [item["subject"] for item in detail["panel_emails"]] == ["Hello Asha"]
     assert detail["user"]["last_emailed_at"] is not None
 
 

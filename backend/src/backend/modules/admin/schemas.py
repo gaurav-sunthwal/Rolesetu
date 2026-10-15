@@ -106,7 +106,8 @@ class AdminUserDetail(BaseModel):
     applications: list[AdminApplication]
     resumes: list[AdminResume]
     gmail_last_synced_at: datetime | None
-    emails: list["OutreachRead"]
+    # Emails admins sent this person from the panel (never anything from their Gmail).
+    panel_emails: list["OutreachRead"]
 
 
 class WaitlistRow(BaseModel):

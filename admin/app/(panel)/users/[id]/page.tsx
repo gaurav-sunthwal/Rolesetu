@@ -299,7 +299,7 @@ export default function UserPage() {
       <UserEmail
         userId={user.id}
         extensionConnected={user.extension_connected}
-        sent={detail.data.emails}
+        sent={detail.data.panel_emails}
       />
 
       <DeleteAccount id={user.id} email={user.email} />

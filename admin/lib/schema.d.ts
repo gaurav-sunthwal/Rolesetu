@@ -988,8 +988,8 @@ export interface components {
       resumes: components['schemas']['AdminResume'][];
       /** Gmail Last Synced At */
       gmail_last_synced_at: string | null;
-      /** Emails */
-      emails: components['schemas']['OutreachRead'][];
+      /** Panel Emails */
+      panel_emails: components['schemas']['OutreachRead'][];
     };
     /** AdminUserRow */
     AdminUserRow: {
