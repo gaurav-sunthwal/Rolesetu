@@ -58,7 +58,12 @@ class Settings(BaseSettings):
     # need JavaScript). Paid per call, so it is only tried after our fetch fails.
     # Keys are tried in order; with none set, the fallback is simply off.
     context_api_keys: list[str] = []
-    context_timeout_seconds: float = 25.0
+    # How long Context.dev may take over one try, and how many tries a page gets.
+    # The same page can take ten seconds one time and stall the next, so two
+    # short tries succeed more often than one long one. Together with our own
+    # fetch this stays inside the minute the website waits for a job check.
+    context_timeout_seconds: float = 15.0
+    context_attempts: int = 2
     # Paid reads a day the landing page's job preview may use, across all visitors.
     # Signed-in users have their own allowance, so this cannot starve them.
     preview_rendered_reads_per_day: int = 20

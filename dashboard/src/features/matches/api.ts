@@ -2,7 +2,7 @@ import { api } from '@/lib/api/client';
 import type { Match, MatchCreate, MatchPage } from '@/lib/api/types';
 
 // With only a link the page is read first, and one that blocks us takes a slower second route.
-const CREATE_TIMEOUT_MS = 45_000;
+const CREATE_TIMEOUT_MS = 60_000;
 
 export async function createMatch(body: MatchCreate): Promise<Match> {
   const { data } = await api.post<Match>('/matches', body, { timeout: CREATE_TIMEOUT_MS });

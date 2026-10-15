@@ -1,7 +1,8 @@
 """Reads the job at a link, trying the free way first and the paid way second."""
 
+import re
 from collections.abc import Awaitable, Callable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from backend.modules.errors import service as errors_service
 from backend.modules.matches.fetching.job_page import JobPage, is_job_list, read_job_page
@@ -13,6 +14,28 @@ from backend.modules.matches.fetching.safe_fetch import (
     fetch_page,
 )
 
+_INDEED_HOST = re.compile(r"(?:^|\.)indeed\.com$")
+_INDEED_JOB_ID = re.compile(r"^[0-9a-f]{16}$")
+
+
+def page_to_read(url: str) -> str:
+    """The address to fetch for a job link.
+
+    Indeed serves an empty page, with no description in it, to its share links
+    ("...&from=shareddesktop_copy") and to links copied from search results
+    ("/jobs?q=...&vjk=..."). Its plain job address has the whole listing, so
+    any Indeed link that names a job is read from there. Other links are
+    fetched as they are.
+    """
+    parts = urlsplit(url)
+    if not _INDEED_HOST.search(parts.hostname or ""):
+        return url
+    query = parse_qs(parts.query)
+    job_id = (query.get("jk") or query.get("vjk") or [""])[0]
+    if not _INDEED_JOB_ID.match(job_id):
+        return url
+    return f"https://{parts.hostname}/viewjob?jk={job_id}"
+
 
 async def load_job_page(
     url: str, may_use_rendered: Callable[[], Awaitable[bool]]
@@ -23,6 +46,7 @@ async def load_job_page(
     it, or the page comes back without a job on it, is the paid reader used,
     and then only if `may_use_rendered` agrees (it holds the caller's limits).
     """
+    url = page_to_read(url)
     blocked: PageBlockedError | None = None
     markup, page = "", None
     try:

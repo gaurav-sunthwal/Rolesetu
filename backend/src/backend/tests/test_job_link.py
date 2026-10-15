@@ -1,6 +1,7 @@
 """Reading a job from its link: the page reader and the fetcher's safety checks."""
 
 import json
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -316,6 +317,37 @@ async def test_the_next_key_is_used_when_one_has_run_out(monkeypatch: pytest.Mon
     assert seen == ["Bearer spent", "Bearer good"]
 
 
+async def test_a_page_that_loaded_too_slowly_is_tried_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replies = [
+        httpx.Response(200, json={"html": {"success": False, "error_code": "REQUEST_TIMEOUT"}}),
+        httpx.Response(200, json={"html": {"success": True, "data": "<p>Job</p>"}}),
+    ]
+    use_context_api(monkeypatch, httpx.MockTransport(lambda request: replies.pop(0)))
+    monkeypatch.setattr(get_settings(), "context_api_keys", ["good"])
+    assert await rendered_fetch.fetch_rendered(JOB_URL) == "<p>Job</p>"
+    assert replies == []
+
+
+async def test_a_page_that_is_always_too_slow_gives_up_after_the_last_try(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def too_slow(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200, json={"html": {"success": False, "error_code": "REQUEST_TIMEOUT"}}
+        )
+
+    use_context_api(monkeypatch, httpx.MockTransport(too_slow))
+    assert await rendered_fetch.fetch_rendered(JOB_URL) is None
+    # Two tries on the first key, and no slower round on the second.
+    assert calls == get_settings().context_attempts
+
+
 @pytest.mark.parametrize(
     "reply",
     [
@@ -331,3 +363,45 @@ async def test_a_failed_paid_read_gives_nothing_instead_of_an_error(
 ) -> None:
     use_context_api(monkeypatch, httpx.MockTransport(lambda request: reply))
     assert await rendered_fetch.fetch_rendered(JOB_URL) is None
+
+
+@pytest.mark.parametrize(
+    ("pasted", "read"),
+    [
+        (
+            "https://in.indeed.com/viewjob?jk=d58f533f017a275e&from=shareddesktop_copy",
+            "https://in.indeed.com/viewjob?jk=d58f533f017a275e",
+        ),
+        (
+            "https://www.indeed.com/jobs?q=react&l=Remote&vjk=0a1b2c3d4e5f6a7b",
+            "https://www.indeed.com/viewjob?jk=0a1b2c3d4e5f6a7b",
+        ),
+        # Not one job, not Indeed, or not an id it uses: left as they are.
+        ("https://in.indeed.com/jobs?q=react", "https://in.indeed.com/jobs?q=react"),
+        (
+            "https://notindeed.com/viewjob?jk=d58f533f017a275e",
+            "https://notindeed.com/viewjob?jk=d58f533f017a275e",
+        ),
+        ("https://in.indeed.com/viewjob?jk=<script>", "https://in.indeed.com/viewjob?jk=<script>"),
+    ],
+    ids=["share link", "search result", "search page", "other site", "odd id"],
+)
+def test_indeed_links_are_read_from_the_plain_job_address(pasted: str, read: str) -> None:
+    assert reader.page_to_read(pasted) == read
+
+
+async def test_the_plain_indeed_address_is_what_gets_fetched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fetched: list[str] = []
+
+    async def fetch(url: str) -> tuple[str, str]:
+        fetched.append(url)
+        return url, page_with(POSTING)
+
+    monkeypatch.setattr(reader, "fetch_page", fetch)
+    allow = AsyncMock(return_value=True)
+    await reader.load_job_page(
+        "https://in.indeed.com/viewjob?jk=d58f533f017a275e&from=shareddesktop_copy", allow
+    )
+    assert fetched == ["https://in.indeed.com/viewjob?jk=d58f533f017a275e"]

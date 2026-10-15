@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 API_URL = "https://api.context.dev/v1/web/scrape"
 # A key that is wrong, out of credits or rate limited: the next key is tried.
 _KEY_REFUSED = {401, 403, 429}
+# Context.dev gave up waiting for the page to load.
+_TOO_SLOW = "REQUEST_TIMEOUT"
 
 
 class _Output(BaseModel):
@@ -49,35 +51,47 @@ async def fetch_rendered(url: str) -> str | None:
         "formats": {"html": True},
         "timeoutOpts": {"milliseconds": int(deadline * 1000), "behavior": "fail"},
     }
-    # Longer than the deadline we give Context.dev, so its answer is not cut off.
-    async with httpx.AsyncClient(timeout=deadline + 5) as client:
+    # A little longer than the deadline we give Context.dev, so its answer is not cut off.
+    async with httpx.AsyncClient(timeout=deadline + 3) as client:
         for position, key in enumerate(settings.context_api_keys, start=1):
-            try:
-                response = await client.post(
-                    API_URL, json=body, headers={"Authorization": f"Bearer {key}"}
+            for attempt in range(1, settings.context_attempts + 1):
+                try:
+                    response = await client.post(
+                        API_URL, json=body, headers={"Authorization": f"Bearer {key}"}
+                    )
+                except httpx.HTTPError as exc:
+                    logger.warning(
+                        "rendered fetch failed host=%s error=%s", host, type(exc).__name__
+                    )
+                    return None
+                if response.status_code in _KEY_REFUSED:
+                    logger.warning(
+                        "rendered fetch key refused key=%d status=%d",
+                        position,
+                        response.status_code,
+                    )
+                    break
+                if response.status_code != 200:
+                    logger.warning(
+                        "rendered fetch failed host=%s status=%d", host, response.status_code
+                    )
+                    return None
+                try:
+                    output = _ScrapeResponse.model_validate_json(response.content).html
+                except ValidationError:
+                    logger.warning("rendered fetch gave an unexpected response host=%s", host)
+                    return None
+                if output.success and output.data:
+                    logger.info("rendered fetch ok host=%s key=%d try=%d", host, position, attempt)
+                    return output.data[:MAX_BYTES]
+                logger.info(
+                    "rendered fetch empty host=%s code=%s try=%d", host, output.error_code, attempt
                 )
-            except httpx.HTTPError as exc:
-                logger.warning("rendered fetch failed host=%s error=%s", host, type(exc).__name__)
+                # Only a page that was too slow is worth another try; a block will block again.
+                if output.error_code != _TOO_SLOW:
+                    return None
+            else:
+                # Every try ran out of time; another key would only be slower still.
                 return None
-            if response.status_code in _KEY_REFUSED:
-                logger.warning(
-                    "rendered fetch key refused key=%d status=%d", position, response.status_code
-                )
-                continue
-            if response.status_code != 200:
-                logger.warning(
-                    "rendered fetch failed host=%s status=%d", host, response.status_code
-                )
-                return None
-            try:
-                output = _ScrapeResponse.model_validate_json(response.content).html
-            except ValidationError:
-                logger.warning("rendered fetch gave an unexpected response host=%s", host)
-                return None
-            if not output.success or not output.data:
-                logger.info("rendered fetch empty host=%s code=%s", host, output.error_code)
-                return None
-            logger.info("rendered fetch ok host=%s key=%d", host, position)
-            return output.data[:MAX_BYTES]
     logger.error("rendered fetch: every Context.dev key was refused")
     return None
