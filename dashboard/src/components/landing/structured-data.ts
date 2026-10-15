@@ -38,6 +38,8 @@ export function applicationData(features: string[]) {
     applicationCategory: 'BusinessApplication',
     applicationSubCategory: 'Job search',
     operatingSystem: 'Web, Chrome',
+    installUrl: SITE.chromeExtensionUrl,
+    downloadUrl: SITE.chromeExtensionUrl,
     featureList: features,
     isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },

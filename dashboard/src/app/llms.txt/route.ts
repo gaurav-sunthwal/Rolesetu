@@ -27,6 +27,7 @@ function body(): string {
     `${SITE.name} is a web app with a Chrome extension for people applying to jobs. It is an assistant, not an auto-apply bot: it never submits an application, never sends an email, and never adds a skill to a resume that the user did not confirm.`,
     '',
     `Website: ${SITE.url}`,
+    `Chrome extension: ${SITE.chromeExtensionUrl}`,
     `Last updated: ${SITE.updated}`,
     '',
     '## Features',

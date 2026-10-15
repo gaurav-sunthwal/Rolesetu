@@ -12,6 +12,13 @@ export const SITE = {
   url,
   title: 'Rolesetu: job match score, resume tailoring and application tracker',
   tagline: 'Know your fit before you apply',
+  // Where the extension is installed from. NEXT_PUBLIC_CHROME_EXTENSION_URL can point elsewhere.
+  chromeExtensionUrl: z
+    .url()
+    .parse(
+      process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL ||
+        'https://chromewebstore.google.com/detail/bbpdnhlpapbkiadfdnkhacamojlkfbjl',
+    ),
   // Published on the privacy policy and the Chrome Web Store listing.
   contactEmail: 'gauravsunthwalwork@gmail.com',
   description:
@@ -38,7 +45,7 @@ export const SITE = {
     'skill gap analysis for jobs',
   ],
   // The day the public pages last changed. Bump it when their content does.
-  updated: '2026-10-14',
+  updated: '2026-10-16',
 } as const;
 
 export function absoluteUrl(path: string): string {

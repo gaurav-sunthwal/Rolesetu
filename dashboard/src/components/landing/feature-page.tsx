@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { Display, Eyebrow } from '@/components/brand/primitives';
+import { AddToChrome } from '@/components/landing/add-to-chrome';
 import { FaqList } from '@/components/landing/faq';
 import { JsonLd } from '@/components/landing/json-ld';
 import { LandingCta } from '@/components/landing/landing-cta';
@@ -13,6 +14,8 @@ import { FEATURE_PAGES, featurePage, featurePath } from '@/content/marketing';
 import { absoluteUrl, SITE } from '@/lib/site';
 import { cn } from '@/lib/utils';
 
+// The one feature page whose feature is installed from a store.
+const EXTENSION_SLUG = 'job-search-extension';
 const RAILS = 'mx-auto w-full max-w-6xl border-x border-dashed';
 const GUTTER = 'px-5 sm:px-10 lg:px-16';
 
@@ -92,7 +95,8 @@ export function FeaturePageView({ slug }: { slug: string }) {
               {page.heading}
             </Display>
             <p className="text-muted-foreground mt-6 max-w-2xl text-lg text-pretty">{page.intro}</p>
-            <div className="mt-9">
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              {page.slug === EXTENSION_SLUG ? <AddToChrome /> : null}
               <LandingCta />
             </div>
           </section>

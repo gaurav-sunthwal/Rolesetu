@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { NAV_LINKS } from '@/components/landing/site-header';
 import { Logo } from '@/components/logo';
 import { FEATURE_PAGES, featurePath } from '@/content/marketing';
+import { SITE } from '@/lib/site';
 
 // Padded so each link is a comfortable target for a thumb.
 const LINK = 'text-foreground/70 hover:text-foreground inline-block py-2 transition-colors';
@@ -28,6 +29,11 @@ export function SiteFooter() {
                 </Link>
               </li>
             ))}
+            <li>
+              <a href={SITE.chromeExtensionUrl} target="_blank" rel="noreferrer" className={LINK}>
+                Add to Chrome
+              </a>
+            </li>
           </ul>
         </nav>
         <nav aria-label="Rolesetu">

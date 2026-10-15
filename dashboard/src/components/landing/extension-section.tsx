@@ -1,16 +1,9 @@
-import { ArrowRight, Check } from 'lucide-react';
-import { z } from 'zod';
+import { Check } from 'lucide-react';
 
 import { Display, Eyebrow } from '@/components/brand/primitives';
-import { ExtensionWaitlist } from '@/components/landing/extension-waitlist';
+import { AddToChrome } from '@/components/landing/add-to-chrome';
 import { Reveal } from '@/components/landing/reveal';
 import { VideoPlayer } from '@/components/landing/video-player';
-
-// Set once the Chrome Web Store has approved the extension; until then people join a waiting list.
-const storeUrl = z
-  .url()
-  .optional()
-  .parse(process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL || undefined);
 
 const VIDEO = {
   id: '8BgRPZmmg9w',
@@ -23,20 +16,19 @@ const POINTS = [
   'Fills the application form from your profile. You review and submit.',
 ] as const;
 
-/** The browser extension: what it does, a video of it, and how to get it (or hear when you can). */
+/** The browser extension: what it does, a video of it, and where to get it. */
 export function ExtensionSection() {
   return (
     <div className="grid items-center gap-12 lg:grid-cols-[5fr_7fr] lg:gap-16">
       <Reveal>
-        <Eyebrow>{storeUrl ? 'Chrome extension · new' : 'Chrome extension · coming soon'}</Eyebrow>
+        <Eyebrow>Chrome extension · new</Eyebrow>
         <Display className="mt-6">
           <span className="block">Your score, right</span>
           <span className="text-primary block">on the job page.</span>
         </Display>
         <p className="text-muted-foreground mt-6 max-w-md text-lg">
-          {storeUrl
-            ? 'No more copying links. Open a job and Rolesetu scores it against your resume where you are already looking.'
-            : 'No more copying links. Open a job and Rolesetu scores it against your resume where you are already looking. Watch it work, then get an email the day it is ready.'}
+          No more copying links. Open a job and Rolesetu scores it against your resume where you are
+          already looking. Free on the Chrome Web Store.
         </p>
         <ul className="mt-6 space-y-2.5">
           {POINTS.map((point) => (
@@ -47,19 +39,10 @@ export function ExtensionSection() {
           ))}
         </ul>
         <div className="mt-8 max-w-md">
-          {storeUrl ? (
-            <a
-              href={storeUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 items-center gap-2 rounded-xl px-6 text-base font-medium"
-            >
-              Add to Chrome
-              <ArrowRight className="size-4" />
-            </a>
-          ) : (
-            <ExtensionWaitlist />
-          )}
+          <AddToChrome />
+          <p className="text-muted-foreground mt-3 text-sm">
+            Also works in Edge, Brave and other Chromium browsers.
+          </p>
         </div>
       </Reveal>
       <Reveal delay={120}>
