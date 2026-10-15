@@ -96,6 +96,11 @@ export default function DashboardPage() {
             />
             <Stat label="Job checks" value={stats.data.job_checks} />
             <Stat label="Applications tracked" value={stats.data.applications} />
+            <Stat
+              label="Extension connected"
+              value={stats.data.extension_connected}
+              note={`${stats.data.extension_active_week} used it in the last 7 days`}
+            />
             <Stat label="Extension waiting list" value={stats.data.waitlist} />
             <Stat label="Gmail connected" value={stats.data.gmail_connected} />
             <Stat

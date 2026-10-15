@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.modules.admin.models import AdminAction
 from backend.modules.applications.models import Application
 from backend.modules.errors.models import ErrorEvent
+from backend.modules.extension.models import ExtensionToken
 from backend.modules.inbox.models import Integration
 from backend.modules.matches.models import Job, Match
 from backend.modules.previews.models import JobPreview
@@ -32,7 +33,7 @@ async def _count(db: AsyncSession, query: Select[Any]) -> int:
     return (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
 
 
-async def totals(db: AsyncSession, since: datetime) -> dict[str, int]:
+async def totals(db: AsyncSession, since: datetime, active_since: datetime) -> dict[str, int]:
     rendered_by_users = select(Job.id).where(
         Job.created_at > since, Job.job_json["listing"]["reader"].astext == "rendered"
     )
@@ -45,6 +46,10 @@ async def totals(db: AsyncSession, since: datetime) -> dict[str, int]:
         "job_checks": await _count(db, select(Match.id)),
         "applications": await _count(db, select(Application.id)),
         "gmail_connected": await _count(db, select(Integration.id)),
+        "extension_connected": await _count(db, select(ExtensionToken.id)),
+        "extension_active_week": await _count(
+            db, select(ExtensionToken.id).where(ExtensionToken.last_used_at > active_since)
+        ),
         "waitlist": await _count(db, select(WaitlistEntry.id)),
         "errors_today": await _count(
             db, select(ErrorEvent.id).where(ErrorEvent.created_at > since)
@@ -104,6 +109,7 @@ def _user_rows() -> Select[Any]:
         count_of(Match),
         count_of(Application),
         count_of(Integration),
+        count_of(ExtensionToken),
         last_check,
     )
 

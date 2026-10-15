@@ -64,6 +64,7 @@ async def test_an_admin_gets_in_and_sees_totals(admin: AsyncClient) -> None:
     assert (await admin.get(f"{ADMIN}/me")).json() == {"email": email_of(admin)}
     stats = (await admin.get(f"{ADMIN}/stats")).json()
     assert stats["users"] >= 1 and len(stats["daily"]) == 14
+    assert stats["extension_connected"] >= stats["extension_active_week"] >= 0
 
 
 async def test_an_admin_finds_a_user_and_opening_them_is_recorded(
@@ -110,3 +111,20 @@ async def test_the_audit_log_lists_what_admins_did(admin: AsyncClient) -> None:
         item["action"] == "waitlist.view" and item["admin_email"] == email_of(admin)
         for item in logged
     )
+
+
+async def test_an_admin_sees_who_connected_the_extension(
+    admin: AsyncClient, client: AsyncClient
+) -> None:
+    async def user_row() -> dict[str, object]:
+        found = await admin.get(f"{ADMIN}/users", params={"q": email_of(client)})
+        row: dict[str, object] = found.json()["items"][0]
+        return row
+
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    before = (await admin.get(f"{ADMIN}/stats")).json()["extension_connected"]
+    assert not (await user_row())["extension_connected"]
+
+    assert (await client.post("/api/v1/extension/connect")).status_code == 201
+    assert (await user_row())["extension_connected"]
+    assert (await admin.get(f"{ADMIN}/stats")).json()["extension_connected"] >= before + 1

@@ -910,6 +910,10 @@ export interface components {
       applications: number;
       /** Gmail Connected */
       gmail_connected: number;
+      /** Extension Connected */
+      extension_connected: number;
+      /** Extension Active Week */
+      extension_active_week: number;
       /** Waitlist */
       waitlist: number;
       /** Previews Today */
@@ -967,6 +971,8 @@ export interface components {
       applications: number;
       /** Gmail Connected */
       gmail_connected: boolean;
+      /** Extension Connected */
+      extension_connected: boolean;
       /** Last Check At */
       last_check_at: string | null;
     };

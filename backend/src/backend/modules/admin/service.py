@@ -57,7 +57,7 @@ def _record(
 
 
 def _to_user_row(row: repository.Fields) -> AdminUserRow:
-    user, profiles, resumes, job_checks, applications, integrations, last_check = row
+    user, profiles, resumes, job_checks, applications, integrations, extensions, last_check = row
     return AdminUserRow(
         id=user.id,
         email=user.email,
@@ -68,6 +68,7 @@ def _to_user_row(row: repository.Fields) -> AdminUserRow:
         job_checks=job_checks,
         applications=applications,
         gmail_connected=integrations > 0,
+        extension_connected=extensions > 0,
         last_check_at=last_check,
     )
 
@@ -80,7 +81,7 @@ async def stats(db: AsyncSession) -> AdminStats:
     days = [(since + timedelta(days=offset)).date() for offset in range(DAYS_CHARTED)]
     sites = await repository.preview_sites(db, now - timedelta(days=1))
     return AdminStats(
-        **await repository.totals(db, now - timedelta(days=1)),
+        **await repository.totals(db, now - timedelta(days=1), now - timedelta(days=7)),
         daily=[
             DayCount(day=day, signups=signups.get(day, 0), job_checks=checks.get(day, 0))
             for day in days

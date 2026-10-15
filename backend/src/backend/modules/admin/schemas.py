@@ -31,6 +31,10 @@ class AdminStats(BaseModel):
     job_checks: int
     applications: int
     gmail_connected: int
+    # Users whose browser extension is connected to their account, and how many
+    # of those it has been used by in the last seven days.
+    extension_connected: int
+    extension_active_week: int
     waitlist: int
     previews_today: int
     errors_today: int
@@ -50,6 +54,7 @@ class AdminUserRow(BaseModel):
     job_checks: int
     applications: int
     gmail_connected: bool
+    extension_connected: bool
     last_check_at: datetime | None
 
 

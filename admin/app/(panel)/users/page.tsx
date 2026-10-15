@@ -71,6 +71,7 @@ export default function UsersPage() {
                   <th className={th}>Job checks</th>
                   <th className={th}>Applications</th>
                   <th className={th}>Gmail</th>
+                  <th className={th}>Extension</th>
                   <th className={th}>Last check</th>
                   <th className={th}>Joined</th>
                 </tr>
@@ -99,6 +100,13 @@ export default function UsersPage() {
                     <td className={td}>{user.applications}</td>
                     <td className={td}>
                       {user.gmail_connected ? (
+                        <Badge tone="blue">Connected</Badge>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
+                    </td>
+                    <td className={td}>
+                      {user.extension_connected ? (
                         <Badge tone="blue">Connected</Badge>
                       ) : (
                         <span className="text-zinc-400">—</span>
