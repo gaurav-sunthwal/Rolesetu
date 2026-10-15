@@ -1,7 +1,7 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.pagination import Page
@@ -14,8 +14,12 @@ from backend.modules.admin.schemas import (
     AdminStats,
     AdminUserDetail,
     AdminUserRow,
+    BulkQueued,
+    EmailCompose,
+    EmailDefaults,
     ErrorEventRead,
     ErrorSummary,
+    OutreachRead,
     WaitlistRow,
 )
 
@@ -40,12 +44,15 @@ async def read_stats(
 @router.get("/users", response_model=Page[AdminUserRow])
 async def list_users(
     q: Annotated[str | None, Query(max_length=200)] = None,
+    extension: Literal["missing"] | None = None,
     cursor: str | None = None,
     limit: Limit = 25,
     _: Admin = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Page[AdminUserRow]:
-    return await service.list_users(db, search=q, cursor=cursor, limit=limit)
+    return await service.list_users(
+        db, search=q, extension_missing=extension == "missing", cursor=cursor, limit=limit
+    )
 
 
 @router.get("/users/{user_id}", response_model=AdminUserDetail)
@@ -118,3 +125,44 @@ async def clear_error(
 ) -> None:
     """Removes every event of one problem, once it has been dealt with."""
     await service.clear_errors(db, admin=admin, fingerprint=fingerprint)
+
+
+@router.get("/emails/extension-nudge", response_model=EmailDefaults)
+async def read_email_defaults(
+    _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> EmailDefaults:
+    """The suggested email to people without the extension, and how many it would reach."""
+    return await service.email_defaults(db)
+
+
+@router.post("/users/{user_id}/email", response_model=OutreachRead)
+async def email_user(
+    user_id: uuid.UUID,
+    payload: EmailCompose,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> OutreachRead:
+    """Sends one email to one person now. The answer says whether it went."""
+    return await service.email_user(
+        db, admin=admin, user_id=user_id, subject=payload.subject, message=payload.message
+    )
+
+
+@router.post("/emails/extension-nudge", response_model=BulkQueued)
+async def email_everyone_without_extension(
+    payload: EmailCompose,
+    background_tasks: BackgroundTasks,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> BulkQueued:
+    """Writes to everyone without the extension, in the background, up to a limit."""
+    queued = await service.start_extension_nudges(
+        db, admin=admin, subject=payload.subject, message=payload.message
+    )
+    if queued:
+        # Committed first, so the audit entry exists even if sending is cut short.
+        await db.commit()
+        background_tasks.add_task(
+            service.send_extension_nudges, admin.email, payload.subject, payload.message
+        )
+    return BulkQueued(queued=queued)

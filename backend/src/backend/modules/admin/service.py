@@ -11,11 +11,19 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import storage
-from backend.core.exceptions import AppError, NotFoundError, ValidationFailedError
+from backend.core.config import get_settings
+from backend.core.email import send_email
+from backend.core.exceptions import (
+    AppError,
+    ConflictError,
+    NotFoundError,
+    ValidationFailedError,
+)
 from backend.core.pagination import Page, decode_cursor, encode_cursor
-from backend.modules.admin import repository
+from backend.db.session import get_sessionmaker
+from backend.modules.admin import emails, repository
 from backend.modules.admin.dependencies import Admin
-from backend.modules.admin.models import AdminAction
+from backend.modules.admin.models import AdminAction, OutreachEmail
 from backend.modules.admin.schemas import (
     AdminActionRead,
     AdminApplication,
@@ -25,9 +33,11 @@ from backend.modules.admin.schemas import (
     AdminUserDetail,
     AdminUserRow,
     DayCount,
+    EmailDefaults,
     ErrorEventRead,
     ErrorGroup,
     ErrorSummary,
+    OutreachRead,
     SiteReads,
     WaitlistRow,
 )
@@ -57,7 +67,17 @@ def _record(
 
 
 def _to_user_row(row: repository.Fields) -> AdminUserRow:
-    user, profiles, resumes, job_checks, applications, integrations, extensions, last_check = row
+    (
+        user,
+        profiles,
+        resumes,
+        job_checks,
+        applications,
+        integrations,
+        extensions,
+        last_check,
+        last_emailed,
+    ) = row
     return AdminUserRow(
         id=user.id,
         email=user.email,
@@ -70,6 +90,7 @@ def _to_user_row(row: repository.Fields) -> AdminUserRow:
         gmail_connected=integrations > 0,
         extension_connected=extensions > 0,
         last_check_at=last_check,
+        last_emailed_at=last_emailed,
     )
 
 
@@ -94,10 +115,17 @@ async def stats(db: AsyncSession) -> AdminStats:
 
 
 async def list_users(
-    db: AsyncSession, *, search: str | None, cursor: str | None, limit: int
+    db: AsyncSession,
+    *,
+    search: str | None,
+    extension_missing: bool,
+    cursor: str | None,
+    limit: int,
 ) -> Page[AdminUserRow]:
     after = decode_cursor(cursor) if cursor else None
-    rows = await repository.list_users(db, search=search, after=after, limit=limit + 1)
+    rows = await repository.list_users(
+        db, search=search, extension_missing=extension_missing, after=after, limit=limit + 1
+    )
     has_more = len(rows) > limit
     rows = rows[:limit]
     last = rows[-1][0] if rows else None
@@ -136,6 +164,10 @@ async def user_detail(db: AsyncSession, *, admin: Admin, user_id: uuid.UUID) -> 
             AdminResume.model_validate(item) for item in await repository.resumes(db, user_id)
         ],
         gmail_last_synced_at=await repository.gmail_last_synced(db, user_id),
+        emails=[
+            OutreachRead.model_validate(item)
+            for item in await repository.emails_for(db, user_id, RECENT_ROWS)
+        ],
     )
 
 
@@ -233,3 +265,148 @@ async def clear_errors(db: AsyncSession, *, admin: Admin, fingerprint: str) -> N
     removed = await errors_repository.delete_group(db, fingerprint)
     if removed:
         _record(db, admin, "errors.clear", "error", fingerprint, f"Cleared {removed} events")
+
+
+# --- Emailing users ---------------------------------------------------------
+
+NUDGE = "extension_nudge"
+# Most people one bulk send writes to. Resend's free plan allows 100 emails a day.
+MAX_PER_SEND = 50
+# Someone sent this email is left alone for this long by later bulk sends.
+QUIET_FOR = timedelta(days=14)
+# One person is not written to twice within this time, to stop a double click.
+ONE_EMAIL_PER = timedelta(hours=24)
+
+
+def _require_email_set_up() -> None:
+    if not get_settings().resend_api_key:
+        raise ValidationFailedError(
+            "Email is not set up on the server. Add RESEND_API_KEY to send from the panel."
+        )
+
+
+async def email_defaults(db: AsyncSession) -> EmailDefaults:
+    recipients = await repository.count_nudge_recipients(db, datetime.now(UTC) - QUIET_FOR)
+    return EmailDefaults(
+        subject=emails.DEFAULT_SUBJECT,
+        message=emails.DEFAULT_MESSAGE,
+        placeholder=emails.PLACEHOLDER,
+        recipients=recipients,
+        max_per_send=MAX_PER_SEND,
+        configured=bool(get_settings().resend_api_key),
+    )
+
+
+async def _deliver(
+    db: AsyncSession,
+    *,
+    admin_email: str,
+    user_id: uuid.UUID,
+    address: str,
+    name: str | None,
+    subject: str,
+    message: str,
+) -> OutreachEmail:
+    """Sends one email and records how it went. Never raises for a failed send."""
+    settings = get_settings()
+    email = emails.extension_nudge(
+        subject=subject,
+        message=message,
+        name=emails.first_name(name),
+        site_url=settings.dashboard_url,
+        store_url=settings.extension_store_url,
+    )
+    record = OutreachEmail(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        admin_email=admin_email,
+        kind=NUDGE,
+        subject=email.subject[:200],
+        status="sent",
+    )
+    try:
+        await send_email(
+            to=address,
+            subject=email.subject,
+            html=email.html,
+            text=email.text,
+            # Names this one email, so a retry never delivers a second copy.
+            idempotency_key=f"outreach-{record.id}",
+        )
+    except Exception as exc:
+        logger.warning("admin email to user=%s failed: %s", user_id, type(exc).__name__)
+        record.status = "failed"
+        record.error = "The email service refused or did not answer. Try again later."
+    db.add(record)
+    return record
+
+
+async def email_user(
+    db: AsyncSession, *, admin: Admin, user_id: uuid.UUID, subject: str, message: str
+) -> OutreachRead:
+    _require_email_set_up()
+    user = await repository.get_user(db, user_id)
+    if user is None:
+        raise NotFoundError("User not found")
+    if await repository.sent_lately(db, user_id, datetime.now(UTC) - ONE_EMAIL_PER):
+        raise ConflictError(
+            "This person was emailed in the last 24 hours. Wait before writing again."
+        )
+    name = await repository.full_name(db, user_id) or user.name
+    record = await _deliver(
+        db,
+        admin_email=admin.email,
+        user_id=user_id,
+        address=user.email,
+        name=name,
+        subject=subject,
+        message=message,
+    )
+    _record(
+        db, admin, "email.send", "user", str(user_id), f"Emailed {user.email} ({record.status})"
+    )
+    await db.flush()
+    return OutreachRead.model_validate(record)
+
+
+async def start_extension_nudges(
+    db: AsyncSession, *, admin: Admin, subject: str, message: str
+) -> int:
+    """How many people the send will reach. The sending itself runs after the
+    response (see send_extension_nudges), since it takes a while.
+    """
+    _require_email_set_up()
+    count = await repository.count_nudge_recipients(db, datetime.now(UTC) - QUIET_FOR)
+    queued = min(count, MAX_PER_SEND)
+    if queued:
+        _record(
+            db,
+            admin,
+            "email.bulk",
+            "users",
+            "extension_missing",
+            f"Emailing {queued} people without the extension",
+        )
+    return queued
+
+
+async def send_extension_nudges(admin_email: str, subject: str, message: str) -> None:
+    """Writes to everyone without the extension who was not written to lately,
+    one at a time, recording each. Runs in the background in its own session.
+    """
+    async with get_sessionmaker()() as db:
+        recipients = await repository.nudge_recipients(
+            db, datetime.now(UTC) - QUIET_FOR, MAX_PER_SEND
+        )
+        for user, full_name in recipients:
+            await _deliver(
+                db,
+                admin_email=admin_email,
+                user_id=user.id,
+                address=user.email,
+                name=full_name or user.name,
+                subject=subject,
+                message=message,
+            )
+            # Committed one by one, so a crash part way keeps the record of who was written to.
+            await db.commit()

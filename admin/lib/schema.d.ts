@@ -775,6 +775,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/emails/extension-nudge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Email Defaults
+     * @description The suggested email to people without the extension, and how many it would reach.
+     */
+    get: operations['read_email_defaults_api_v1_admin_emails_extension_nudge_get'];
+    put?: never;
+    /**
+     * Email Everyone Without Extension
+     * @description Writes to everyone without the extension, in the background, up to a limit.
+     */
+    post: operations['email_everyone_without_extension_api_v1_admin_emails_extension_nudge_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/email': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Email User
+     * @description Sends one email to one person now. The answer says whether it went.
+     */
+    post: operations['email_user_api_v1_admin_users__user_id__email_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -944,6 +988,8 @@ export interface components {
       resumes: components['schemas']['AdminResume'][];
       /** Gmail Last Synced At */
       gmail_last_synced_at: string | null;
+      /** Emails */
+      emails: components['schemas']['OutreachRead'][];
     };
     /** AdminUserRow */
     AdminUserRow: {
@@ -973,6 +1019,8 @@ export interface components {
       gmail_connected: boolean;
       /** Extension Connected */
       extension_connected: boolean;
+      /** Last Emailed At */
+      last_emailed_at: string | null;
       /** Last Check At */
       last_check_at: string | null;
     };
@@ -1182,6 +1230,11 @@ export interface components {
       /** File */
       file: string;
     };
+    /** BulkQueued */
+    BulkQueued: {
+      /** Queued */
+      queued: number;
+    };
     /**
      * ChangeRead
      * @description Existing text that was reworded, or why it could not be.
@@ -1241,6 +1294,31 @@ export interface components {
       start_year?: number | null;
       /** End Year */
       end_year?: number | null;
+    };
+    /**
+     * EmailCompose
+     * @description What the admin wrote. {first_name} is replaced for each person.
+     */
+    EmailCompose: {
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+    };
+    /** EmailDefaults */
+    EmailDefaults: {
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+      /** Placeholder */
+      placeholder: string;
+      /** Recipients */
+      recipients: number;
+      /** Max Per Send */
+      max_per_send: number;
+      /** Configured */
+      configured: boolean;
     };
     /**
      * EmailRead
@@ -1628,6 +1706,29 @@ export interface components {
       gaps: string[];
       /** Profile Version */
       profile_version: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** OutreachRead */
+    OutreachRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Admin Email */
+      admin_email: string;
+      /** Kind */
+      kind: string;
+      /** Subject */
+      subject: string;
+      /** Status */
+      status: string;
+      /** Error */
+      error: string | null;
       /**
        * Created At
        * Format: date-time
@@ -3254,6 +3355,7 @@ export interface operations {
     parameters: {
       query?: {
         q?: string | null;
+        extension?: 'missing' | null;
         cursor?: string | null;
         limit?: number;
       };
@@ -3489,6 +3591,94 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_email_defaults_api_v1_admin_emails_extension_nudge_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmailDefaults'];
+        };
+      };
+    };
+  };
+  email_everyone_without_extension_api_v1_admin_emails_extension_nudge_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailCompose'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkQueued'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  email_user_api_v1_admin_users__user_id__email_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailCompose'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OutreachRead'];
+        };
       };
       /** @description Validation Error */
       422: {

@@ -15,6 +15,7 @@ import {
   td,
   th,
 } from '@/components/ui';
+import { BulkEmail } from '@/components/BulkEmail';
 import { api, errorMessage } from '@/lib/api';
 import { formatDate, timeAgo } from '@/lib/format';
 import type { UserPage } from '@/lib/types';
@@ -22,10 +23,17 @@ import type { UserPage } from '@/lib/types';
 export default function UsersPage() {
   const [typed, setTyped] = useState('');
   const [search, setSearch] = useState('');
+  const [withoutExtension, setWithoutExtension] = useState(false);
   const users = useInfiniteQuery({
-    queryKey: ['admin', 'users', search],
+    queryKey: ['admin', 'users', search, withoutExtension],
     queryFn: ({ pageParam }) =>
-      api<UserPage>('/admin/users', { params: { q: search || undefined, cursor: pageParam } }),
+      api<UserPage>('/admin/users', {
+        params: {
+          q: search || undefined,
+          extension: withoutExtension ? 'missing' : undefined,
+          cursor: pageParam,
+        },
+      }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
   });
@@ -54,6 +62,18 @@ export default function UsersPage() {
           </button>
         </form>
       </PageHeader>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
+          <input
+            type="checkbox"
+            checked={withoutExtension}
+            onChange={(event) => setWithoutExtension(event.target.checked)}
+            className="size-4 accent-zinc-900"
+          />
+          Only people without the extension
+        </label>
+        <BulkEmail />
+      </div>
       <Card>
         {users.isPending ? (
           <Loading />
@@ -73,6 +93,7 @@ export default function UsersPage() {
                   <th className={th}>Gmail</th>
                   <th className={th}>Extension</th>
                   <th className={th}>Last check</th>
+                  <th className={th}>Emailed</th>
                   <th className={th}>Joined</th>
                 </tr>
               </thead>
@@ -114,6 +135,9 @@ export default function UsersPage() {
                     </td>
                     <td className={`${td} text-zinc-600`}>
                       {user.last_check_at ? timeAgo(user.last_check_at) : '—'}
+                    </td>
+                    <td className={`${td} text-zinc-600`}>
+                      {user.last_emailed_at ? timeAgo(user.last_emailed_at) : '—'}
                     </td>
                     <td className={`${td} text-zinc-600`}>{formatDate(user.created_at)}</td>
                   </tr>

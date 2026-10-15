@@ -7,12 +7,13 @@ routes that require an admin.
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import Date, Select, and_, cast, func, or_, select
+from sqlalchemy import Date, Select, and_, exists, func, or_, select
+from sqlalchemy import cast as sql_cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.modules.admin.models import AdminAction
+from backend.modules.admin.models import AdminAction, OutreachEmail
 from backend.modules.applications.models import Application
 from backend.modules.errors.models import ErrorEvent
 from backend.modules.extension.models import ExtensionToken
@@ -25,6 +26,13 @@ from backend.modules.users.models import User
 from backend.modules.waitlist.models import WaitlistEntry
 
 Cursor = tuple[datetime, uuid.UUID] | None
+
+
+def cast_select(query: Any) -> Select[Any]:
+    """A typed query, for helpers that only care that it is a query."""
+    return cast("Select[Any]", query)
+
+
 # A result row with columns of mixed kinds, unpacked by position where it is used.
 Fields = tuple[Any, ...]
 
@@ -65,7 +73,7 @@ async def totals(db: AsyncSession, since: datetime, active_since: datetime) -> d
 async def per_day(
     db: AsyncSession, model: type[User] | type[Match], since: datetime
 ) -> dict[Any, int]:
-    day = cast(model.created_at, Date)
+    day = sql_cast(model.created_at, Date)
     result = await db.execute(
         select(day, func.count()).where(model.created_at > since).group_by(day)
     )
@@ -102,6 +110,12 @@ def _user_rows() -> Select[Any]:
         .correlate(User)
         .scalar_subquery()
     )
+    last_emailed = (
+        select(func.max(OutreachEmail.created_at))
+        .where(OutreachEmail.user_id == User.id, OutreachEmail.status == "sent")
+        .correlate(User)
+        .scalar_subquery()
+    )
     return select(
         User,
         count_of(Profile),
@@ -111,13 +125,25 @@ def _user_rows() -> Select[Any]:
         count_of(Integration),
         count_of(ExtensionToken),
         last_check,
+        last_emailed,
     )
 
 
+def _without_extension() -> Any:
+    return ~exists(select(ExtensionToken.id).where(ExtensionToken.user_id == User.id))
+
+
 async def list_users(
-    db: AsyncSession, *, search: str | None, after: Cursor, limit: int
+    db: AsyncSession,
+    *,
+    search: str | None,
+    extension_missing: bool,
+    after: Cursor,
+    limit: int,
 ) -> list[Fields]:
     query = _user_rows()
+    if extension_missing:
+        query = query.where(_without_extension())
     if search:
         pattern = f"%{search.strip().lower()}%"
         query = query.where(
@@ -208,5 +234,64 @@ async def list_actions(db: AsyncSession, *, after: Cursor, limit: int) -> list[A
         )
     result = await db.execute(
         query.order_by(AdminAction.created_at.desc(), AdminAction.id.desc()).limit(limit)
+    )
+    return list(result.scalars())
+
+
+def _nudge_recipients(quiet_since: datetime) -> Select[User, str | None]:
+    """Users without the extension who have not been sent this email lately."""
+    emailed_lately = exists(
+        select(OutreachEmail.id).where(
+            OutreachEmail.user_id == User.id,
+            OutreachEmail.kind == "extension_nudge",
+            OutreachEmail.status == "sent",
+            OutreachEmail.created_at > quiet_since,
+        )
+    )
+    return (
+        select(User, Profile.full_name)
+        .outerjoin(Profile, Profile.user_id == User.id)
+        .where(_without_extension(), ~emailed_lately)
+    )
+
+
+async def count_nudge_recipients(db: AsyncSession, quiet_since: datetime) -> int:
+    return await _count(db, cast_select(_nudge_recipients(quiet_since)))
+
+
+async def nudge_recipients(db: AsyncSession, quiet_since: datetime, limit: int) -> list[Fields]:
+    # Longest-standing accounts first: they have waited longest to hear about it.
+    result = await db.execute(
+        _nudge_recipients(quiet_since).order_by(User.created_at, User.id).limit(limit)
+    )
+    return [tuple(row) for row in result]
+
+
+async def full_name(db: AsyncSession, user_id: uuid.UUID) -> str | None:
+    result = await db.execute(select(Profile.full_name).where(Profile.user_id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def sent_lately(db: AsyncSession, user_id: uuid.UUID, since: datetime) -> bool:
+    result = await db.execute(
+        select(
+            exists(
+                select(OutreachEmail.id).where(
+                    OutreachEmail.user_id == user_id,
+                    OutreachEmail.status == "sent",
+                    OutreachEmail.created_at > since,
+                )
+            )
+        )
+    )
+    return bool(result.scalar_one())
+
+
+async def emails_for(db: AsyncSession, user_id: uuid.UUID, limit: int) -> list[OutreachEmail]:
+    result = await db.execute(
+        select(OutreachEmail)
+        .where(OutreachEmail.user_id == user_id)
+        .order_by(OutreachEmail.created_at.desc())
+        .limit(limit)
     )
     return list(result.scalars())

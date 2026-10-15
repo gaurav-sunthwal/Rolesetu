@@ -12,3 +12,7 @@ export type AuditPage = Schemas['Page_AdminActionRead_'];
 export type ErrorSummary = Schemas['ErrorSummary'];
 export type ErrorGroup = Schemas['ErrorGroup'];
 export type ErrorEvent = Schemas['ErrorEventRead'];
+export type EmailDefaults = Schemas['EmailDefaults'];
+export type EmailCompose = Schemas['EmailCompose'];
+export type OutreachEmail = Schemas['OutreachRead'];
+export type BulkQueued = Schemas['BulkQueued'];

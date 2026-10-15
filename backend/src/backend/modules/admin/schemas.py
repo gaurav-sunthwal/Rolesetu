@@ -1,7 +1,8 @@
 import uuid
 from datetime import date, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from backend.modules.profiles.schemas import ProfileRead
 
@@ -55,6 +56,8 @@ class AdminUserRow(BaseModel):
     applications: int
     gmail_connected: bool
     extension_connected: bool
+    # When an admin last emailed this person from the panel.
+    last_emailed_at: datetime | None
     last_check_at: datetime | None
 
 
@@ -103,6 +106,7 @@ class AdminUserDetail(BaseModel):
     applications: list[AdminApplication]
     resumes: list[AdminResume]
     gmail_last_synced_at: datetime | None
+    emails: list["OutreachRead"]
 
 
 class WaitlistRow(BaseModel):
@@ -160,3 +164,41 @@ class ErrorEventRead(BaseModel):
     message: str
     stack: str | None
     created_at: datetime
+
+
+class OutreachRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    admin_email: str
+    kind: str
+    subject: str
+    status: str
+    error: str | None
+    created_at: datetime
+
+
+class EmailCompose(BaseModel):
+    """What the admin wrote. {first_name} is replaced for each person."""
+
+    subject: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5000)]
+
+
+class EmailDefaults(BaseModel):
+    subject: str
+    message: str
+    placeholder: str
+    # People a bulk send would reach now, and the most one send will email.
+    recipients: int
+    max_per_send: int
+    # False when no email provider is set up, so nothing can be sent.
+    configured: bool
+
+
+class BulkQueued(BaseModel):
+    queued: int
+
+
+# The user detail names OutreachRead before it is defined above.
+AdminUserDetail.model_rebuild()

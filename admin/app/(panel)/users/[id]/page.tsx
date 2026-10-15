@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { UserEmail } from '@/components/UserEmail';
 import { Badge, Card, Empty, ErrorNote, Loading, PageHeader, td, th } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { formatBytes, formatDate, formatDateTime, timeAgo } from '@/lib/format';
@@ -294,6 +295,12 @@ export default function UserPage() {
           </div>
         )}
       </Section>
+
+      <UserEmail
+        userId={user.id}
+        extensionConnected={user.extension_connected}
+        sent={detail.data.emails}
+      />
 
       <DeleteAccount id={user.id} email={user.email} />
     </div>

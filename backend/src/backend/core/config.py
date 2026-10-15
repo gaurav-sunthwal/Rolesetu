@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/v1/inbox/gmail/callback"
     # Where the browser is sent back to after Google's consent screen.
     dashboard_url: str = "http://localhost:3000"
+    # The extension's page on the Chrome Web Store, linked from emails.
+    extension_store_url: str = (
+        "https://chromewebstore.google.com/detail/bbpdnhlpapbkiadfdnkhacamojlkfbjl"
+    )
     # How far back the first sync of a newly connected inbox looks.
     inbox_lookback_days: int = 15
 

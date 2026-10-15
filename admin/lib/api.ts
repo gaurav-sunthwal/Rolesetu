@@ -23,7 +23,11 @@ const detailSchema = z.object({ detail: z.string() });
  */
 export async function api<T>(
   path: string,
-  options: { method?: 'GET' | 'DELETE'; params?: Record<string, string | undefined> } = {},
+  options: {
+    method?: 'GET' | 'POST' | 'DELETE';
+    params?: Record<string, string | undefined>;
+    body?: unknown;
+  } = {},
 ): Promise<T> {
   await firebaseAuth.authStateReady();
   const token = await firebaseAuth.currentUser?.getIdToken();
@@ -36,7 +40,11 @@ export async function api<T>(
   try {
     response = await fetch(url, {
       method: options.method ?? 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: AbortSignal.timeout(20_000),
     });
   } catch {

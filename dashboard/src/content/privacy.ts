@@ -60,6 +60,7 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
     title: 'How your data is used',
     items: [
       'Only to provide the product: scoring jobs, preparing your resume, filling forms and keeping your tracker current.',
+      'We may email the address on your account about Rolesetu itself, such as a new feature like the browser extension. Not often, and never on behalf of anyone else. Reply “stop” to any of these emails and we will not send you another.',
       'We do not sell your data or share it with advertisers or data brokers.',
       'We do not use it to decide creditworthiness or for lending.',
       'We do not use it for anything unrelated to helping you apply for jobs.',
