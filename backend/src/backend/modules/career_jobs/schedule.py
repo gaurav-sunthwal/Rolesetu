@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 CHECK_EVERY = timedelta(hours=1)
 # A little under a day, so the run drifts no later from one day to the next.
 COLLECT_EVERY = timedelta(hours=20)
-# Longer than a run takes (a few minutes); a server that dies mid-run frees it by then.
-LEASE = timedelta(minutes=45)
+# Longer than a run takes (each company is saved as it is read, so even a run
+# cut short keeps what it read); a server that dies mid-run frees it by then.
+LEASE = timedelta(hours=2)
 # Let the server finish starting before the first check.
 _FIRST_CHECK_AFTER_SECONDS = 60
 

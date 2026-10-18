@@ -146,9 +146,15 @@ async def current(db: AsyncSession) -> Collection:
     if _held is not None and _held.version == now_version:
         return _held
     jobs = [_job(row) for row in await db.scalars(select(CareerJob))]
+    # When the jobs were last refreshed: the end of the last full run, or the
+    # latest company read since, so a long first run already shows its jobs.
+    last_read = await db.scalar(
+        select(func.max(CareerCompany.updated_at)).where(CareerCompany.error.is_(None))
+    )
+    finished = collector.last_finished_at if collector else None
     _held = Collection(
         version=now_version,
-        collected_at=collector.last_finished_at if collector else None,
+        collected_at=max((t for t in (finished, last_read) if t is not None), default=None),
         companies=await companies(db),
         jobs=jobs,
     )
