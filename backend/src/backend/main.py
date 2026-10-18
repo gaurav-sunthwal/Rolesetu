@@ -9,6 +9,7 @@ from backend.api.v1.router import api_router
 from backend.core.config import get_settings
 from backend.core.exceptions import register_exception_handlers
 from backend.db.session import get_engine
+from backend.modules.career_jobs import schedule as career_jobs_schedule
 from backend.modules.matches.local import semantic
 
 
@@ -17,8 +18,15 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     # Load the embedding model in the background, so startup is not held up and
     # the first job check does not pay for it.
     warm = asyncio.create_task(asyncio.to_thread(semantic.warm_up))
+    collector = (
+        asyncio.create_task(career_jobs_schedule.keep_collecting())
+        if get_settings().collects_career_jobs
+        else None
+    )
     yield
     warm.cancel()
+    if collector is not None:
+        collector.cancel()
     await get_engine().dispose()
 
 

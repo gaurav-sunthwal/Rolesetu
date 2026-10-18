@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from backend.modules.admin.router import router as admin_router
 from backend.modules.applications.router import router as applications_router
+from backend.modules.career_jobs.router import router as career_jobs_router
 from backend.modules.extension.router import router as extension_router
 from backend.modules.inbox.router import router as inbox_router
 from backend.modules.llm_keys.router import router as llm_keys_router
@@ -20,6 +21,7 @@ api_router.include_router(llm_keys_router)
 api_router.include_router(profiles_router)
 api_router.include_router(saved_answers_router)
 api_router.include_router(applications_router)
+api_router.include_router(career_jobs_router)
 api_router.include_router(matches_router)
 api_router.include_router(resumes_router)
 api_router.include_router(extension_router)

@@ -124,7 +124,7 @@ export function MatchResult({
   );
 }
 
-function SkillGroup({ label, skills }: { label: string; skills: SkillResult[] }) {
+export function SkillGroup({ label, skills }: { label: string; skills: SkillResult[] }) {
   if (skills.length === 0) return null;
   return (
     <div className="not-first:mt-6">

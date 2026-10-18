@@ -68,6 +68,17 @@ class Settings(BaseSettings):
     # Signed-in users have their own allowance, so this cannot starve them.
     preview_rendered_reads_per_day: int = 20
 
+    # Collect jobs from company careers sites once a day inside the API. Unset:
+    # on in production only, so a laptop pointed at a shared database does not
+    # collect as well. Set CAREER_JOBS_AUTO_COLLECT=true or false to override.
+    career_jobs_auto_collect: bool | None = None
+
+    @property
+    def collects_career_jobs(self) -> bool:
+        if self.career_jobs_auto_collect is not None:
+            return self.career_jobs_auto_collect
+        return self.environment == "production"
+
     # Gmail (read-only). Created in Google Cloud Console; without them the
     # "Connect Gmail" button reports that Gmail is not set up.
     google_client_id: str | None = None

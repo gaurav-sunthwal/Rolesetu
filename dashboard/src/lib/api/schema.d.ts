@@ -147,6 +147,45 @@ export interface paths {
     patch: operations['update_application_api_v1_applications__application_id__patch'];
     trace?: never;
   };
+  '/api/v1/career-jobs/companies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Companies */
+    get: operations['list_companies_api_v1_career_jobs_companies_get'];
+    put?: never;
+    /**
+     * Add Company
+     * @description Reads the company's careers site straight away, so its jobs show at once.
+     *     Limited per user, because every added site is read daily for everyone.
+     */
+    post: operations['add_company_api_v1_career_jobs_companies_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/career-jobs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Jobs */
+    get: operations['list_jobs_api_v1_career_jobs_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/matches': {
     parameters: {
       query?: never;
@@ -624,6 +663,201 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Admin
+     * @description Lets the panel find out whether the signed-in account is an admin.
+     */
+    get: operations['read_admin_api_v1_admin_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/stats': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Stats */
+    get: operations['read_stats_api_v1_admin_stats_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Users */
+    get: operations['list_users_api_v1_admin_users_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read User */
+    get: operations['read_user_api_v1_admin_users__user_id__get'];
+    put?: never;
+    post?: never;
+    /**
+     * Delete User
+     * @description Deletes the account and everything stored for it. Cannot be undone, so
+     *     the caller must repeat the account's email address.
+     */
+    delete: operations['delete_user_api_v1_admin_users__user_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/waitlist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Waitlist */
+    get: operations['list_waitlist_api_v1_admin_waitlist_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Audit */
+    get: operations['list_audit_api_v1_admin_audit_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/errors': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Errors
+     * @description What went wrong in the period, grouped by problem, most frequent first.
+     */
+    get: operations['list_errors_api_v1_admin_errors_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/errors/{fingerprint}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Error */
+    get: operations['read_error_api_v1_admin_errors__fingerprint__get'];
+    put?: never;
+    post?: never;
+    /**
+     * Clear Error
+     * @description Removes every event of one problem, once it has been dealt with.
+     */
+    delete: operations['clear_error_api_v1_admin_errors__fingerprint__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/emails/extension-nudge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Email Defaults
+     * @description The suggested email to people without the extension, and how many it would reach.
+     */
+    get: operations['read_email_defaults_api_v1_admin_emails_extension_nudge_get'];
+    put?: never;
+    /**
+     * Email Everyone Without Extension
+     * @description Writes to everyone without the extension, in the background, up to a limit.
+     */
+    post: operations['email_everyone_without_extension_api_v1_admin_emails_extension_nudge_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/email': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Email User
+     * @description Sends one email to one person now. The answer says whether it went.
+     */
+    post: operations['email_user_api_v1_admin_users__user_id__email_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -655,6 +889,179 @@ export interface components {
       exact_font: boolean;
       /** Readable */
       readable: boolean;
+    };
+    /** AdminActionRead */
+    AdminActionRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Admin Email */
+      admin_email: string;
+      /** Action */
+      action: string;
+      /** Target Type */
+      target_type: string;
+      /** Target Id */
+      target_id: string;
+      /** Summary */
+      summary: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminApplication */
+    AdminApplication: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Role */
+      role: string;
+      /** Company */
+      company: string;
+      /** Status */
+      status: string;
+      /** Match Score */
+      match_score: number | null;
+      /** Applied At */
+      applied_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminJobCheck */
+    AdminJobCheck: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Role */
+      role: string | null;
+      /** Company */
+      company: string | null;
+      /** Url */
+      url: string | null;
+      /** Status */
+      status: string;
+      /** Score */
+      score: number | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminRead */
+    AdminRead: {
+      /** Email */
+      email: string;
+    };
+    /**
+     * AdminResume
+     * @description About the file only. The resume itself is not served to admins.
+     */
+    AdminResume: {
+      /** Filename */
+      filename: string;
+      /** Size Bytes */
+      size_bytes: number;
+      /** Status */
+      status: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminStats */
+    AdminStats: {
+      /** Users */
+      users: number;
+      /** Users With Profile */
+      users_with_profile: number;
+      /** Job Checks */
+      job_checks: number;
+      /** Applications */
+      applications: number;
+      /** Gmail Connected */
+      gmail_connected: number;
+      /** Extension Connected */
+      extension_connected: number;
+      /** Extension Active Week */
+      extension_active_week: number;
+      /** Waitlist */
+      waitlist: number;
+      /** Previews Today */
+      previews_today: number;
+      /** Errors Today */
+      errors_today: number;
+      /** Paid Reads Today */
+      paid_reads_today: number;
+      /** Daily */
+      daily: components['schemas']['DayCount'][];
+      /** Sites */
+      sites: components['schemas']['SiteReads'][];
+    };
+    /**
+     * AdminUserDetail
+     * @description What support needs to help someone. Deliberately without anything read
+     *     from the user's Gmail (Google's rules do not allow people to read it) and
+     *     without the resume file.
+     */
+    AdminUserDetail: {
+      user: components['schemas']['AdminUserRow'];
+      profile: components['schemas']['ProfileRead'] | null;
+      /** Job Checks */
+      job_checks: components['schemas']['AdminJobCheck'][];
+      /** Applications */
+      applications: components['schemas']['AdminApplication'][];
+      /** Resumes */
+      resumes: components['schemas']['AdminResume'][];
+      /** Gmail Last Synced At */
+      gmail_last_synced_at: string | null;
+      /** Panel Emails */
+      panel_emails: components['schemas']['OutreachRead'][];
+    };
+    /** AdminUserRow */
+    AdminUserRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Email */
+      email: string;
+      /** Name */
+      name: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Has Profile */
+      has_profile: boolean;
+      /** Resumes */
+      resumes: number;
+      /** Job Checks */
+      job_checks: number;
+      /** Applications */
+      applications: number;
+      /** Gmail Connected */
+      gmail_connected: boolean;
+      /** Extension Connected */
+      extension_connected: boolean;
+      /** Last Emailed At */
+      last_emailed_at: string | null;
+      /** Last Check At */
+      last_check_at: string | null;
     };
     /** ApplicationCreate */
     ApplicationCreate: {
@@ -862,6 +1269,88 @@ export interface components {
       /** File */
       file: string;
     };
+    /** BulkQueued */
+    BulkQueued: {
+      /** Queued */
+      queued: number;
+    };
+    /** CareerCompany */
+    CareerCompany: {
+      /** Slug */
+      slug: string;
+      /** Name */
+      name: string;
+      /** Job Count */
+      job_count: number;
+      /** Added */
+      added: boolean;
+      /** Error */
+      error: string | null;
+    };
+    /** CareerCompanyAdd */
+    CareerCompanyAdd: {
+      /** Link */
+      link: string;
+    };
+    /** CareerCompanyList */
+    CareerCompanyList: {
+      /** Collected At */
+      collected_at: string | null;
+      /** Days */
+      days: number;
+      /** Companies */
+      companies: components['schemas']['CareerCompany'][];
+    };
+    /** CareerJobPage */
+    CareerJobPage: {
+      /** Items */
+      items: components['schemas']['CareerJobRead'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+      /** Total */
+      total: number;
+      /** Places */
+      places: components['schemas']['PlaceCount'][];
+      /** Collected At */
+      collected_at: string | null;
+      /** Candidate Years */
+      candidate_years: number;
+    };
+    /** CareerJobRead */
+    CareerJobRead: {
+      /** Id */
+      id: string;
+      /** Company Slug */
+      company_slug: string;
+      /** Company */
+      company: string;
+      /** Title */
+      title: string;
+      /** Url */
+      url: string;
+      /** Location */
+      location: string;
+      /** Places */
+      places: string[];
+      /** Posted On */
+      posted_on: string | null;
+      /**
+       * First Seen
+       * Format: date
+       */
+      first_seen: string;
+      /** Score */
+      score: number | null;
+      /**
+       * Fit
+       * @enum {string}
+       */
+      fit: 'fits' | 'stretch' | 'not_stated';
+      /** Fit Note */
+      fit_note: string;
+      /** Skill Results */
+      skill_results: components['schemas']['SkillResult'][];
+    };
     /**
      * ChangeRead
      * @description Existing text that was reworded, or why it could not be.
@@ -888,6 +1377,18 @@ export interface components {
       /** Url */
       url: string;
     };
+    /** DayCount */
+    DayCount: {
+      /**
+       * Day
+       * Format: date
+       */
+      day: string;
+      /** Signups */
+      signups: number;
+      /** Job Checks */
+      job_checks: number;
+    };
     /** DownloadLink */
     DownloadLink: {
       /** Url */
@@ -909,6 +1410,31 @@ export interface components {
       start_year?: number | null;
       /** End Year */
       end_year?: number | null;
+    };
+    /**
+     * EmailCompose
+     * @description What the admin wrote. {first_name} is replaced for each person.
+     */
+    EmailCompose: {
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+    };
+    /** EmailDefaults */
+    EmailDefaults: {
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+      /** Placeholder */
+      placeholder: string;
+      /** Recipients */
+      recipients: number;
+      /** Max Per Send */
+      max_per_send: number;
+      /** Configured */
+      configured: boolean;
     };
     /**
      * EmailRead
@@ -949,6 +1475,78 @@ export interface components {
       application_id: string | null;
       /** Gmail Url */
       gmail_url?: string | null;
+    };
+    /** ErrorEventRead */
+    ErrorEventRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Source */
+      source: string;
+      /** Level */
+      level: string;
+      /** Route */
+      route: string | null;
+      /** Method */
+      method: string | null;
+      /** Status */
+      status: number | null;
+      /** Code */
+      code: string | null;
+      /** Message */
+      message: string;
+      /** Stack */
+      stack: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * ErrorGroup
+     * @description One problem: every event with the same cause, counted together.
+     */
+    ErrorGroup: {
+      /** Fingerprint */
+      fingerprint: string;
+      /** Source */
+      source: string;
+      /** Level */
+      level: string;
+      /** Route */
+      route: string | null;
+      /** Method */
+      method: string | null;
+      /** Status */
+      status: number | null;
+      /** Code */
+      code: string | null;
+      /** Message */
+      message: string;
+      /** Events */
+      events: number;
+      /**
+       * First At
+       * Format: date-time
+       */
+      first_at: string;
+      /**
+       * Last At
+       * Format: date-time
+       */
+      last_at: string;
+    };
+    /** ErrorSummary */
+    ErrorSummary: {
+      /** Groups */
+      groups: components['schemas']['ErrorGroup'][];
+      /** By Source */
+      by_source: {
+        [key: string]: number;
+      };
     };
     /**
      * ExperienceCheck
@@ -1230,6 +1828,43 @@ export interface components {
        */
       created_at: string;
     };
+    /** OutreachRead */
+    OutreachRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Admin Email */
+      admin_email: string;
+      /** Kind */
+      kind: string;
+      /** Subject */
+      subject: string;
+      /** Status */
+      status: string;
+      /** Error */
+      error: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** Page[AdminActionRead] */
+    Page_AdminActionRead_: {
+      /** Items */
+      items: components['schemas']['AdminActionRead'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** Page[AdminUserRow] */
+    Page_AdminUserRow_: {
+      /** Items */
+      items: components['schemas']['AdminUserRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
     /** Page[ApplicationRead] */
     Page_ApplicationRead_: {
       /** Items */
@@ -1250,6 +1885,20 @@ export interface components {
       items: components['schemas']['MatchRead'][];
       /** Next Cursor */
       next_cursor: string | null;
+    };
+    /** Page[WaitlistRow] */
+    Page_WaitlistRow_: {
+      /** Items */
+      items: components['schemas']['WaitlistRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** PlaceCount */
+    PlaceCount: {
+      /** Name */
+      name: string;
+      /** Count */
+      count: number;
     };
     /**
      * ProfileRead
@@ -1399,6 +2048,20 @@ export interface components {
     SavedAnswerWrite: {
       /** Answer */
       answer: string;
+    };
+    /**
+     * SiteReads
+     * @description Job links visitors pasted on the landing page in the last day, by site.
+     */
+    SiteReads: {
+      /** Host */
+      host: string;
+      /** Read */
+      read: number;
+      /** Failed */
+      failed: number;
+      /** Paid */
+      paid: number;
     };
     /** SkillItem */
     SkillItem: {
@@ -1567,6 +2230,21 @@ export interface components {
        * @default true
        */
       joined: boolean;
+    };
+    /** WaitlistRow */
+    WaitlistRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Email */
+      email: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
     };
   };
   responses: never;
@@ -1976,6 +2654,94 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApplicationDetail'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_companies_api_v1_career_jobs_companies_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CareerCompanyList'];
+        };
+      };
+    };
+  };
+  add_company_api_v1_career_jobs_companies_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CareerCompanyAdd'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CareerCompany'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_jobs_api_v1_career_jobs_get: {
+    parameters: {
+      query?: {
+        companies?: string[] | null;
+        places?: string[] | null;
+        include_stretch?: boolean;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CareerJobPage'];
         };
       };
       /** @description Validation Error */
@@ -2743,6 +3509,386 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WaitlistJoined'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_admin_api_v1_admin_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRead'];
+        };
+      };
+    };
+  };
+  read_stats_api_v1_admin_stats_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminStats'];
+        };
+      };
+    };
+  };
+  list_users_api_v1_admin_users_get: {
+    parameters: {
+      query?: {
+        q?: string | null;
+        extension?: 'missing' | null;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminUserRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_user_api_v1_admin_users__user_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserDetail'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_user_api_v1_admin_users__user_id__delete: {
+    parameters: {
+      query: {
+        confirm_email: string;
+      };
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_waitlist_api_v1_admin_waitlist_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_WaitlistRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_audit_api_v1_admin_audit_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminActionRead_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_errors_api_v1_admin_errors_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+        source?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorSummary'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_error_api_v1_admin_errors__fingerprint__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEventRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  clear_error_api_v1_admin_errors__fingerprint__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_email_defaults_api_v1_admin_emails_extension_nudge_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmailDefaults'];
+        };
+      };
+    };
+  };
+  email_everyone_without_extension_api_v1_admin_emails_extension_nudge_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailCompose'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkQueued'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  email_user_api_v1_admin_users__user_id__email_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailCompose'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OutreachRead'];
         };
       };
       /** @description Validation Error */
