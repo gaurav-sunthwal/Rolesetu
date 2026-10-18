@@ -6,6 +6,8 @@ export type AutofillData = components['schemas']['AutofillData'];
 export type Tailored = components['schemas']['TailoredRead'];
 export type TailorRequest = components['schemas']['TailorRequest'];
 export type KeywordCheck = components['schemas']['KeywordCheck'];
+export type LearnedAnswer = components['schemas']['LearnedAnswer'];
+export type LearnedAnswerRead = components['schemas']['LearnedAnswerRead'];
 
 export type DetectedJob = {
   title: string | null;
@@ -28,6 +30,8 @@ export type Request =
   | { type: 'connection' }
   | { type: 'activate' }
   | { type: 'autofill-data' }
+  | { type: 'learn-answers'; answers: LearnedAnswer[] }
+  | { type: 'forget-answer'; key: string }
   | { type: 'keyword-check'; matchId: string }
   | { type: 'tailor-resume'; changes: TailorRequest }
   | { type: 'keep-resume'; changes: TailorRequest }
@@ -45,6 +49,8 @@ export type Responses = {
   connection: Result<{ connected: boolean }>;
   activate: Result<null>;
   'autofill-data': Result<AutofillData>;
+  'learn-answers': Result<LearnedAnswerRead[]>;
+  'forget-answer': Result<null>;
   'keyword-check': Result<KeywordCheck>;
   'tailor-resume': Result<Tailored>;
   'keep-resume': Result<{ filename: string; skills_added: string[] }>;

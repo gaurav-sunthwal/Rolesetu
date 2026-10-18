@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     # Google accounts allowed into the admin panel (verified emails). Empty: nobody.
     admin_emails: list[str] = []
+    # Told by email each time someone signs in for the first time. Empty: nobody.
+    signup_alert_emails: list[str] = []
 
     # CORS — dashboard origin(s)
     cors_origins: list[str] = ["http://localhost:3000"]

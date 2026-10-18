@@ -14,6 +14,7 @@ from backend.core.security import CurrentUser, get_current_user
 from backend.db.session import get_engine, get_sessionmaker
 from backend.main import app
 from backend.modules.errors import service as errors_service
+from backend.modules.users import service as users_service
 from backend.modules.users.models import User
 
 ClientFactory = Callable[[], AsyncClient]
@@ -37,6 +38,20 @@ def _errors_not_recorded(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
         return None
 
     monkeypatch.setattr(errors_service, "record", nothing)
+
+
+@pytest.fixture(autouse=True)
+def _no_signup_alerts(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test user is a first sign-in. None of them may email the people
+    on SIGNUP_ALERT_EMAILS, except in the tests about that alert, which catch it.
+    """
+    if "signup_alerts" in request.keywords:
+        return
+
+    async def nothing(**_: object) -> None:
+        return None
+
+    monkeypatch.setattr(users_service, "send_email", nothing)
 
 
 @pytest.fixture

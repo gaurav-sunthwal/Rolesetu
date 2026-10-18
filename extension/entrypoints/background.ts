@@ -4,6 +4,7 @@ import type {
   AutofillData,
   Failure,
   KeywordCheck,
+  LearnedAnswerRead,
   Match,
   Request,
   Result,
@@ -32,7 +33,8 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
   // The server can be asleep or mid-restart, and then the first call fails or
   // gets a "starting up" reply. Waiting briefly and trying again is usually all
   // it takes. Every call here is safe to repeat: reads, a job check (the server
-  // reuses the result) and tracker writes (which carry a retry key).
+  // reuses the result), tracker writes (which carry a retry key) and saving
+  // learned answers (saving the same answer twice changes nothing).
   let response: Response | null = null;
   for (const wait of RETRY_AFTER_MS) {
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
@@ -61,6 +63,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
     await accessKey.setValue(null);
     return NOT_CONNECTED;
   }
+  if (response.status === 204) return { ok: true, data: null as T };
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     return { ok: false, status: response.status, message: messageFor(response.status, body) };
@@ -126,6 +129,17 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
 
     case 'autofill-data':
       return api<AutofillData>('/extension/autofill');
+
+    case 'learn-answers':
+      return api<LearnedAnswerRead[]>('/extension/learned-answers', {
+        method: 'POST',
+        body: JSON.stringify({ answers: request.answers }),
+      });
+
+    case 'forget-answer':
+      return api<null>(`/extension/learned-answers/${encodeURIComponent(request.key)}`, {
+        method: 'DELETE',
+      });
 
     case 'keyword-check':
       return api<KeywordCheck>(

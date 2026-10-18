@@ -6,6 +6,9 @@ export const CONTROLS = 'button, a, input[type="submit"], input[type="button"], 
 export const APPLY =
   /^(?:easy |quick |1[- ]click )?apply(?: now| here| for (?:this|the) (?:job|role|position|internship)| to (?:this )?job| on company (?:web)?site| on employer site)?$/i;
 
+// The button that sends a form: "Submit", "Submit application", "Send application".
+export const SUBMIT = /^(?:submit|send)(?: (?:my |your |the )?application)?$|^apply and submit$/i;
+
 const MAX_LABEL = 40;
 
 export function labelOf(element: Element): string {

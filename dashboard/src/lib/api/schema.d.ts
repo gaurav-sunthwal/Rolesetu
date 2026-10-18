@@ -315,6 +315,92 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/resume-editor': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Resume Layout
+     * @description The saved resume as sections of lines, with a picture of each page.
+     */
+    get: operations['read_resume_layout_api_v1_resume_editor_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview Resume Edits
+     * @description The resume with the edits made, in its own fonts and layout. Nothing is
+     *     stored. Editing is local and takes a fraction of a second, so there is no
+     *     background job.
+     */
+    post: operations['preview_resume_edits_api_v1_resume_editor_preview_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Save Resume Edits
+     * @description Makes the edits again on the saved resume and keeps the result as the
+     *     user's resume, replacing the one on file.
+     */
+    post: operations['save_resume_edits_api_v1_resume_editor_save_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor/assist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Ask Resume Assistant
+     * @description Turns a request in plain words ("add my Rolesetu project") into edits to
+     *     the resume's lines. The editor applies them to its draft; nothing is saved.
+     *     The model call takes a few seconds, like a job check, so it is answered
+     *     directly rather than through a background job.
+     */
+    post: operations['ask_resume_assistant_api_v1_resume_editor_assist_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/extension/connect': {
     parameters: {
       query?: never;
@@ -378,6 +464,47 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/learned-answers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Learn Answers
+     * @description Remembers what the user typed into a form, for the next form that asks.
+     *     Repeating a request changes nothing, so the extension may retry it.
+     */
+    post: operations['learn_answers_api_v1_extension_learned_answers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/learned-answers/{question_key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Forget Answer
+     * @description The Undo for an answer that was new when it was learned.
+     */
+    delete: operations['forget_answer_api_v1_extension_learned_answers__question_key__delete'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1250,6 +1377,61 @@ export interface components {
       source?: ('manual' | 'extension') | null;
     };
     /**
+     * AssistEdit
+     * @description One edit the assistant made, for the editor to apply to its draft.
+     */
+    AssistEdit: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'change' | 'remove' | 'add_below' | 'add_skill' | 'set_link';
+      /** Line Id */
+      line_id: string | null;
+      /** New Key */
+      new_key: string | null;
+      /** Style Line Id */
+      style_line_id: string | null;
+      /** Link Id */
+      link_id?: string | null;
+      /** Text */
+      text: string;
+      /** Before */
+      before: string | null;
+      /** Section */
+      section: string | null;
+      /** Unsupported */
+      unsupported: string[];
+    };
+    /** AssistReply */
+    AssistReply: {
+      /** Reply */
+      reply: string;
+      /** Edits */
+      edits: components['schemas']['AssistEdit'][];
+    };
+    /**
+     * AssistRequest
+     * @description A message to the resume assistant, with the editor as the user sees it now.
+     */
+    AssistRequest: {
+      /**
+       * Resume Id
+       * Format: uuid
+       */
+      resume_id: string;
+      /** Message */
+      message: string;
+      /** History */
+      history?: components['schemas']['ChatTurn'][];
+      /** Lines */
+      lines?: components['schemas']['DraftLine'][];
+      /** Skills */
+      skills?: string[];
+      /** Links */
+      links?: components['schemas']['LinkEdit'][];
+    };
+    /**
      * AutofillData
      * @description Everything the extension may type into an application form for the user.
      */
@@ -1372,6 +1554,16 @@ export interface components {
       /** Exact Font */
       exact_font: boolean;
     };
+    /** ChatTurn */
+    ChatTurn: {
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: 'user' | 'assistant';
+      /** Text */
+      text: string;
+    };
     /** ConnectUrl */
     ConnectUrl: {
       /** Url */
@@ -1395,6 +1587,137 @@ export interface components {
       url: string;
       /** Expires In */
       expires_in: number;
+    };
+    /**
+     * DraftLine
+     * @description How the user has changed one line of the resume so far.
+     */
+    DraftLine: {
+      /** Line Id */
+      line_id: string;
+      /** Text */
+      text?: string | null;
+      /**
+       * Removed
+       * @default false
+       */
+      removed: boolean;
+      /** Added */
+      added?: components['schemas']['DraftNewLine'][];
+    };
+    /**
+     * DraftNewLine
+     * @description A line the user has added in the editor but not saved.
+     */
+    DraftNewLine: {
+      /** Key */
+      key: string;
+      /** Text */
+      text: string;
+      /** Style Line Id */
+      style_line_id?: string | null;
+    };
+    /** EditOutcome */
+    EditOutcome: {
+      /** Applied */
+      applied: boolean;
+      /** Message */
+      message: string | null;
+      /** Exact Font */
+      exact_font: boolean;
+    };
+    /**
+     * EditRequest
+     * @description The user's edits, always against the resume they opened (`resume_id`).
+     */
+    EditRequest: {
+      /**
+       * Resume Id
+       * Format: uuid
+       */
+      resume_id: string;
+      /** Edits */
+      edits?: components['schemas']['LineEdit'][];
+      /** Skills */
+      skills?: components['schemas']['SkillToAdd'][];
+      /** Links */
+      links?: components['schemas']['LinkEdit'][];
+    };
+    /**
+     * EditedResume
+     * @description The edited resume, handed straight back. Nothing is kept on the server.
+     */
+    EditedResume: {
+      /** Filename */
+      filename: string;
+      /** Outcomes */
+      outcomes: components['schemas']['EditOutcome'][];
+      /** Added */
+      added: components['schemas']['AddedSkill'][];
+      /** Skipped */
+      skipped: components['schemas']['SkippedSkill'][];
+      /** Pdf */
+      pdf: string;
+      /** Pages */
+      pages: string[];
+    };
+    /**
+     * EditorLine
+     * @description One line of the resume as it is drawn on the page.
+     */
+    EditorLine: {
+      /** Id */
+      id: string;
+      /** Text */
+      text: string;
+      /** Bullet */
+      bullet: boolean;
+      /** Heading */
+      heading: boolean;
+      /** Bold */
+      bold: boolean;
+      /** Italic */
+      italic: boolean;
+      /** Right Aligned */
+      right_aligned: boolean;
+      /** Can Add Below */
+      can_add_below: boolean;
+      /** Page */
+      page: number;
+      /** Box */
+      box: [number, number, number, number];
+      /** Links */
+      links?: components['schemas']['EditorLink'][];
+    };
+    /**
+     * EditorLink
+     * @description A link over some words of a line.
+     */
+    EditorLink: {
+      /** Id */
+      id: string;
+      /** Text */
+      text: string;
+      /** Uri */
+      uri: string;
+    };
+    /** EditorPage */
+    EditorPage: {
+      /** Width */
+      width: number;
+      /** Height */
+      height: number;
+      /** Image */
+      image: string;
+    };
+    /** EditorSection */
+    EditorSection: {
+      /** Title */
+      title: string;
+      /** Is Skills */
+      is_skills: boolean;
+      /** Lines */
+      lines: components['schemas']['EditorLine'][];
     };
     /** EducationItem */
     EducationItem: {
@@ -1745,6 +2068,55 @@ export interface components {
       /** Skills */
       skills: components['schemas']['SkillKeyword'][];
     };
+    /** LearnedAnswer */
+    LearnedAnswer: {
+      /** Question Key */
+      question_key: string;
+      /** Answer */
+      answer: string;
+    };
+    /** LearnedAnswerRead */
+    LearnedAnswerRead: {
+      /** Question Key */
+      question_key: string;
+      /** Previous */
+      previous: string | null;
+    };
+    /**
+     * LearnedAnswersWrite
+     * @description Answers the user typed into an application form, sent by the extension.
+     */
+    LearnedAnswersWrite: {
+      /** Answers */
+      answers: components['schemas']['LearnedAnswer'][];
+    };
+    /** LineEdit */
+    LineEdit: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'change' | 'remove' | 'add_below';
+      /** Line Id */
+      line_id: string;
+      /**
+       * Text
+       * @default
+       */
+      text: string;
+      /** Style Line Id */
+      style_line_id?: string | null;
+    };
+    /**
+     * LinkEdit
+     * @description A new address for one of the resume's links.
+     */
+    LinkEdit: {
+      /** Link Id */
+      link_id: string;
+      /** Uri */
+      uri: string;
+    };
     /** Links */
     Links: {
       /** Linkedin */
@@ -1991,6 +2363,25 @@ export interface components {
        * @enum {string}
        */
       mode: 'merge' | 'replace';
+    };
+    /**
+     * ResumeLayout
+     * @description The user's saved resume, read as sections of lines they can edit.
+     */
+    ResumeLayout: {
+      /**
+       * Resume Id
+       * Format: uuid
+       */
+      resume_id: string;
+      /** Filename */
+      filename: string;
+      /** Pages */
+      pages: components['schemas']['EditorPage'][];
+      /** Sections */
+      sections: components['schemas']['EditorSection'][];
+      /** Skill Rows */
+      skill_rows: string[];
     };
     /** ResumeRead */
     ResumeRead: {
@@ -3030,6 +3421,125 @@ export interface operations {
       };
     };
   };
+  read_resume_layout_api_v1_resume_editor_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeLayout'];
+        };
+      };
+    };
+  };
+  preview_resume_edits_api_v1_resume_editor_preview_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EditRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EditedResume'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  save_resume_edits_api_v1_resume_editor_save_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EditRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  ask_resume_assistant_api_v1_resume_editor_assist_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AssistRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssistReply'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   connect_extension_api_v1_extension_connect_post: {
     parameters: {
       query?: never;
@@ -3104,6 +3614,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AutofillData'];
+        };
+      };
+    };
+  };
+  learn_answers_api_v1_extension_learned_answers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LearnedAnswersWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearnedAnswerRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  forget_answer_api_v1_extension_learned_answers__question_key__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        question_key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };

@@ -4,7 +4,8 @@
  * root), so every style is set inline and nothing depends on the site's CSS.
  */
 
-import { APPLY, CONTROLS, labelOf } from '@/lib/apply-controls';
+import { APPLY, CONTROLS, labelOf, SUBMIT } from '@/lib/apply-controls';
+import { openJobDialog } from '@/lib/job-detect';
 
 const MARK = 'data-rolesetu-pill';
 const MAX_PILLS = 3;
@@ -19,12 +20,16 @@ function isVisible(element: Element): boolean {
 }
 
 function findApplyButtons(): HTMLElement[] {
+  // With a job open in a pop-up, the buttons behind it are for other jobs. In
+  // the pop-up the form's "Submit" is the Apply button (Internshala).
+  const dialog = openJobDialog(document);
+  const isApply = (label: string) => APPLY.test(label) || (dialog !== null && SUBMIT.test(label));
   const found: HTMLElement[] = [];
-  for (const element of document.querySelectorAll(CANDIDATES)) {
+  for (const element of (dialog ?? document).querySelectorAll(CANDIDATES)) {
     if (found.length >= MAX_PILLS) break;
     if (element.hasAttribute(MARK) || element.closest('rolesetu-root')) continue;
     const label = labelOf(element);
-    if (label.length > 40 || !APPLY.test(label) || !isVisible(element)) continue;
+    if (label.length > 40 || !isApply(label) || !isVisible(element)) continue;
     // A button nested in another match ("<a><button>Apply</button></a>") counts once.
     if (found.some((other) => other.contains(element) || element.contains(other))) continue;
     found.push(element as HTMLElement);

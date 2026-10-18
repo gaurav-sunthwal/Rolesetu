@@ -117,7 +117,7 @@ def _write(page: pymupdf.Page, x: float, baseline: float, pieces: list[_Piece]) 
         x += font.width(text)
 
 
-def _content_bottom(page: pymupdf.Page) -> float:
+def content_bottom(page: pymupdf.Page) -> float:
     bottoms = [line.y1 for line in read_lines(page)]
     for drawing in page.get_drawings():
         rect = drawing["rect"]
@@ -127,8 +127,10 @@ def _content_bottom(page: pymupdf.Page) -> float:
     return max(bottoms, default=0.0)
 
 
-def _move_down(doc: pymupdf.Document, page: pymupdf.Page, cuts: list[tuple[float, float]]) -> None:
-    """Moves what is below each (y, distance) down. `y` is measured from the top of the page."""
+def move_down(doc: pymupdf.Document, page: pymupdf.Page, cuts: list[tuple[float, float]]) -> None:
+    """Moves what is below each (y, distance) down; a negative distance moves it up.
+    `y` is measured from the top of the page.
+    """
     if page.rotation != 0:
         raise CannotShiftError("Rotated pages are not supported.")
     to_pdf = ~page.transformation_matrix
@@ -163,7 +165,7 @@ def _plan(
 ) -> tuple[list[_Row], list[Skipped]]:
     rows = [_Row(entry=entry) for entry in section.entries]
     section_text = " ".join(entry.text for entry in section.entries)
-    spare = page.rect.height - MIN_BOTTOM_MARGIN - _content_bottom(page)
+    spare = page.rect.height - MIN_BOTTOM_MARGIN - content_bottom(page)
     lines_left = int(spare // section.leading) if section.can_grow else 0
     skipped: list[Skipped] = []
 
@@ -246,7 +248,7 @@ def add_skills(
         ]
         if cuts:
             try:
-                _move_down(doc, page, cuts)
+                move_down(doc, page, cuts)
             except CannotShiftError:
                 # Keep what fits on existing lines; report the rest as having no room.
                 wrapped = {skill for row in changed if row.new_lines for skill, _ in row.skills}

@@ -94,11 +94,24 @@ async def test_model_a_key_cannot_use_tries_the_other_key(monkeypatch: pytest.Mo
     assert isinstance(result, Answer) and result.text == "k2/primary"
 
 
-async def test_user_key_is_the_last_resort(monkeypatch: pytest.MonkeyPatch) -> None:
-    quota = _error(errors.ClientError, 429)
-    FakeGemini(monkeypatch, {("k1", "primary"): quota, ("k2", "primary"): quota})
+async def test_the_users_own_key_is_tried_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    gemini = FakeGemini(monkeypatch, {})
     result = await generate_structured("hi", Answer, user_api_key="mine")
     assert isinstance(result, Answer) and result.text == "mine/primary"
+    assert gemini.calls == [("mine", "primary")]
+
+
+async def test_our_keys_answer_when_the_users_key_cannot(monkeypatch: pytest.MonkeyPatch) -> None:
+    quota = _error(errors.ClientError, 429)
+    FakeGemini(monkeypatch, {("mine", "primary"): quota})
+    result = await generate_structured("hi", Answer, user_api_key="mine")
+    assert isinstance(result, Answer) and result.text == "k1/primary"
+
+    rejected = _error(errors.ClientError, 400, "API key not valid. Please pass a valid API key.")
+    gemini = FakeGemini(monkeypatch, {("mine", "primary"): rejected})
+    result = await generate_structured("hi", Answer, user_api_key="mine")
+    assert isinstance(result, Answer) and result.text == "k1/primary"
+    assert ("mine", "backup") not in gemini.calls
 
 
 async def test_raises_only_when_every_model_is_down(monkeypatch: pytest.MonkeyPatch) -> None:

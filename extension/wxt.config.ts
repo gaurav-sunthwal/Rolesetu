@@ -21,13 +21,16 @@ export default defineConfig({
     ? '{{browser}}-mv{{manifestVersion}}-live'
     : '{{browser}}-mv{{manifestVersion}}',
   manifest: ({ browser }) => ({
-    name: 'Rolesetu',
+    // The store searches the name and this description first, so they say in
+    // plain words what people search for. Store rules forbid keyword stuffing:
+    // keep them true and readable. Name: at most 75 characters; description: 132.
+    name: 'Rolesetu – Job Match Score, Resume Checker & Autofill',
+    short_name: 'Rolesetu',
     description:
-      'See your match score on any job page, fill application forms from your profile, and track the jobs you apply to.',
+      'See your match score on any job on LinkedIn, Naukri, Indeed and career sites. Tailor your resume and autofill applications.',
     permissions: ['storage', 'scripting'],
     // Every site: a job can be on any company's own pages. This also covers the API.
     host_permissions: ['http://*/*', 'https://*/*'],
-    action: { default_title: 'Rolesetu' },
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {

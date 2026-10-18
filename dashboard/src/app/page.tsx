@@ -8,6 +8,8 @@ import { FeatureShowcase } from '@/components/landing/feature-showcase';
 import { HeroJobCheck } from '@/components/landing/hero-job-check';
 import { JsonLd } from '@/components/landing/json-ld';
 import { LandingCta } from '@/components/landing/landing-cta';
+import { FreshJobsDemo } from '@/components/landing/fresh-jobs-demo';
+import { ResumeAssistantDemo } from '@/components/landing/resume-assistant-demo';
 import { ResumeEditDemo } from '@/components/landing/resume-edit-demo';
 import { Reveal } from '@/components/landing/reveal';
 import { LiquidTexture } from '@/components/brand/liquid-texture';
@@ -28,7 +30,16 @@ import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = { alternates: { canonical: '/' } };
 
-const JOB_SITES = ['LinkedIn', 'Naukri', 'Indeed', 'Company career pages'] as const;
+const JOB_SITES = ['LinkedIn', 'Naukri', 'Indeed', 'Internshala', 'Company career pages'] as const;
+
+const FRESH_COMPANIES = [
+  'Google',
+  'Microsoft',
+  'Amazon',
+  'Atlassian',
+  'NVIDIA',
+  'Freshworks',
+] as const;
 
 const SCORE_FACTS = [
   { title: 'Judged per skill', body: 'Strong, partial or missing.' },
@@ -44,18 +55,25 @@ const RESUME_FACTS = [
   { title: 'Previewed first', body: 'Before and after, then download.' },
 ] as const;
 
+const EDITOR_FACTS = [
+  { title: 'Any line, any section', body: 'Change, remove or add. Enter adds a bullet.' },
+  { title: 'Live preview', body: 'Your own PDF, redrawn as you type.' },
+  { title: 'Links keep working', body: 'LinkedIn, GitHub and project links follow.' },
+  { title: 'Asks, never invents', body: 'Claims you never gave wait for you.' },
+] as const;
+
 const STEPS = [
   {
     title: 'Upload your resume',
     body: 'We turn it into a profile and an evidence bank you can review and correct.',
   },
   {
-    title: 'Check any job',
-    body: 'Paste a link, or open the job page and read your score beside the Apply button.',
+    title: 'Find or check a job',
+    body: "See this week's jobs picked for your experience, paste any link, or open a job page and read your score beside the Apply button.",
   },
   {
     title: 'Match your resume and apply',
-    body: "Tick the skills you really have to put them in the job's wording, then let autofill fill the form. You review it and submit.",
+    body: 'Tick the skills you really have, edit any line yourself or ask the AI, then let autofill fill the form. You review it and submit.',
   },
   {
     title: 'Tracked for you',
@@ -70,10 +88,10 @@ const STEPS = [
 const PROMISES = [
   { label: 'Never', body: 'Submits an application for you.' },
   { label: 'Never', body: 'Sends an email for you.' },
-  { label: 'Never', body: 'Adds a skill you did not tick.' },
-  { label: 'Never', body: 'Changes a job title, employer or date on your resume.' },
+  { label: 'Never', body: 'Adds a skill, number or link you never gave.' },
+  { label: 'Never', body: 'Changes a job title, employer or date unless you ask.' },
   { label: 'Never', body: 'Overwrites what you typed into a form.' },
-  { label: 'Not stored', body: 'A tailored resume is kept only if you choose to keep it.' },
+  { label: 'Not stored', body: 'An edited resume is kept only when you press Save.' },
   {
     label: 'Read-only',
     body: 'Gmail access cannot send or delete, and mail bodies are never stored.',
@@ -136,10 +154,10 @@ export default function LandingPage() {
               </Display>
               <p className="text-muted-foreground mt-6 text-lg text-pretty">
                 Rolesetu is a web app and browser extension for people applying to jobs. Upload your
-                resume once. For every job after that it tells you how well you fit and why, helps
-                you put the job&apos;s wording into your resume, fills the application form, and
-                keeps a record of what you applied to and what came back. It prepares the work; you
-                decide what gets sent.
+                resume once. It finds this week&apos;s jobs that fit your experience, tells you how
+                well you fit any job and why, lets you edit your resume yourself or by asking its
+                AI, fills the application form, and keeps a record of what you applied to and what
+                came back. It prepares the work; you decide what gets sent.
               </p>
             </Reveal>
 
@@ -168,6 +186,48 @@ export default function LandingPage() {
                 </span>
               ))}
               <p className="text-muted-foreground">or paste a link from anywhere else.</p>
+            </div>
+          </section>
+
+          <section
+            id="fresh-jobs"
+            className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
+          >
+            <div className="grid items-center gap-12 lg:grid-cols-[7fr_5fr] lg:gap-16">
+              <Reveal className="lg:order-last">
+                <Eyebrow>Fresh jobs · new</Eyebrow>
+                <Display className="mt-6">
+                  <span className="block">This week&apos;s jobs,</span>
+                  <span className="text-primary block">picked for you.</span>
+                </Display>
+                <p className="text-muted-foreground mt-6 max-w-md text-lg">
+                  Every morning we read top companies&apos; own careers sites and list the jobs in
+                  India posted in the last 7 days. Only roles that fit your experience are shown,
+                  each with your match score.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-2 text-sm">
+                  {FRESH_COMPANIES.map((company) => (
+                    <span key={company} className="bg-muted rounded-full px-3 py-1 font-medium">
+                      {company}
+                    </span>
+                  ))}
+                  <span className="text-muted-foreground px-1 py-1">and 50 more</span>
+                </div>
+                <Link
+                  href={featurePath('fresh-jobs')}
+                  className="text-primary mt-4 inline-flex items-center gap-2 py-3 text-sm font-medium hover:underline"
+                >
+                  See how fresh jobs are picked
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Reveal>
+              <Reveal
+                delay={120}
+                className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.47_0.15_45)] p-4 sm:p-8"
+              >
+                <LiquidTexture className="-z-10 opacity-20" />
+                <FreshJobsDemo />
+              </Reveal>
             </div>
           </section>
 
@@ -245,6 +305,49 @@ export default function LandingPage() {
 
             <dl className="mt-16 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
               {RESUME_FACTS.map((fact, index) => (
+                <Reveal key={fact.title} delay={index * 80} className="border-t pt-4">
+                  <dt className="text-sm font-medium">{fact.title}</dt>
+                  <dd className="text-muted-foreground mt-1.5 text-sm">{fact.body}</dd>
+                </Reveal>
+              ))}
+            </dl>
+          </section>
+
+          <section
+            id="editor"
+            className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
+          >
+            <div className="grid items-center gap-12 lg:grid-cols-[5fr_7fr] lg:gap-16">
+              <Reveal>
+                <Eyebrow>Resume editor · new</Eyebrow>
+                <Display className="mt-6">
+                  <span className="block">Edit any line.</span>
+                  <span className="text-primary block">Or just ask.</span>
+                </Display>
+                <p className="text-muted-foreground mt-6 max-w-md text-lg">
+                  Change, remove or add anything on your resume and watch your own PDF redraw as you
+                  type. Or tell the AI what you want, like &ldquo;add my Rolesetu project&rdquo;. It
+                  works from your resume and profile, and asks when it does not know.
+                </p>
+                <Link
+                  href={featurePath('resume-editor')}
+                  className="text-primary mt-4 inline-flex items-center gap-2 py-3 text-sm font-medium hover:underline"
+                >
+                  See how the resume editor works
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Reveal>
+              <Reveal
+                delay={120}
+                className="relative isolate overflow-hidden rounded-2xl bg-[oklch(0.42_0.13_205)] p-4 sm:p-8"
+              >
+                <LiquidTexture className="-z-10 opacity-20" />
+                <ResumeAssistantDemo />
+              </Reveal>
+            </div>
+
+            <dl className="mt-16 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+              {EDITOR_FACTS.map((fact, index) => (
                 <Reveal key={fact.title} delay={index * 80} className="border-t pt-4">
                   <dt className="text-sm font-medium">{fact.title}</dt>
                   <dd className="text-muted-foreground mt-1.5 text-sm">{fact.body}</dd>

@@ -53,7 +53,9 @@ def _remove(page: pymupdf.Page, line: Line) -> None:
     kept = {(round(link["from"].x0), round(link["from"].y0)) for link in page.get_links()}
     for link in links:
         if (round(link["from"].x0), round(link["from"].y0)) not in kept:
+            # A link put back is a new one: its old identity would clash.
             link.pop("xref", None)
+            link.pop("id", None)
             page.insert_link(link)
 
 
@@ -67,10 +69,14 @@ def replace_in_line(
     *,
     left_limit: float,
     right_limit: float,
+    right_aligned: bool = False,
 ) -> bool:
     """Replaces characters `start` to `end` of the line (counted across its
     spans, see `raw_text`) with `new`. Returns whether the page's own font was
     used for the changed words (False means a look-alike was needed).
+
+    A line grows to the right, or both ways when it is centred. A
+    `right_aligned` line, such as a date at the right margin, grows to the left.
     """
     index, offset = None, 0
     for number, span in enumerate(line.spans):
@@ -96,7 +102,7 @@ def replace_in_line(
 
     growth = pieces[index].width - (line.spans[index].x1 - line.spans[index].x0)
     centred = abs((line.x0 + line.x1) / 2 - page.rect.width / 2) < _CENTRE_TOLERANCE
-    start_shift = -growth / 2 if centred else 0.0
+    start_shift = -growth if right_aligned else -growth / 2 if centred else 0.0
     if (
         line.x0 + start_shift < left_limit - 0.5
         or line.x1 + start_shift + growth > right_limit + 0.5

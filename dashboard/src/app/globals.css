@@ -177,6 +177,16 @@
     animation: ring-draw 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
   }
 
+  /* A thin bar sliding across the resume while its preview is redrawn. */
+  @keyframes resume-progress {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+
   /* Tied to the scroll position itself, where the browser supports it. */
   @supports (animation-timeline: scroll()) {
     @keyframes header-edge {
