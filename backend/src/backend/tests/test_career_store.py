@@ -203,3 +203,11 @@ def test_a_job_link_that_is_not_a_web_address_is_not_kept() -> None:
         description="We need Python.",
     )
     assert _stored(company("acme"), posting, date.today()) is None
+
+
+async def test_a_job_listed_twice_in_one_read_is_saved_once(slug: str) -> None:
+    async with get_sessionmaker()() as db:
+        await store.save_company(db, company(slug), [job(slug, 1), job(slug, 1), job(slug, 2)])
+        await db.commit()
+    async with get_sessionmaker()() as db:
+        assert sorted(j.id for j in await store.jobs_of(db, [slug])) == [f"{slug}:1", f"{slug}:2"]

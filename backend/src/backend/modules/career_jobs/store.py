@@ -204,8 +204,10 @@ async def save_company(
     )
     if jobs is not None:
         await db.execute(delete(CareerJob).where(CareerJob.company_slug == company.slug))
-        if jobs:
-            await db.execute(insert(CareerJob), [_row(job) for job in jobs])
+        # A site can list the same job twice in one read; it is one job.
+        unique = list({job.id[:300]: job for job in jobs}.values())
+        if unique:
+            await db.execute(insert(CareerJob), [_row(job) for job in unique])
     await _bump(db)
 
 

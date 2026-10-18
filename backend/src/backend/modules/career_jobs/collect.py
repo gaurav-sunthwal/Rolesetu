@@ -162,10 +162,17 @@ async def collect(
     if report:
         print(audience.describe(), flush=True)
 
-    async def save(company: StoredCompany, jobs: list[StoredJob] | None) -> None:
-        async with sessions() as db:
-            await store.save_company(db, company, jobs, added_by=added_by)
-            await db.commit()
+    async def save(company: StoredCompany, jobs: list[StoredJob] | None) -> bool:
+        """Saves one company. A save that fails is logged and reported, never
+        raised: it must not stop the other companies in the run."""
+        try:
+            async with sessions() as db:
+                await store.save_company(db, company, jobs, added_by=added_by)
+                await db.commit()
+        except Exception:
+            logger.exception("careers site not saved company=%s", company.slug)
+            return False
+        return True
 
     async with new_client() as client:
         http = Http(client)
@@ -199,7 +206,11 @@ async def collect(
                         print(f"✗ {company.name:24} {type(exc).__name__}", flush=True)
                     return
             done = company.model_copy(update={"error": None})
-            await save(done, read.jobs)
+            if not await save(done, read.jobs):
+                result.companies[company.slug] = company.model_copy(
+                    update={"error": "Could not be saved"}
+                )
+                return
             result.companies[company.slug] = done
             result.jobs[company.slug] = read.jobs
             result.skipped += read.skipped
