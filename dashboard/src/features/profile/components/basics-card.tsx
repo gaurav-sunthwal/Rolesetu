@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -47,6 +48,13 @@ export function BasicsCard({ profile }: { profile: Profile }) {
     reset,
     formState: { errors, isDirty },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: valuesOf(profile) });
+
+  // The profile can change after this form is shown (a resume import lands a
+  // moment later). Show the new values, unless the person is mid-edit.
+  const latest = JSON.stringify(valuesOf(profile));
+  useEffect(() => {
+    if (!isDirty) reset(JSON.parse(latest) as FormValues);
+  }, [latest, isDirty, reset]);
 
   function onSubmit(values: FormValues) {
     update.mutate(
