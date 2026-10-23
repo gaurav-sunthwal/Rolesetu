@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core import storage
 from backend.core.config import get_settings
+from backend.core.email import is_configured as email_is_configured
 from backend.core.email import send_email
 from backend.core.exceptions import (
     AppError,
@@ -279,9 +280,10 @@ ONE_EMAIL_PER = timedelta(hours=24)
 
 
 def _require_email_set_up() -> None:
-    if not get_settings().resend_api_key:
+    if not email_is_configured():
         raise ValidationFailedError(
-            "Email is not set up on the server. Add RESEND_API_KEY to send from the panel."
+            "Email is not set up on the server. Add GMAIL_SENDER_REFRESH_TOKEN to send "
+            "from the panel."
         )
 
 
@@ -293,7 +295,7 @@ async def email_defaults(db: AsyncSession) -> EmailDefaults:
         placeholder=emails.PLACEHOLDER,
         recipients=recipients,
         max_per_send=MAX_PER_SEND,
-        configured=bool(get_settings().resend_api_key),
+        configured=email_is_configured(),
     )
 
 

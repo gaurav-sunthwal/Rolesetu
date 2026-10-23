@@ -111,6 +111,7 @@ async def test_joining_still_works_when_the_email_cannot_be_sent(
 
 async def test_nothing_is_sent_when_no_mail_key_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(get_settings(), "resend_api_key", None)
+    monkeypatch.setattr(get_settings(), "gmail_sender_refresh_token", None)
     # Returns without raising, and without a network call to make.
     await email_sender.send_email(
         to="someone@example.com", subject="s", html="h", text="t", idempotency_key="k"

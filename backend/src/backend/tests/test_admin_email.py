@@ -109,10 +109,11 @@ async def test_nothing_is_sent_when_email_is_not_set_up(
     admin: AsyncClient, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(get_settings(), "resend_api_key", None)
+    monkeypatch.setattr(get_settings(), "gmail_sender_refresh_token", None)
     await client.put("/api/v1/profile/me", json=PROFILE)
     target = await user_id(admin, client)
     refused = await admin.post(f"{ADMIN}/users/{target}/email", json=NOTE)
-    assert refused.status_code == 422 and "RESEND_API_KEY" in refused.json()["detail"]
+    assert refused.status_code == 422 and "GMAIL_SENDER_REFRESH_TOKEN" in refused.json()["detail"]
 
 
 async def test_people_without_the_extension_can_be_listed(

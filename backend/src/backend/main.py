@@ -9,6 +9,7 @@ from backend.api.v1.router import api_router
 from backend.core.config import get_settings
 from backend.core.exceptions import register_exception_handlers
 from backend.db.session import get_engine
+from backend.modules.feedback import service as feedback
 from backend.modules.matches.local import semantic
 
 
@@ -17,8 +18,10 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     # Load the embedding model in the background, so startup is not held up and
     # the first job check does not pay for it.
     warm = asyncio.create_task(asyncio.to_thread(semantic.warm_up))
+    feedback_emails = asyncio.create_task(feedback.run_forever())
     yield
     warm.cancel()
+    feedback_emails.cancel()
     await get_engine().dispose()
 
 
