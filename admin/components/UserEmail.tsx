@@ -43,7 +43,8 @@ export function UserEmail({
           <ErrorNote message={errorMessage(defaults.error)} onRetry={() => defaults.refetch()} />
         ) : !defaults.data.configured ? (
           <p className="text-sm font-medium text-red-700">
-            Email is not set up on the server. Add RESEND_API_KEY to the API to send from here.
+            Email is not set up on the server. Add GMAIL_SENDER_REFRESH_TOKEN to the API to send
+            from here.
           </p>
         ) : send.isSuccess && send.data.status === 'sent' ? (
           <p role="status" className="text-sm font-medium text-emerald-800">

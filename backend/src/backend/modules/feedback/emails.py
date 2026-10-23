@@ -12,7 +12,7 @@ what make an email look like a mailing.
 
 from dataclasses import dataclass
 
-SENDER_NAME = "Gaurav Sunthwal"
+from backend.modules.admin.emails import SENDER_NAME as SENDER_NAME
 
 _SIGN_OFF = """\
 Thanks,

@@ -4,6 +4,7 @@ Reading one person's data and deleting an account are both written to the
 audit log, in the same transaction as the read or the delete.
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -271,8 +272,12 @@ async def clear_errors(db: AsyncSession, *, admin: Admin, fingerprint: str) -> N
 # --- Emailing users ---------------------------------------------------------
 
 NUDGE = "extension_nudge"
-# Most people one bulk send writes to. Resend's free plan allows 100 emails a day.
+# Most people one bulk send writes to. Gmail allows about 500 a day, shared with
+# every other email the API sends.
 MAX_PER_SEND = 50
+# Pause between emails in a bulk send. A burst of identical emails is what a
+# spammer sends; a few seconds apart reads like someone working through a list.
+SECONDS_BETWEEN_SENDS = 4.0
 # Someone sent this email is left alone for this long by later bulk sends.
 QUIET_FOR = timedelta(days=14)
 # One person is not written to twice within this time, to stop a double click.
@@ -315,7 +320,6 @@ async def _deliver(
         subject=subject,
         message=message,
         name=emails.first_name(name),
-        site_url=settings.dashboard_url,
         store_url=settings.extension_store_url,
     )
     record = OutreachEmail(
@@ -330,10 +334,11 @@ async def _deliver(
         await send_email(
             to=address,
             subject=email.subject,
-            html=email.html,
+            html=None,
             text=email.text,
             # Names this one email, so a retry never delivers a second copy.
             idempotency_key=f"outreach-{record.id}",
+            sender_name=emails.SENDER_NAME,
         )
     except Exception as exc:
         logger.warning("admin email to user=%s failed: %s", user_id, type(exc).__name__)
@@ -412,3 +417,4 @@ async def send_extension_nudges(admin_email: str, subject: str, message: str) ->
             )
             # Committed one by one, so a crash part way keeps the record of who was written to.
             await db.commit()
+            await asyncio.sleep(SECONDS_BETWEEN_SENDS)

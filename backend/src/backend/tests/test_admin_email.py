@@ -27,10 +27,10 @@ NOTE = {"subject": "Hello {first_name}", "message": "Hi {first_name},\n\nTry the
 
 @dataclass
 class Outbox:
-    sent: list[dict[str, str]] = field(default_factory=list)
+    sent: list[dict[str, object]] = field(default_factory=list)
     fail: bool = False
 
-    async def send(self, **email: str) -> None:
+    async def send(self, **email: object) -> None:
         if self.fail:
             raise RuntimeError("provider down")
         self.sent.append(email)
@@ -41,6 +41,7 @@ def outbox(monkeypatch: pytest.MonkeyPatch) -> Outbox:
     box = Outbox()
     monkeypatch.setattr(admin_service, "send_email", box.send)
     monkeypatch.setattr(get_settings(), "resend_api_key", "test-key")
+    monkeypatch.setattr(admin_service, "SECONDS_BETWEEN_SENDS", 0)
     return box
 
 
@@ -78,7 +79,9 @@ async def test_an_admin_emails_one_person_by_first_name(
     assert len(outbox.sent) == 1
     email = outbox.sent[0]
     assert email["to"] == email_of(client) and email["subject"] == "Hello Asha"
-    assert "Hi Asha," in email["text"] and get_settings().extension_store_url in email["html"]
+    text = str(email["text"])
+    assert "Hi Asha," in text and get_settings().extension_store_url in text
+    assert email["html"] is None and email["sender_name"] == emails.SENDER_NAME
 
     detail = (await admin.get(f"{ADMIN}/users/{target}")).json()
     assert [item["subject"] for item in detail["panel_emails"]] == ["Hello Asha"]
@@ -159,14 +162,14 @@ async def test_an_ordinary_user_cannot_send(client: AsyncClient, outbox: Outbox)
     assert outbox.sent == []
 
 
-def test_the_message_is_escaped_and_split_into_paragraphs() -> None:
-    email = emails.extension_nudge(
-        subject="Hi",
-        message="One <b>bold</b> line\n\nSecond",
+def test_the_note_is_plain_text_with_the_store_link_and_sign_off() -> None:
+    note = emails.extension_nudge(
+        subject="Hi {first_name}",
+        message="Hi {first_name},\n\nOne <b>bold</b> line",
         name="Asha",
-        site_url="https://rolesetu.example",
         store_url="https://store.example/x",
     )
-    assert "&lt;b&gt;bold&lt;/b&gt;" in email.html and "<b>bold</b>" not in email.html
-    assert email.html.count('<p style="margin:16px') == 2
+    assert note.subject == "Hi Asha"
+    assert note.text.startswith("Hi Asha,\n\nOne <b>bold</b> line\n")
+    assert "https://store.example/x" in note.text and "Gaurav Sunthwal" in note.text
     assert emails.first_name("  Asha  Rao ") == "Asha" and emails.first_name(None) == "there"

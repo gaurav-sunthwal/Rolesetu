@@ -6,8 +6,8 @@ import type { EmailCompose } from '@/lib/types';
 
 /**
  * Subject and message, prefilled with the suggested email. {first_name} is
- * replaced for each person. The "Add to Chrome" button, the link to connect
- * the extension and the footer are added by the server, not typed here.
+ * replaced for each person. The Chrome Web Store link, how to connect the
+ * extension and the founder's sign-off are added by the server, not typed here.
  */
 export function EmailComposer({
   initial,
@@ -57,8 +57,8 @@ export function EmailComposer({
       </label>
       <p className="text-xs text-zinc-500">
         <code className="rounded bg-zinc-100 px-1">{placeholder}</code> becomes each person&apos;s
-        first name. An &ldquo;Add to Chrome&rdquo; button, a link to connect the extension and a
-        note saying they can reply &ldquo;stop&rdquo; are added below your message.
+        first name. It goes as plain text from Gaurav Sunthwal. The Chrome Web Store link, how to
+        connect the extension and your sign-off are added below your message.
       </p>
       <button
         disabled={!ready || sending}

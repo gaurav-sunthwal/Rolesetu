@@ -42,32 +42,43 @@ async def _count(db: AsyncSession, query: Select[Any]) -> int:
 
 
 async def totals(db: AsyncSession, since: datetime, active_since: datetime) -> dict[str, int]:
-    rendered_by_users = select(Job.id).where(
-        Job.created_at > since, Job.job_json["listing"]["reader"].astext == "rendered"
-    )
-    rendered_by_visitors = select(JobPreview.id).where(
-        JobPreview.created_at > since, JobPreview.reader == "rendered"
-    )
-    return {
-        "users": await _count(db, select(User.id)),
-        "users_with_profile": await _count(db, select(Profile.id)),
-        "job_checks": await _count(db, select(Match.id)),
-        "applications": await _count(db, select(Application.id)),
-        "gmail_connected": await _count(db, select(Integration.id)),
-        "extension_connected": await _count(db, select(ExtensionToken.id)),
-        "extension_active_week": await _count(
-            db, select(ExtensionToken.id).where(ExtensionToken.last_used_at > active_since)
+    """Every count on the dashboard, in one query. The database is far from
+    the API, so each separate query costs a full round trip.
+    """
+
+    def count(query: Select[Any]) -> Any:
+        return select(func.count()).select_from(query.subquery()).scalar_subquery()
+
+    counts = {
+        "users": count(select(User.id)),
+        "users_with_profile": count(select(Profile.id)),
+        "job_checks": count(select(Match.id)),
+        "applications": count(select(Application.id)),
+        "gmail_connected": count(select(Integration.id)),
+        "extension_connected": count(select(ExtensionToken.id)),
+        "extension_active_week": count(
+            select(ExtensionToken.id).where(ExtensionToken.last_used_at > active_since)
         ),
-        "waitlist": await _count(db, select(WaitlistEntry.id)),
-        "errors_today": await _count(
-            db, select(ErrorEvent.id).where(ErrorEvent.created_at > since)
+        "waitlist": count(select(WaitlistEntry.id)),
+        "errors_today": count(select(ErrorEvent.id).where(ErrorEvent.created_at > since)),
+        "previews_today": count(select(JobPreview.id).where(JobPreview.created_at > since)),
+        "paid_reads_by_users": count(
+            select(Job.id).where(
+                Job.created_at > since, Job.job_json["listing"]["reader"].astext == "rendered"
+            )
         ),
-        "previews_today": await _count(
-            db, select(JobPreview.id).where(JobPreview.created_at > since)
+        "paid_reads_by_visitors": count(
+            select(JobPreview.id).where(
+                JobPreview.created_at > since, JobPreview.reader == "rendered"
+            )
         ),
-        "paid_reads_today": await _count(db, rendered_by_users)
-        + await _count(db, rendered_by_visitors),
     }
+    row = (await db.execute(select(*(value.label(key) for key, value in counts.items())))).one()
+    found: dict[str, int] = dict(row._mapping)
+    found["paid_reads_today"] = found.pop("paid_reads_by_users") + found.pop(
+        "paid_reads_by_visitors"
+    )
+    return found
 
 
 async def per_day(
@@ -239,11 +250,13 @@ async def list_actions(db: AsyncSession, *, after: Cursor, limit: int) -> list[A
 
 
 def _nudge_recipients(quiet_since: datetime) -> Select[User, str | None]:
-    """Users without the extension who have not been sent this email lately."""
+    """Users without the extension who have not been told about it lately, by
+    this email or by the founder's note sent after their first sign-in.
+    """
     emailed_lately = exists(
         select(OutreachEmail.id).where(
             OutreachEmail.user_id == User.id,
-            OutreachEmail.kind == "extension_nudge",
+            OutreachEmail.kind.in_(("extension_nudge", "first_use_feedback")),
             OutreachEmail.status == "sent",
             OutreachEmail.created_at > quiet_since,
         )
