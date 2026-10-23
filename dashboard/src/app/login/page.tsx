@@ -75,6 +75,12 @@ export default function LoginPage() {
     if (!loading && user) router.replace(afterSignIn());
   }, [loading, user, router]);
 
+  useEffect(() => {
+    // Load where sign-in leads while the person types, so arriving is instant.
+    router.prefetch('/app');
+    router.prefetch('/app/welcome');
+  }, [router]);
+
   async function onSubmit({ email, password }: FormValues) {
     try {
       if (mode === 'sign-in') {
