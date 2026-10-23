@@ -48,6 +48,17 @@ function reportAuthError(error: unknown) {
   toast.error(ERROR_MESSAGES[code] ?? 'Something went wrong. Please try again.');
 }
 
+/**
+ * Where to go once signed in: the job looked up on the landing page, else the
+ * page that sent the visitor here, else the dashboard. Only dashboard paths are
+ * followed, so a crafted link cannot send anyone off the site.
+ */
+function afterSignIn(): string {
+  if (readPendingJob()) return '/app/check';
+  const next = new URLSearchParams(window.location.search).get('next');
+  return next && /^\/app(\/[\w-]+)*$/.test(next) ? next : '/app';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -61,8 +72,7 @@ export default function LoginPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
-    // A visitor who looked up a job on the landing page goes straight to its score.
-    if (!loading && user) router.replace(readPendingJob() ? '/app/check' : '/app');
+    if (!loading && user) router.replace(afterSignIn());
   }, [loading, user, router]);
 
   async function onSubmit({ email, password }: FormValues) {

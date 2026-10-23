@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/layout/app-sidebar';
 import { AuthGuard } from '@/components/layout/auth-guard';
 import { Topbar } from '@/components/layout/topbar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { WelcomeRedirect } from '@/features/welcome/components/welcome-redirect';
 import { SITE_NAME } from '@/lib/site';
 
 // Private pages: nothing here belongs in search results.
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default function DashboardLayout({ children }: LayoutProps<'/app'>) {
   return (
     <AuthGuard>
+      <WelcomeRedirect />
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>

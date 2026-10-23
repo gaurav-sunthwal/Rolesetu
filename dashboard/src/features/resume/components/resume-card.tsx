@@ -20,18 +20,10 @@ import {
   useUploadResume,
 } from '@/features/resume/hooks';
 import { errorMessage } from '@/lib/api/client';
+import { isProfileEmpty } from '@/features/welcome/state';
 import type { Profile } from '@/lib/api/types';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-function isEmpty(profile: Profile): boolean {
-  return (
-    !profile.full_name &&
-    !profile.headline &&
-    profile.skills.length + profile.experience.length === 0 &&
-    profile.projects.length + profile.education.length === 0
-  );
-}
 
 function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
@@ -91,7 +83,10 @@ export function ResumeCard({ profile, onApplied }: { profile: Profile; onApplied
   // Nothing on the profile yet: there is nothing to overwrite, so fill it
   // straight away instead of asking. Once per resume.
   const readyToAutoApply =
-    current?.status === 'parsed' && !current.applied_at && current.parsed && isEmpty(profile);
+    current?.status === 'parsed' &&
+    !current.applied_at &&
+    current.parsed &&
+    isProfileEmpty(profile);
   useEffect(() => {
     if (!readyToAutoApply || !current?.parsed || autoApplied.current === current.id) return;
     autoApplied.current = current.id;

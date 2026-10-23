@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
@@ -8,10 +8,12 @@ import { useAuth } from '@/lib/auth-context';
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login');
-  }, [loading, user, router]);
+    // Remember the page, so signing in returns to it (the extension opens Settings, for one).
+    if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [loading, user, router, pathname]);
 
   if (loading || !user) {
     return (
