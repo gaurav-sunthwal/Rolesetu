@@ -1,9 +1,11 @@
 import { fitJob, fitUrl, messageFor, UNREACHABLE } from '@/lib/api-errors';
-import { API_BASE_URL, DASHBOARD_URL } from '@/lib/config';
+import { type Badge, badgeForMatch, NO_BADGE, NOT_CONNECTED_BADGE } from '@/lib/badge';
+import { API_BASE_URL, DASHBOARD_URL, SETUP_PATH } from '@/lib/config';
 import type {
   AutofillData,
   Failure,
   KeywordCheck,
+  LearnedAnswerRead,
   Match,
   Request,
   Result,
@@ -32,7 +34,8 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
   // The server can be asleep or mid-restart, and then the first call fails or
   // gets a "starting up" reply. Waiting briefly and trying again is usually all
   // it takes. Every call here is safe to repeat: reads, a job check (the server
-  // reuses the result) and tracker writes (which carry a retry key).
+  // reuses the result), tracker writes (which carry a retry key) and saving
+  // learned answers (saving the same answer twice changes nothing).
   let response: Response | null = null;
   for (const wait of RETRY_AFTER_MS) {
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
@@ -61,6 +64,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
     await accessKey.setValue(null);
     return NOT_CONNECTED;
   }
+  if (response.status === 204) return { ok: true, data: null as T };
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     return { ok: false, status: response.status, message: messageFor(response.status, body) };
@@ -127,6 +131,17 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
     case 'autofill-data':
       return api<AutofillData>('/extension/autofill');
 
+    case 'learn-answers':
+      return api<LearnedAnswerRead[]>('/extension/learned-answers', {
+        method: 'POST',
+        body: JSON.stringify({ answers: request.answers }),
+      });
+
+    case 'forget-answer':
+      return api<null>(`/extension/learned-answers/${encodeURIComponent(request.key)}`, {
+        method: 'DELETE',
+      });
+
     case 'keyword-check':
       return api<KeywordCheck>(
         `/tailored-resumes/keywords?match_id=${encodeURIComponent(request.matchId)}`,
@@ -150,8 +165,12 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
 
     case 'check-job': {
       const job = fitJob(request.job);
-      if ('problem' in job) return { ok: false, status: 422, message: job.problem };
-      return api<Match>('/matches', { method: 'POST', body: JSON.stringify(job) });
+      const result: Result<Match> =
+        'problem' in job
+          ? { ok: false, status: 422, message: job.problem }
+          : await api<Match>('/matches', { method: 'POST', body: JSON.stringify(job) });
+      if (sender.tab?.id !== undefined) await showBadge(badgeForMatch(result), sender.tab.id);
+      return result;
     }
 
     case 'record-application':
@@ -168,7 +187,75 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
   }
 }
 
+/** Sets the toolbar badge for one tab, or for every tab without its own when no tab is given. */
+async function showBadge(badge: Badge, tabId?: number): Promise<void> {
+  // The Firefox build is Manifest V2, where the toolbar button is `browserAction`.
+  const button = browser.action ?? browser.browserAction;
+  try {
+    await button.setBadgeText({ text: badge.text, tabId });
+    await button.setBadgeBackgroundColor({ color: badge.color, tabId });
+    await button.setTitle({ title: badge.title, tabId });
+  } catch {
+    // The tab closed meanwhile: there is nothing left to label.
+  }
+}
+
+/**
+ * Puts the setup in front of the user. A Rolesetu tab that is already open
+ * (the browser may have restored one) is brought forward rather than opened
+ * twice.
+ */
+async function showSetup(): Promise<void> {
+  const [open] = await browser.tabs.query({ url: `${DASHBOARD_URL}/*` });
+  if (open?.id === undefined) {
+    await browser.tabs.create({ url: `${DASHBOARD_URL}${SETUP_PATH}` });
+    return;
+  }
+  await browser.tabs.update(open.id, { active: true });
+  if (open.windowId !== undefined) await browser.windows.update(open.windowId, { focused: true });
+}
+
+// A fresh browser start can report both a start and a first window: one setup is enough.
+let showing: Promise<void> | null = null;
+
+/** Shows the setup if this browser is not connected yet. */
+function showSetupIfNotConnected(): void {
+  showing ??= accessKey
+    .getValue()
+    .then((key) => (key === null ? showSetup() : undefined))
+    .catch((error: unknown) => console.error('Rolesetu: could not open the setup', error))
+    .finally(() => {
+      showing = null;
+    });
+}
+
 export default defineBackground(() => {
+  // Most people who install never come back to connect, so the setup opens by
+  // itself: right after install, and each time the browser is opened until connected.
+  browser.runtime.onInstalled.addListener(({ reason }) => {
+    if (reason === 'install') showSetupIfNotConnected();
+  });
+  browser.runtime.onStartup.addListener(showSetupIfNotConnected);
+  // On a Mac, closing every window leaves the browser running, so opening it
+  // again is not a start. A first window after none counts as opening it.
+  browser.windows.onCreated.addListener((created) => {
+    if (created.type !== 'normal') return;
+    void browser.windows.getAll({ windowTypes: ['normal'] }).then((all) => {
+      if (all.length === 1) showSetupIfNotConnected();
+    });
+  });
+
+  // A "!" on the icon until the browser is connected, so it is clear setup is needed.
+  const resting = (key: string | null) => (key === null ? NOT_CONNECTED_BADGE : NO_BADGE);
+  void accessKey.getValue().then((key) => showBadge(resting(key)));
+  accessKey.watch((key) => void showBadge(resting(key)));
+
+  // A tab's score belongs to the page it was given for: reset it when the tab moves on.
+  browser.tabs.onUpdated.addListener((tabId, change) => {
+    if (change.url === undefined) return;
+    void accessKey.getValue().then((key) => showBadge(resting(key), tabId));
+  });
+
   browser.runtime.onMessage.addListener((request: Request, sender, sendResponse) => {
     // Whatever happens in here, the page gets an answer. Without one it would
     // wait forever, or crash trying to read a reply that never came.

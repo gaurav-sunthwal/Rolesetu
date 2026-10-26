@@ -1,72 +1,27 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Puzzle } from 'lucide-react';
-import { toast } from 'sonner';
 
 import { SectionCard } from '@/components/app/section-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { connectExtension, disconnectExtension, getExtensionStatus } from '@/features/settings/api';
-import {
-  clearExtensionKey,
-  findExtension,
-  giveKeyToExtension,
-} from '@/features/settings/extension-bridge';
 import { extensionStoreUrl } from '@/features/settings/extension-store';
+import { useExtensionConnection } from '@/features/settings/extension-connection';
 import { errorMessage } from '@/lib/api/client';
 import { formatDate, timeAgo } from '@/lib/format';
 
-const statusKey = ['extension', 'status'] as const;
-const browserKey = ['extension', 'browser'] as const;
-
 export function ExtensionCard() {
-  const queryClient = useQueryClient();
-  const status = useQuery({ queryKey: statusKey, queryFn: getExtensionStatus });
-  // Asked of the browser, not the server: is the extension installed right here?
-  const browser = useQuery({ queryKey: browserKey, queryFn: findExtension, staleTime: 0 });
-
-  const refresh = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: statusKey }),
-      queryClient.invalidateQueries({ queryKey: browserKey }),
-    ]);
-
-  const connect = useMutation({
-    mutationFn: async () => {
-      const { token } = await connectExtension();
-      if (!(await giveKeyToExtension(token))) {
-        // The key was issued but nothing received it: take it back.
-        await disconnectExtension();
-        throw new Error('not-installed');
-      }
-    },
-    onSuccess: () => toast.success('Extension connected. Open a job page to see your score.'),
-    onError: (error) =>
-      toast.error(
-        error instanceof Error && error.message === 'not-installed'
-          ? 'The extension did not respond. Check it is installed and enabled, then reload this page.'
-          : errorMessage(error),
-      ),
-    onSettled: refresh,
-  });
-
-  const disconnect = useMutation({
-    mutationFn: async () => {
-      await disconnectExtension();
-      await clearExtensionKey();
-    },
-    onSuccess: () => toast.success('Extension disconnected'),
-    onError: (error) => toast.error(errorMessage(error)),
-    onSettled: refresh,
-  });
-
-  const loading = status.isPending || browser.isPending;
-  const installed = browser.data?.installed === true;
-  // Connected only when the server has a key and this browser holds it.
-  const connectedHere = status.data?.connected === true && browser.data?.connected === true;
-  const connectedElsewhere = status.data?.connected === true && !connectedHere;
-  const busy = connect.isPending || disconnect.isPending;
+  const {
+    status,
+    browser,
+    connect,
+    disconnect,
+    loading,
+    installed,
+    connectedHere,
+    connectedElsewhere,
+    busy,
+  } = useExtensionConnection();
   // Read only once the browser has answered, so the server never renders it.
   const storeUrl = browser.data ? extensionStoreUrl(navigator.userAgent) : null;
 
@@ -120,7 +75,7 @@ export function ExtensionCard() {
               </Button>
             ) : null}
             {installed ? (
-              <Button onClick={() => connect.mutate()} disabled={busy}>
+              <Button onClick={() => connect.mutate({ automatic: false })} disabled={busy}>
                 {connect.isPending ? 'Connecting…' : 'Connect extension'}
               </Button>
             ) : (

@@ -4,6 +4,7 @@ import { ScanSearch } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { ExtensionConnectButton } from '@/components/layout/extension-connect-button';
 import { NAV_ITEMS } from '@/components/layout/nav-items';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ export function Topbar() {
       <SidebarTrigger className="text-muted-foreground -ml-1" />
       <h1 className="text-base font-medium tracking-tight">{title}</h1>
       <div className="ml-auto flex items-center gap-2">
+        <ExtensionConnectButton />
         <ThemeToggle />
         {hideCta ? null : (
           <Button nativeButton={false} render={<Link href="/app/check" />}>

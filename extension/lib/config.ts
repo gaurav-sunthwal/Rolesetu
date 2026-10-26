@@ -7,6 +7,13 @@ export const DASHBOARD_URL = (
 ).replace(/\/$/, '');
 
 /**
+ * Where a new user is sent to get going: the resume upload first (logging in is
+ * one click away), then Settings, where the extension is connected. A new
+ * account is moved on to the welcome setup from there.
+ */
+export const SETUP_PATH = '/login?next=%2Fapp%2Fsettings&from=extension';
+
+/**
  * Pages allowed to hand the extension its key: only the dashboard this build
  * was made for. A local build trusts localhost; a live build trusts the live
  * site. Never both, so a page on someone's localhost cannot talk to a published

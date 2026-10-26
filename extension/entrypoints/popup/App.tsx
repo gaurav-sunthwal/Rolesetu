@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { SETUP_PATH } from '@/lib/config';
 import { Mark } from '@/lib/mark';
 import { ask } from '@/lib/messages';
 
@@ -66,12 +67,15 @@ export function App() {
             <i />
             Not connected
           </div>
-          <p>Open Rolesetu, go to Settings, and press “Connect extension”.</p>
+          <p>
+            Sign in, add your resume, and connect this browser. Then your match score shows on every
+            job page.
+          </p>
           <button
             type="button"
-            onClick={() => void ask({ type: 'open-dashboard', path: '/app/settings' })}
+            onClick={() => void ask({ type: 'open-dashboard', path: SETUP_PATH })}
           >
-            Open Settings
+            Set up Rolesetu
           </button>
         </>
       )}
