@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, Plus, RotateCcw } from 'lucide-react';
+import { ExternalLink, Plus, RotateCcw, Share2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { SectionCard } from '@/components/app/section-card';
@@ -9,6 +9,7 @@ import { AddApplicationDialog } from '@/features/applications/components/add-app
 import { ExperienceNote } from '@/features/matches/components/experience-note';
 import { ScoreRing } from '@/features/matches/components/score-ring';
 import { bandOf, projectedScore, VERDICT_META } from '@/features/matches/score';
+import { ShareDialog } from '@/features/share/components/share-dialog';
 import { GapsCard } from '@/features/tailoring/components/gaps-card';
 import type { Match, SkillResult } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ export function MatchResult({
   onCheckAnother: () => void;
 }) {
   const [tracking, setTracking] = useState(false);
+  const [sharing, setSharing] = useState(false);
   // Skills ticked in the resume card. The ring shows where the score would land with them.
   const [ticked, setTicked] = useState<string[]>([]);
   const current = match.score ?? 0;
@@ -92,6 +94,10 @@ export function MatchResult({
               <Plus />
               Track this job
             </Button>
+            <Button variant="outline" onClick={() => setSharing(true)}>
+              <Share2 />
+              Share score
+            </Button>
             <Button variant="outline" onClick={onCheckAnother}>
               <RotateCcw />
               Check another job
@@ -115,6 +121,8 @@ export function MatchResult({
         <GapsCard key={match.id} match={match} onTicked={setTicked} />
       </div>
 
+      <ShareDialog match={match} open={sharing} onOpenChange={setSharing} />
+
       <AddApplicationDialog
         open={tracking}
         onOpenChange={setTracking}
@@ -124,7 +132,7 @@ export function MatchResult({
   );
 }
 
-function SkillGroup({ label, skills }: { label: string; skills: SkillResult[] }) {
+export function SkillGroup({ label, skills }: { label: string; skills: SkillResult[] }) {
   if (skills.length === 0) return null;
   return (
     <div className="not-first:mt-6">

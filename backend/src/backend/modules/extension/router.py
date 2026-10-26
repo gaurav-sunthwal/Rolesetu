@@ -9,12 +9,17 @@ from backend.modules.extension.schemas import AutofillData, ExtensionConnected, 
 from backend.modules.matches import scoring
 from backend.modules.profiles import service as profiles_service
 from backend.modules.saved_answers import service as saved_answers_service
+from backend.modules.saved_answers.schemas import (
+    LearnedAnswerRead,
+    LearnedAnswersWrite,
+    QuestionKey,
+)
 from backend.modules.users.dependencies import get_db_user, get_db_user_or_extension
 from backend.modules.users.models import User
 
 # Managing the connection is done from the dashboard only: those routes use
 # `get_db_user`, which refuses a request signed with an extension key. Reading
-# the autofill data is the one thing here the extension itself may do.
+# and writing the autofill data is the one thing here the extension itself may do.
 router = APIRouter(prefix="/extension", tags=["extension"])
 
 
@@ -61,3 +66,30 @@ async def read_autofill_data(
         saved_answers={answer.question_key: answer.answer for answer in answers},
         years_of_experience=years,
     )
+
+
+@router.post("/learned-answers", response_model=list[LearnedAnswerRead])
+async def learn_answers(
+    payload: LearnedAnswersWrite,
+    user: User = Depends(get_db_user_or_extension),
+    db: AsyncSession = Depends(get_db),
+) -> list[LearnedAnswerRead]:
+    """Remembers what the user typed into a form, for the next form that asks.
+    Repeating a request changes nothing, so the extension may retry it.
+    """
+    learned = await saved_answers_service.learn_answers(
+        db,
+        user_id=user.id,
+        answers=[(answer.question_key, answer.answer) for answer in payload.answers],
+    )
+    return [LearnedAnswerRead(question_key=key, previous=previous) for key, previous in learned]
+
+
+@router.delete("/learned-answers/{question_key}", status_code=204)
+async def forget_answer(
+    question_key: QuestionKey,
+    user: User = Depends(get_db_user_or_extension),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """The Undo for an answer that was new when it was learned."""
+    await saved_answers_service.delete_answer(db, user_id=user.id, question_key=question_key)

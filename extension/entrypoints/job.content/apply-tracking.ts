@@ -8,10 +8,9 @@
  * Nothing is ever clicked or submitted for the user; this only watches.
  */
 
-import { APPLY, CONTROLS, labelOf } from '@/lib/apply-controls';
+import { APPLY, CONTROLS, labelOf, SUBMIT } from '@/lib/apply-controls';
 import { whenSettled } from '@/lib/settled';
 
-const SUBMIT = /^(?:submit|send)(?: (?:my |your |the )?application)?$|^submit$|^apply and submit$/i;
 // What a site says once an application has gone through.
 const SUCCESS =
   /application (?:was |has been |is )?(?:successfully )?(?:submitted|sent|received)|successfully applied|applied successfully|you(?:'ve| have) (?:successfully )?applied|thanks? (?:you )?for applying|your application (?:has been|was) (?:sent|submitted|received)/i;

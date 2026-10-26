@@ -3,9 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { SOCIAL_ENABLED } from '@/lib/features';
+
 const LINKS = [
   { href: '/', label: 'Dashboard' },
   { href: '/users', label: 'Users' },
+  ...(SOCIAL_ENABLED ? [{ href: '/social', label: 'Social' }] : []),
   { href: '/waitlist', label: 'Waiting list' },
   { href: '/errors', label: 'Errors' },
   { href: '/audit', label: 'Audit log' },

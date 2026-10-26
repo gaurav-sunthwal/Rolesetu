@@ -3,6 +3,7 @@ import type { ContentScriptContext } from '#imports';
 
 import { hasApplicationForm } from '@/lib/autofill/fields';
 import { fill, planAutofill } from '@/lib/autofill/fill';
+import { type Learned, watchAnswers } from '@/lib/autofill/learn';
 import { detectJob } from '@/lib/job-detect';
 import { projectedScore } from '@/lib/projected-score';
 import { sameJob } from '@/lib/same-job';
@@ -13,6 +14,7 @@ import {
   type AutofillData,
   type DetectedJob,
   type KeywordCheck,
+  type LearnedAnswerRead,
   type Match,
   type PendingApply,
   type SkillResult,
@@ -209,6 +211,7 @@ type Autofill =
   | { name: 'offer'; count: number }
   | { name: 'connect' }
   | { name: 'filled'; count: number }
+  | { name: 'learned'; names: string[]; changes: LearnedAnswerRead[] }
   | { name: 'failed'; message: string };
 
 const RESCAN_AFTER_MS = 800;
@@ -217,7 +220,8 @@ const RESCAN_AT_MOST_MS = 3000;
 /**
  * Offers to fill an application form from the user's profile. The form is
  * looked for again whenever the page changes, because the next step of an
- * application usually appears without a reload.
+ * application usually appears without a reload. What the user types into a
+ * question we could not answer is remembered for the next form.
  */
 function useAutofill(ctx: ContentScriptContext) {
   const [state, setState] = useState<Autofill>({ name: 'none' });
@@ -264,6 +268,66 @@ function useAutofill(ctx: ContentScriptContext) {
     );
   }, []);
 
+  const remember = useCallback(
+    async (learned: Learned[]) => {
+      if (ctx.isInvalid || data.current === null) return;
+      const result = await ask({ type: 'learn-answers', answers: learned.map((item) => item.answer) });
+      // Not worth interrupting the application for: the next change tries again.
+      if (!result.ok || data.current === null) return;
+      for (const { answer } of learned) data.current.saved_answers[answer.question_key] = answer.answer;
+      if (result.data.length === 0) return;
+
+      const changed = new Set(result.data.map((change) => change.question_key));
+      const names = learned.filter((item) => changed.has(item.answer.question_key)).map((item) => item.name);
+      holding.current = true;
+      setState((shown) => {
+        if (shown.name !== 'learned') return { name: 'learned', names, changes: result.data };
+        // Undo goes back to what was saved before the first of these changes.
+        const before = new Set(shown.changes.map((change) => change.question_key));
+        return {
+          name: 'learned',
+          names: [...new Set([...shown.names, ...names])],
+          changes: [...shown.changes, ...result.data.filter((change) => !before.has(change.question_key))],
+        };
+      });
+    },
+    [ctx],
+  );
+
+  useEffect(
+    () =>
+      watchAnswers(
+        document,
+        () => data.current?.saved_answers ?? null,
+        (learned) => void remember(learned),
+      ),
+    [remember],
+  );
+
+  const undo = useCallback(async (changes: LearnedAnswerRead[]) => {
+    setState({ name: 'none' });
+    holding.current = false;
+    const results = await Promise.all(
+      changes.map(async ({ question_key: key, previous }) => {
+        const result =
+          previous === null
+            ? await ask({ type: 'forget-answer', key })
+            : await ask({ type: 'learn-answers', answers: [{ question_key: key, answer: previous }] });
+        if (result.ok && data.current !== null) {
+          if (previous === null) delete data.current.saved_answers[key];
+          else data.current.saved_answers[key] = previous;
+        }
+        return result.ok;
+      }),
+    );
+    if (results.every(Boolean)) return;
+    holding.current = true;
+    setState({
+      name: 'failed',
+      message: 'We could not undo that. You can remove it under Saved answers on your Profile.',
+    });
+  }, []);
+
   const close = useCallback(() => {
     // Closing the offer means "not on this page"; closing a result just clears it.
     if (!holding.current) dismissed.current = true;
@@ -272,7 +336,7 @@ function useAutofill(ctx: ContentScriptContext) {
     void scan();
   }, [scan]);
 
-  return { state, run, close };
+  return { state, run, undo, close };
 }
 
 export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolean }) {
@@ -420,7 +484,12 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   const autofill = useAutofill(ctx);
   const autofillCard =
     autofill.state.name === 'none' ? null : (
-      <AutofillCard state={autofill.state} onFill={autofill.run} onClose={autofill.close} />
+      <AutofillCard
+        state={autofill.state}
+        onFill={autofill.run}
+        onUndo={(changes) => void autofill.undo(changes)}
+        onClose={autofill.close}
+      />
     );
 
   const notice = tracking.notice ? (
@@ -1285,14 +1354,16 @@ function Skills({ title, skills }: { title: string; skills: SkillResult[] }) {
 function AutofillCard({
   state,
   onFill,
+  onUndo,
   onClose,
 }: {
   state: Exclude<Autofill, { name: 'none' }>;
   onFill: () => void;
+  onUndo: (changes: LearnedAnswerRead[]) => void;
   onClose: () => void;
 }) {
   useEffect(() => {
-    if (state.name !== 'filled' && state.name !== 'failed') return;
+    if (state.name !== 'filled' && state.name !== 'learned' && state.name !== 'failed') return;
     const timer = setTimeout(onClose, 9000);
     return () => clearTimeout(timer);
   }, [state.name, onClose]);
@@ -1335,6 +1406,25 @@ function AutofillCard({
           <span className="muted small">
             They are outlined in blue. Check them, add anything missing, then submit it yourself.
           </span>
+        </>
+      ) : state.name === 'learned' ? (
+        <>
+          <strong>Remembered for next time</strong>
+          <span className="muted small">
+            {state.names.join(', ')}. The next form that asks gets it filled in.
+          </span>
+          <div className="row">
+            <button type="button" className="btn" onClick={() => onUndo(state.changes)}>
+              Undo
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void ask({ type: 'open-dashboard', path: '/app/profile' })}
+            >
+              Manage answers
+            </button>
+          </div>
         </>
       ) : (
         <>

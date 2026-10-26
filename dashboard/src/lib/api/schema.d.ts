@@ -147,6 +147,45 @@ export interface paths {
     patch: operations['update_application_api_v1_applications__application_id__patch'];
     trace?: never;
   };
+  '/api/v1/career-jobs/companies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Companies */
+    get: operations['list_companies_api_v1_career_jobs_companies_get'];
+    put?: never;
+    /**
+     * Add Company
+     * @description Reads the company's careers site straight away, so its jobs show at once.
+     *     Limited per user, because every added site is read daily for everyone.
+     */
+    post: operations['add_company_api_v1_career_jobs_companies_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/career-jobs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Jobs */
+    get: operations['list_jobs_api_v1_career_jobs_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/matches': {
     parameters: {
       query?: never;
@@ -178,6 +217,63 @@ export interface paths {
     };
     /** Read Match */
     get: operations['read_match_api_v1_matches__match_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/matches/{match_id}/share': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Share Match
+     * @description Makes this match's score card public. Asking again returns the same link.
+     */
+    post: operations['share_match_api_v1_matches__match_id__share_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/shares/{slug}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Stop Sharing */
+    delete: operations['stop_sharing_api_v1_shares__slug__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/public/shares/{slug}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Public Share
+     * @description A shared score card. Works without signing in: the link is the permission.
+     */
+    get: operations['read_public_share_api_v1_public_shares__slug__get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -276,6 +372,113 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/public/resume-identity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Read Resume Identity
+     * @description No sign-in needed: the login page reads the email off a resume so the
+     *     visitor can sign up with it. The file is not kept.
+     */
+    post: operations['read_resume_identity_api_v1_public_resume_identity_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Resume Layout
+     * @description The saved resume as sections of lines, with a picture of each page.
+     */
+    get: operations['read_resume_layout_api_v1_resume_editor_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview Resume Edits
+     * @description The resume with the edits made, in its own fonts and layout. Nothing is
+     *     stored. Editing is local and takes a fraction of a second, so there is no
+     *     background job.
+     */
+    post: operations['preview_resume_edits_api_v1_resume_editor_preview_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Save Resume Edits
+     * @description Makes the edits again on the saved resume and keeps the result as the
+     *     user's resume, replacing the one on file.
+     */
+    post: operations['save_resume_edits_api_v1_resume_editor_save_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/resume-editor/assist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Ask Resume Assistant
+     * @description Turns a request in plain words ("add my Rolesetu project") into edits to
+     *     the resume's lines. The editor applies them to its draft; nothing is saved.
+     *     The model call takes a few seconds, like a job check, so it is answered
+     *     directly rather than through a background job.
+     */
+    post: operations['ask_resume_assistant_api_v1_resume_editor_assist_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/extension/connect': {
     parameters: {
       query?: never;
@@ -339,6 +542,47 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/learned-answers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Learn Answers
+     * @description Remembers what the user typed into a form, for the next form that asks.
+     *     Repeating a request changes nothing, so the extension may retry it.
+     */
+    post: operations['learn_answers_api_v1_extension_learned_answers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/learned-answers/{question_key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Forget Answer
+     * @description The Undo for an answer that was new when it was learned.
+     */
+    delete: operations['forget_answer_api_v1_extension_learned_answers__question_key__delete'];
     options?: never;
     head?: never;
     patch?: never;
@@ -624,6 +868,409 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Admin
+     * @description Lets the panel find out whether the signed-in account is an admin.
+     */
+    get: operations['read_admin_api_v1_admin_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/stats': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Stats */
+    get: operations['read_stats_api_v1_admin_stats_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Users */
+    get: operations['list_users_api_v1_admin_users_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read User */
+    get: operations['read_user_api_v1_admin_users__user_id__get'];
+    put?: never;
+    post?: never;
+    /**
+     * Delete User
+     * @description Deletes the account, everything stored for it, and its Firebase sign-in.
+     *     Cannot be undone, so the caller must repeat the account's email address.
+     */
+    delete: operations['delete_user_api_v1_admin_users__user_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/resumes/{resume_id}/file': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Resume File
+     * @description The resume PDF, served through the API (not a storage link) so the panel
+     *     can draw it in the page. Recorded in the audit log each time.
+     */
+    get: operations['read_resume_file_api_v1_admin_users__user_id__resumes__resume_id__file_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/waitlist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Waitlist */
+    get: operations['list_waitlist_api_v1_admin_waitlist_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Audit */
+    get: operations['list_audit_api_v1_admin_audit_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/errors': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Errors
+     * @description What went wrong in the period, grouped by problem, most frequent first.
+     */
+    get: operations['list_errors_api_v1_admin_errors_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/errors/{fingerprint}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Error */
+    get: operations['read_error_api_v1_admin_errors__fingerprint__get'];
+    put?: never;
+    post?: never;
+    /**
+     * Clear Error
+     * @description Removes every event of one problem, once it has been dealt with.
+     */
+    delete: operations['clear_error_api_v1_admin_errors__fingerprint__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/emails/extension-nudge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Email Defaults
+     * @description The suggested email to people without the extension, and how many it would reach.
+     */
+    get: operations['read_email_defaults_api_v1_admin_emails_extension_nudge_get'];
+    put?: never;
+    /**
+     * Email Everyone Without Extension
+     * @description Writes to everyone without the extension, in the background, up to a limit.
+     */
+    post: operations['email_everyone_without_extension_api_v1_admin_emails_extension_nudge_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/email-templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Email Templates
+     * @description Ready-made notes for this person, filled in with what they have done.
+     */
+    get: operations['read_email_templates_api_v1_admin_users__user_id__email_templates_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/email': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Email User
+     * @description Sends one email to one person now. The answer says whether it went.
+     */
+    post: operations['email_user_api_v1_admin_users__user_id__email_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Overview
+     * @description Which platforms are set up on the server, and the accounts connected.
+     */
+    get: operations['read_overview_api_v1_admin_social_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/{provider}/connect-url': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Connect Url */
+    get: operations['read_connect_url_api_v1_admin_social__provider__connect_url_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/accounts/{account_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Disconnect Account */
+    delete: operations['disconnect_account_api_v1_admin_social_accounts__account_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/images': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Upload Image
+     * @description Stores an image for a post. Returns its public link, made a JPEG.
+     */
+    post: operations['upload_image_api_v1_admin_social_images_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/posts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Posts */
+    get: operations['list_posts_api_v1_admin_social_posts_get'];
+    put?: never;
+    /**
+     * Create Post
+     * @description Saves a draft. Nothing is posted until the draft is scheduled.
+     */
+    post: operations['create_post_api_v1_admin_social_posts_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/posts/{post_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Post */
+    put: operations['update_post_api_v1_admin_social_posts__post_id__put'];
+    post?: never;
+    /** Delete Post */
+    delete: operations['delete_post_api_v1_admin_social_posts__post_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/posts/{post_id}/schedule': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Schedule Post
+     * @description Approves a draft to go out at the given time, or within a minute.
+     */
+    post: operations['schedule_post_api_v1_admin_social_posts__post_id__schedule_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/posts/{post_id}/unschedule': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Unschedule Post */
+    post: operations['unschedule_post_api_v1_admin_social_posts__post_id__unschedule_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/social/posts/{post_id}/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry Post */
+    post: operations['retry_post_api_v1_admin_social_posts__post_id__retry_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -645,6 +1292,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** AccountDeleted */
+    AccountDeleted: {
+      /** Sign In Removed */
+      sign_in_removed: boolean;
+      /** Note */
+      note?: string | null;
+    };
     /** AddedSkill */
     AddedSkill: {
       /** Skill */
@@ -655,6 +1309,184 @@ export interface components {
       exact_font: boolean;
       /** Readable */
       readable: boolean;
+    };
+    /** AdminActionRead */
+    AdminActionRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Admin Email */
+      admin_email: string;
+      /** Action */
+      action: string;
+      /** Target Type */
+      target_type: string;
+      /** Target Id */
+      target_id: string;
+      /** Summary */
+      summary: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminApplication */
+    AdminApplication: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Role */
+      role: string;
+      /** Company */
+      company: string;
+      /** Status */
+      status: string;
+      /** Match Score */
+      match_score: number | null;
+      /** Applied At */
+      applied_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminJobCheck */
+    AdminJobCheck: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Role */
+      role: string | null;
+      /** Company */
+      company: string | null;
+      /** Url */
+      url: string | null;
+      /** Status */
+      status: string;
+      /** Score */
+      score: number | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminRead */
+    AdminRead: {
+      /** Email */
+      email: string;
+    };
+    /**
+     * AdminResume
+     * @description About the file. The PDF itself is opened separately, and each opening is recorded.
+     */
+    AdminResume: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Filename */
+      filename: string;
+      /** Size Bytes */
+      size_bytes: number;
+      /** Status */
+      status: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AdminStats */
+    AdminStats: {
+      /** Users */
+      users: number;
+      /** Users With Profile */
+      users_with_profile: number;
+      /** Job Checks */
+      job_checks: number;
+      /** Applications */
+      applications: number;
+      /** Gmail Connected */
+      gmail_connected: number;
+      /** Extension Connected */
+      extension_connected: number;
+      /** Extension Active Week */
+      extension_active_week: number;
+      /** Waitlist */
+      waitlist: number;
+      /** Previews Today */
+      previews_today: number;
+      /** Errors Today */
+      errors_today: number;
+      /** Paid Reads Today */
+      paid_reads_today: number;
+      /** Daily */
+      daily: components['schemas']['DayCount'][];
+      /** Sites */
+      sites: components['schemas']['SiteReads'][];
+    };
+    /**
+     * AdminUserDetail
+     * @description What support needs to help someone. Deliberately without anything read
+     *     from the user's Gmail (Google's rules do not allow people to read it). The
+     *     resume file is fetched on its own, only when an admin chooses to open it.
+     */
+    AdminUserDetail: {
+      user: components['schemas']['AdminUserRow'];
+      profile: components['schemas']['ProfileRead'] | null;
+      /** Job Checks */
+      job_checks: components['schemas']['AdminJobCheck'][];
+      /** Applications */
+      applications: components['schemas']['AdminApplication'][];
+      /** Resumes */
+      resumes: components['schemas']['AdminResume'][];
+      /** Gmail Last Synced At */
+      gmail_last_synced_at: string | null;
+      /** Panel Emails */
+      panel_emails: components['schemas']['OutreachRead'][];
+    };
+    /** AdminUserRow */
+    AdminUserRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Email */
+      email: string;
+      /** Name */
+      name: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Has Profile */
+      has_profile: boolean;
+      /** Resumes */
+      resumes: number;
+      /** Job Checks */
+      job_checks: number;
+      /** Applications */
+      applications: number;
+      /** Gmail Connected */
+      gmail_connected: boolean;
+      /** Extension Connected */
+      extension_connected: boolean;
+      /** Last Emailed At */
+      last_emailed_at: string | null;
+      /** Last Check At */
+      last_check_at: string | null;
     };
     /** ApplicationCreate */
     ApplicationCreate: {
@@ -843,6 +1675,61 @@ export interface components {
       source?: ('manual' | 'extension') | null;
     };
     /**
+     * AssistEdit
+     * @description One edit the assistant made, for the editor to apply to its draft.
+     */
+    AssistEdit: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'change' | 'remove' | 'add_below' | 'add_skill' | 'set_link';
+      /** Line Id */
+      line_id: string | null;
+      /** New Key */
+      new_key: string | null;
+      /** Style Line Id */
+      style_line_id: string | null;
+      /** Link Id */
+      link_id?: string | null;
+      /** Text */
+      text: string;
+      /** Before */
+      before: string | null;
+      /** Section */
+      section: string | null;
+      /** Unsupported */
+      unsupported: string[];
+    };
+    /** AssistReply */
+    AssistReply: {
+      /** Reply */
+      reply: string;
+      /** Edits */
+      edits: components['schemas']['AssistEdit'][];
+    };
+    /**
+     * AssistRequest
+     * @description A message to the resume assistant, with the editor as the user sees it now.
+     */
+    AssistRequest: {
+      /**
+       * Resume Id
+       * Format: uuid
+       */
+      resume_id: string;
+      /** Message */
+      message: string;
+      /** History */
+      history?: components['schemas']['ChatTurn'][];
+      /** Lines */
+      lines?: components['schemas']['DraftLine'][];
+      /** Skills */
+      skills?: string[];
+      /** Links */
+      links?: components['schemas']['LinkEdit'][];
+    };
+    /**
      * AutofillData
      * @description Everything the extension may type into an application form for the user.
      */
@@ -857,10 +1744,113 @@ export interface components {
       /** Years Of Experience */
       years_of_experience: number;
     };
+    /** Body_read_resume_identity_api_v1_public_resume_identity_post */
+    Body_read_resume_identity_api_v1_public_resume_identity_post: {
+      /** File */
+      file: string;
+    };
+    /** Body_upload_image_api_v1_admin_social_images_post */
+    Body_upload_image_api_v1_admin_social_images_post: {
+      /** File */
+      file: string;
+    };
     /** Body_upload_resume_api_v1_resume_post */
     Body_upload_resume_api_v1_resume_post: {
       /** File */
       file: string;
+    };
+    /** BulkQueued */
+    BulkQueued: {
+      /** Queued */
+      queued: number;
+    };
+    /** CareerCompany */
+    CareerCompany: {
+      /** Slug */
+      slug: string;
+      /** Name */
+      name: string;
+      /** Job Count */
+      job_count: number;
+      /** Added */
+      added: boolean;
+      /** Error */
+      error: string | null;
+    };
+    /** CareerCompanyAdd */
+    CareerCompanyAdd: {
+      /** Link */
+      link: string;
+    };
+    /** CareerCompanyList */
+    CareerCompanyList: {
+      /** Collected At */
+      collected_at: string | null;
+      /** Days */
+      days: number;
+      /** Companies */
+      companies: components['schemas']['CareerCompany'][];
+    };
+    /** CareerJobPage */
+    CareerJobPage: {
+      /** Items */
+      items: components['schemas']['CareerJobRead'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+      /** Total */
+      total: number;
+      /** Places */
+      places: components['schemas']['PlaceCount'][];
+      /** Work Modes */
+      work_modes: components['schemas']['WorkModeCount'][];
+      /** Collected At */
+      collected_at: string | null;
+      /** Candidate Years */
+      candidate_years: number;
+    };
+    /** CareerJobRead */
+    CareerJobRead: {
+      /** Id */
+      id: string;
+      /** Company Slug */
+      company_slug: string;
+      /** Company */
+      company: string;
+      /** Title */
+      title: string;
+      /** Url */
+      url: string;
+      /** Location */
+      location: string;
+      /** Places */
+      places: string[];
+      /**
+       * Work Mode
+       * @enum {string}
+       */
+      work_mode: 'remote' | 'hybrid' | 'onsite' | 'not_stated';
+      /** Posted On */
+      posted_on: string | null;
+      /**
+       * First Seen
+       * Format: date
+       */
+      first_seen: string;
+      /** Score */
+      score: number | null;
+      /** Score Cap */
+      score_cap: number | null;
+      /**
+       * Fit
+       * @enum {string}
+       */
+      fit: 'fits' | 'stretch' | 'not_stated';
+      /** Fit Note */
+      fit_note: string;
+      /** Skill Results */
+      skill_results: components['schemas']['SkillResult'][];
+      /** Score Boosts */
+      score_boosts: components['schemas']['ScoreBoost'][];
     };
     /**
      * ChangeRead
@@ -883,10 +1873,32 @@ export interface components {
       /** Exact Font */
       exact_font: boolean;
     };
+    /** ChatTurn */
+    ChatTurn: {
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: 'user' | 'assistant';
+      /** Text */
+      text: string;
+    };
     /** ConnectUrl */
     ConnectUrl: {
       /** Url */
       url: string;
+    };
+    /** DayCount */
+    DayCount: {
+      /**
+       * Day
+       * Format: date
+       */
+      day: string;
+      /** Signups */
+      signups: number;
+      /** Job Checks */
+      job_checks: number;
     };
     /** DownloadLink */
     DownloadLink: {
@@ -894,6 +1906,137 @@ export interface components {
       url: string;
       /** Expires In */
       expires_in: number;
+    };
+    /**
+     * DraftLine
+     * @description How the user has changed one line of the resume so far.
+     */
+    DraftLine: {
+      /** Line Id */
+      line_id: string;
+      /** Text */
+      text?: string | null;
+      /**
+       * Removed
+       * @default false
+       */
+      removed: boolean;
+      /** Added */
+      added?: components['schemas']['DraftNewLine'][];
+    };
+    /**
+     * DraftNewLine
+     * @description A line the user has added in the editor but not saved.
+     */
+    DraftNewLine: {
+      /** Key */
+      key: string;
+      /** Text */
+      text: string;
+      /** Style Line Id */
+      style_line_id?: string | null;
+    };
+    /** EditOutcome */
+    EditOutcome: {
+      /** Applied */
+      applied: boolean;
+      /** Message */
+      message: string | null;
+      /** Exact Font */
+      exact_font: boolean;
+    };
+    /**
+     * EditRequest
+     * @description The user's edits, always against the resume they opened (`resume_id`).
+     */
+    EditRequest: {
+      /**
+       * Resume Id
+       * Format: uuid
+       */
+      resume_id: string;
+      /** Edits */
+      edits?: components['schemas']['LineEdit'][];
+      /** Skills */
+      skills?: components['schemas']['SkillToAdd'][];
+      /** Links */
+      links?: components['schemas']['LinkEdit'][];
+    };
+    /**
+     * EditedResume
+     * @description The edited resume, handed straight back. Nothing is kept on the server.
+     */
+    EditedResume: {
+      /** Filename */
+      filename: string;
+      /** Outcomes */
+      outcomes: components['schemas']['EditOutcome'][];
+      /** Added */
+      added: components['schemas']['AddedSkill'][];
+      /** Skipped */
+      skipped: components['schemas']['SkippedSkill'][];
+      /** Pdf */
+      pdf: string;
+      /** Pages */
+      pages: string[];
+    };
+    /**
+     * EditorLine
+     * @description One line of the resume as it is drawn on the page.
+     */
+    EditorLine: {
+      /** Id */
+      id: string;
+      /** Text */
+      text: string;
+      /** Bullet */
+      bullet: boolean;
+      /** Heading */
+      heading: boolean;
+      /** Bold */
+      bold: boolean;
+      /** Italic */
+      italic: boolean;
+      /** Right Aligned */
+      right_aligned: boolean;
+      /** Can Add Below */
+      can_add_below: boolean;
+      /** Page */
+      page: number;
+      /** Box */
+      box: [number, number, number, number];
+      /** Links */
+      links?: components['schemas']['EditorLink'][];
+    };
+    /**
+     * EditorLink
+     * @description A link over some words of a line.
+     */
+    EditorLink: {
+      /** Id */
+      id: string;
+      /** Text */
+      text: string;
+      /** Uri */
+      uri: string;
+    };
+    /** EditorPage */
+    EditorPage: {
+      /** Width */
+      width: number;
+      /** Height */
+      height: number;
+      /** Image */
+      image: string;
+    };
+    /** EditorSection */
+    EditorSection: {
+      /** Title */
+      title: string;
+      /** Is Skills */
+      is_skills: boolean;
+      /** Lines */
+      lines: components['schemas']['EditorLine'][];
     };
     /** EducationItem */
     EducationItem: {
@@ -909,6 +2052,40 @@ export interface components {
       start_year?: number | null;
       /** End Year */
       end_year?: number | null;
+    };
+    /**
+     * EmailCompose
+     * @description What the admin wrote. {first_name} is replaced for each person.
+     *
+     *     `kind` says what is added after the message: the extension's store link
+     *     and how to connect it (extension_nudge), or only the sign-off (founder_note).
+     */
+    EmailCompose: {
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+      /**
+       * Kind
+       * @default extension_nudge
+       * @enum {string}
+       */
+      kind: 'extension_nudge' | 'founder_note';
+    };
+    /** EmailDefaults */
+    EmailDefaults: {
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+      /** Placeholder */
+      placeholder: string;
+      /** Recipients */
+      recipients: number;
+      /** Max Per Send */
+      max_per_send: number;
+      /** Configured */
+      configured: boolean;
     };
     /**
      * EmailRead
@@ -949,6 +2126,101 @@ export interface components {
       application_id: string | null;
       /** Gmail Url */
       gmail_url?: string | null;
+    };
+    /**
+     * EmailTemplate
+     * @description A ready-made email for one person, already filled in with what they have done.
+     */
+    EmailTemplate: {
+      /** Id */
+      id: string;
+      /** Label */
+      label: string;
+      /** Hint */
+      hint: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'extension_nudge' | 'founder_note';
+      /** Subject */
+      subject: string;
+      /** Message */
+      message: string;
+      /** Recommended */
+      recommended: boolean;
+    };
+    /** ErrorEventRead */
+    ErrorEventRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Source */
+      source: string;
+      /** Level */
+      level: string;
+      /** Route */
+      route: string | null;
+      /** Method */
+      method: string | null;
+      /** Status */
+      status: number | null;
+      /** Code */
+      code: string | null;
+      /** Message */
+      message: string;
+      /** Stack */
+      stack: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * ErrorGroup
+     * @description One problem: every event with the same cause, counted together.
+     */
+    ErrorGroup: {
+      /** Fingerprint */
+      fingerprint: string;
+      /** Source */
+      source: string;
+      /** Level */
+      level: string;
+      /** Route */
+      route: string | null;
+      /** Method */
+      method: string | null;
+      /** Status */
+      status: number | null;
+      /** Code */
+      code: string | null;
+      /** Message */
+      message: string;
+      /** Events */
+      events: number;
+      /**
+       * First At
+       * Format: date-time
+       */
+      first_at: string;
+      /**
+       * Last At
+       * Format: date-time
+       */
+      last_at: string;
+    };
+    /** ErrorSummary */
+    ErrorSummary: {
+      /** Groups */
+      groups: components['schemas']['ErrorGroup'][];
+      /** By Source */
+      by_source: {
+        [key: string]: number;
+      };
     };
     /**
      * ExperienceCheck
@@ -1024,6 +2296,11 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components['schemas']['ValidationError'][];
+    };
+    /** ImageUploaded */
+    ImageUploaded: {
+      /** Url */
+      url: string;
     };
     /** InboxInsights */
     InboxInsights: {
@@ -1147,6 +2424,55 @@ export interface components {
       /** Skills */
       skills: components['schemas']['SkillKeyword'][];
     };
+    /** LearnedAnswer */
+    LearnedAnswer: {
+      /** Question Key */
+      question_key: string;
+      /** Answer */
+      answer: string;
+    };
+    /** LearnedAnswerRead */
+    LearnedAnswerRead: {
+      /** Question Key */
+      question_key: string;
+      /** Previous */
+      previous: string | null;
+    };
+    /**
+     * LearnedAnswersWrite
+     * @description Answers the user typed into an application form, sent by the extension.
+     */
+    LearnedAnswersWrite: {
+      /** Answers */
+      answers: components['schemas']['LearnedAnswer'][];
+    };
+    /** LineEdit */
+    LineEdit: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'change' | 'remove' | 'add_below';
+      /** Line Id */
+      line_id: string;
+      /**
+       * Text
+       * @default
+       */
+      text: string;
+      /** Style Line Id */
+      style_line_id?: string | null;
+    };
+    /**
+     * LinkEdit
+     * @description A new address for one of the resume's links.
+     */
+    LinkEdit: {
+      /** Link Id */
+      link_id: string;
+      /** Uri */
+      uri: string;
+    };
     /** Links */
     Links: {
       /** Linkedin */
@@ -1230,6 +2556,43 @@ export interface components {
        */
       created_at: string;
     };
+    /** OutreachRead */
+    OutreachRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Admin Email */
+      admin_email: string;
+      /** Kind */
+      kind: string;
+      /** Subject */
+      subject: string;
+      /** Status */
+      status: string;
+      /** Error */
+      error: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** Page[AdminActionRead] */
+    Page_AdminActionRead_: {
+      /** Items */
+      items: components['schemas']['AdminActionRead'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** Page[AdminUserRow] */
+    Page_AdminUserRow_: {
+      /** Items */
+      items: components['schemas']['AdminUserRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
     /** Page[ApplicationRead] */
     Page_ApplicationRead_: {
       /** Items */
@@ -1250,6 +2613,27 @@ export interface components {
       items: components['schemas']['MatchRead'][];
       /** Next Cursor */
       next_cursor: string | null;
+    };
+    /** Page[SocialPostRead] */
+    Page_SocialPostRead_: {
+      /** Items */
+      items: components['schemas']['SocialPostRead'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** Page[WaitlistRow] */
+    Page_WaitlistRow_: {
+      /** Items */
+      items: components['schemas']['WaitlistRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** PlaceCount */
+    PlaceCount: {
+      /** Name */
+      name: string;
+      /** Count */
+      count: number;
     };
     /**
      * ProfileRead
@@ -1319,6 +2703,16 @@ export interface components {
       /** Url */
       url?: string | null;
     };
+    /** ProviderStatus */
+    ProviderStatus: {
+      /**
+       * Provider
+       * @enum {string}
+       */
+      provider: 'linkedin' | 'meta';
+      /** Configured */
+      configured: boolean;
+    };
     /**
      * Respell
      * @description A skill already on the resume, to be written the way the job writes it.
@@ -1342,6 +2736,35 @@ export interface components {
        * @enum {string}
        */
       mode: 'merge' | 'replace';
+    };
+    /**
+     * ResumeIdentity
+     * @description Read from a resume before sign-in, to start the account. Nothing is stored.
+     */
+    ResumeIdentity: {
+      /** Email */
+      email: string | null;
+      /** First Name */
+      first_name: string | null;
+    };
+    /**
+     * ResumeLayout
+     * @description The user's saved resume, read as sections of lines they can edit.
+     */
+    ResumeLayout: {
+      /**
+       * Resume Id
+       * Format: uuid
+       */
+      resume_id: string;
+      /** Filename */
+      filename: string;
+      /** Pages */
+      pages: components['schemas']['EditorPage'][];
+      /** Sections */
+      sections: components['schemas']['EditorSection'][];
+      /** Skill Rows */
+      skill_rows: string[];
     };
     /** ResumeRead */
     ResumeRead: {
@@ -1399,6 +2822,73 @@ export interface components {
     SavedAnswerWrite: {
       /** Answer */
       answer: string;
+    };
+    /** ScheduleRequest */
+    ScheduleRequest: {
+      /** At */
+      at?: string | null;
+    };
+    /**
+     * ScoreBoost
+     * @description One skill that would raise this job's score if the user showed strong evidence for it.
+     */
+    ScoreBoost: {
+      /** Name */
+      name: string;
+      /** Required */
+      required: boolean;
+      /**
+       * Verdict
+       * @enum {string}
+       */
+      verdict: 'strong' | 'partial' | 'missing';
+      /** Points */
+      points: number;
+    };
+    /** ShareCreate */
+    ShareCreate: {
+      /**
+       * Show Gaps
+       * @default false
+       */
+      show_gaps: boolean;
+    };
+    /**
+     * ShareRead
+     * @description A public match card. The same fields are what anyone with the link sees.
+     */
+    ShareRead: {
+      /** Slug */
+      slug: string;
+      /** Role */
+      role: string | null;
+      /** Company */
+      company: string | null;
+      /** Score */
+      score: number;
+      /** Matched */
+      matched: string[];
+      /** Gaps */
+      gaps: string[];
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * SiteReads
+     * @description Job links visitors pasted on the landing page in the last day, by site.
+     */
+    SiteReads: {
+      /** Host */
+      host: string;
+      /** Read */
+      read: number;
+      /** Failed */
+      failed: number;
+      /** Paid */
+      paid: number;
     };
     /** SkillItem */
     SkillItem: {
@@ -1463,6 +2953,112 @@ export interface components {
       reason: 'already_listed' | 'no_room' | 'no_font';
       /** Message */
       message: string;
+    };
+    /** SocialAccountRead */
+    SocialAccountRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Platform
+       * @enum {string}
+       */
+      platform: 'linkedin' | 'facebook' | 'instagram';
+      /** Name */
+      name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'active' | 'expired';
+      /** Expires At */
+      expires_at: string | null;
+      /** Connected By */
+      connected_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** SocialOverview */
+    SocialOverview: {
+      /** Providers */
+      providers: components['schemas']['ProviderStatus'][];
+      /** Accounts */
+      accounts: components['schemas']['SocialAccountRead'][];
+    };
+    /** SocialPostRead */
+    SocialPostRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Text */
+      text: string;
+      /** Image Url */
+      image_url: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'draft' | 'scheduled' | 'publishing' | 'posted' | 'partly_posted' | 'failed';
+      /** Scheduled At */
+      scheduled_at: string | null;
+      /** Created By */
+      created_by: string;
+      /** Approved By */
+      approved_by: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Targets */
+      targets: components['schemas']['SocialTargetRead'][];
+    };
+    /** SocialPostWrite */
+    SocialPostWrite: {
+      /** Text */
+      text: string;
+      /** Image Url */
+      image_url?: string | null;
+      /** Account Ids */
+      account_ids: string[];
+    };
+    /** SocialTargetRead */
+    SocialTargetRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string;
+      /**
+       * Platform
+       * @enum {string}
+       */
+      platform: 'linkedin' | 'facebook' | 'instagram';
+      /** Account Name */
+      account_name: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'publishing' | 'posted' | 'failed';
+      /** External Url */
+      external_url: string | null;
+      /** Error */
+      error: string | null;
+      /** Posted At */
+      posted_at: string | null;
     };
     /**
      * TailorRequest
@@ -1567,6 +3163,31 @@ export interface components {
        * @default true
        */
       joined: boolean;
+    };
+    /** WaitlistRow */
+    WaitlistRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Email */
+      email: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** WorkModeCount */
+    WorkModeCount: {
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'remote' | 'hybrid' | 'onsite' | 'not_stated';
+      /** Count */
+      count: number;
     };
   };
   responses: never;
@@ -1989,6 +3610,95 @@ export interface operations {
       };
     };
   };
+  list_companies_api_v1_career_jobs_companies_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CareerCompanyList'];
+        };
+      };
+    };
+  };
+  add_company_api_v1_career_jobs_companies_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CareerCompanyAdd'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CareerCompany'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_jobs_api_v1_career_jobs_get: {
+    parameters: {
+      query?: {
+        companies?: string[] | null;
+        places?: string[] | null;
+        work_modes?: ('remote' | 'hybrid' | 'onsite' | 'not_stated')[] | null;
+        include_stretch?: boolean;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CareerJobPage'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   list_matches_api_v1_matches_get: {
     parameters: {
       query?: {
@@ -2072,6 +3782,101 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['MatchRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  share_match_api_v1_matches__match_id__share_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        match_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ShareCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ShareRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  stop_sharing_api_v1_shares__slug__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_public_share_api_v1_public_shares__slug__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ShareRead'];
         };
       };
       /** @description Validation Error */
@@ -2264,6 +4069,158 @@ export interface operations {
       };
     };
   };
+  read_resume_identity_api_v1_public_resume_identity_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_read_resume_identity_api_v1_public_resume_identity_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeIdentity'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_resume_layout_api_v1_resume_editor_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeLayout'];
+        };
+      };
+    };
+  };
+  preview_resume_edits_api_v1_resume_editor_preview_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EditRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EditedResume'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  save_resume_edits_api_v1_resume_editor_save_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EditRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  ask_resume_assistant_api_v1_resume_editor_assist_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AssistRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssistReply'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   connect_extension_api_v1_extension_connect_post: {
     parameters: {
       query?: never;
@@ -2338,6 +4295,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AutofillData'];
+        };
+      };
+    };
+  };
+  learn_answers_api_v1_extension_learned_answers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LearnedAnswersWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearnedAnswerRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  forget_answer_api_v1_extension_learned_answers__question_key__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        question_key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -2743,6 +4762,790 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WaitlistJoined'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_admin_api_v1_admin_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRead'];
+        };
+      };
+    };
+  };
+  read_stats_api_v1_admin_stats_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminStats'];
+        };
+      };
+    };
+  };
+  list_users_api_v1_admin_users_get: {
+    parameters: {
+      query?: {
+        q?: string | null;
+        extension?: 'missing' | null;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminUserRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_user_api_v1_admin_users__user_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserDetail'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_user_api_v1_admin_users__user_id__delete: {
+    parameters: {
+      query: {
+        confirm_email: string;
+      };
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDeleted'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_resume_file_api_v1_admin_users__user_id__resumes__resume_id__file_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+        resume_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/pdf': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_waitlist_api_v1_admin_waitlist_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_WaitlistRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_audit_api_v1_admin_audit_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminActionRead_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_errors_api_v1_admin_errors_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+        source?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorSummary'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_error_api_v1_admin_errors__fingerprint__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEventRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  clear_error_api_v1_admin_errors__fingerprint__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_email_defaults_api_v1_admin_emails_extension_nudge_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmailDefaults'];
+        };
+      };
+    };
+  };
+  email_everyone_without_extension_api_v1_admin_emails_extension_nudge_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailCompose'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BulkQueued'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_email_templates_api_v1_admin_users__user_id__email_templates_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmailTemplate'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  email_user_api_v1_admin_users__user_id__email_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailCompose'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OutreachRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_overview_api_v1_admin_social_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialOverview'];
+        };
+      };
+    };
+  };
+  read_connect_url_api_v1_admin_social__provider__connect_url_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider: 'linkedin' | 'meta';
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConnectUrl'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  disconnect_account_api_v1_admin_social_accounts__account_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        account_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  upload_image_api_v1_admin_social_images_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_image_api_v1_admin_social_images_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImageUploaded'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_posts_api_v1_admin_social_posts_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_SocialPostRead_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  create_post_api_v1_admin_social_posts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SocialPostWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialPostRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_post_api_v1_admin_social_posts__post_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SocialPostWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialPostRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_post_api_v1_admin_social_posts__post_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  schedule_post_api_v1_admin_social_posts__post_id__schedule_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScheduleRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialPostRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  unschedule_post_api_v1_admin_social_posts__post_id__unschedule_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialPostRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  retry_post_api_v1_admin_social_posts__post_id__retry_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SocialPostRead'];
         };
       };
       /** @description Validation Error */

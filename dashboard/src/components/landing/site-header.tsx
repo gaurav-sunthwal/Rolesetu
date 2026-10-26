@@ -6,10 +6,10 @@ import { Logo } from '@/components/logo';
 
 // Addressed from the root, so the same menu works on every public page.
 export const NAV_LINKS = [
+  { href: '/#fresh-jobs', label: 'Fresh jobs' },
+  { href: '/#editor', label: 'Resume editor' },
   { href: '/#extension', label: 'Extension' },
   { href: '/#features', label: 'Features' },
-  { href: '/#resume', label: 'Resume match' },
-  { href: '/#how-it-works', label: 'How it works' },
   { href: '/#faq', label: 'FAQ' },
 ] as const;
 

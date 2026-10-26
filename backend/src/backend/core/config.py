@@ -17,11 +17,16 @@ class Settings(BaseSettings):
 
     # Firebase Auth — service account JSON path, used to verify ID tokens
     firebase_service_account_path: str | None = None
+    # The same key file's contents, for hosts where an env var is easier than a
+    # file (Railway). Used to delete a person's sign-in when their account is deleted.
+    firebase_service_account_json: str | None = None
     # Verifying ID tokens only needs the project id (Google's public keys do the rest).
     firebase_project_id: str | None = None
 
     # Google accounts allowed into the admin panel (verified emails). Empty: nobody.
     admin_emails: list[str] = []
+    # Told by email each time someone signs in for the first time. Empty: nobody.
+    signup_alert_emails: list[str] = []
 
     # CORS — dashboard origin(s)
     cors_origins: list[str] = ["http://localhost:3000"]
@@ -68,6 +73,17 @@ class Settings(BaseSettings):
     # Signed-in users have their own allowance, so this cannot starve them.
     preview_rendered_reads_per_day: int = 20
 
+    # Collect jobs from company careers sites once a day inside the API. Unset:
+    # on in production only, so a laptop pointed at a shared database does not
+    # collect as well. Set CAREER_JOBS_AUTO_COLLECT=true or false to override.
+    career_jobs_auto_collect: bool | None = None
+
+    @property
+    def collects_career_jobs(self) -> bool:
+        if self.career_jobs_auto_collect is not None:
+            return self.career_jobs_auto_collect
+        return self.environment == "production"
+
     # Gmail (read-only). Created in Google Cloud Console; without them the
     # "Connect Gmail" button reports that Gmail is not set up.
     google_client_id: str | None = None
@@ -97,6 +113,32 @@ class Settings(BaseSettings):
     # How long after someone first signs in they get the founder's one-time
     # note (modules/feedback).
     feedback_email_delay_hours: float = 3.0
+
+    # Social posting from the admin panel (modules/social). Each platform's
+    # "Connect" button stays disabled until its app id and secret are set.
+    # Where the admin panel lives: the browser returns there after a platform's consent screen.
+    admin_url: str = "http://localhost:3003"
+    # This API's own public address. Instagram and Facebook download post images from it.
+    public_api_url: str = "http://localhost:8000"
+    linkedin_client_id: str | None = None
+    linkedin_client_secret: str | None = None
+    linkedin_redirect_uri: str = "http://localhost:8000/api/v1/admin/social/linkedin/callback"
+    # LinkedIn's REST API is versioned by month (YYYYMM); each version works for about a year.
+    linkedin_api_version: str = "202608"
+    meta_app_id: str | None = None
+    meta_app_secret: str | None = None
+    meta_redirect_uri: str = "http://localhost:8000/api/v1/admin/social/meta/callback"
+    meta_graph_version: str = "v23.0"
+    social_timeout_seconds: float = 20.0
+    # Publish scheduled posts from inside the API. Unset: on in production only,
+    # so a laptop pointed at a shared database does not publish as well.
+    social_auto_publish: bool | None = None
+
+    @property
+    def publishes_social_posts(self) -> bool:
+        if self.social_auto_publish is not None:
+            return self.social_auto_publish
+        return self.environment == "production"
 
     # Extra folder searched for fonts when a resume's own font lacks a letter.
     font_dir: str | None = None

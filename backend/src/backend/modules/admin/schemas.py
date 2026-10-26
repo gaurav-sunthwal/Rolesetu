@@ -1,10 +1,16 @@
 import uuid
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from backend.modules.profiles.schemas import ProfileRead
+
+
+class AccountDeleted(BaseModel):
+    # False when the data is gone but the Firebase sign-in still has to be removed by hand.
+    sign_in_removed: bool
+    note: str | None = None
 
 
 class AdminRead(BaseModel):
@@ -84,10 +90,11 @@ class AdminApplication(BaseModel):
 
 
 class AdminResume(BaseModel):
-    """About the file only. The resume itself is not served to admins."""
+    """About the file. The PDF itself is opened separately, and each opening is recorded."""
 
     model_config = ConfigDict(from_attributes=True)
 
+    id: uuid.UUID
     filename: str
     size_bytes: int
     status: str
@@ -96,8 +103,8 @@ class AdminResume(BaseModel):
 
 class AdminUserDetail(BaseModel):
     """What support needs to help someone. Deliberately without anything read
-    from the user's Gmail (Google's rules do not allow people to read it) and
-    without the resume file.
+    from the user's Gmail (Google's rules do not allow people to read it). The
+    resume file is fetched on its own, only when an admin chooses to open it.
     """
 
     user: AdminUserRow
@@ -179,11 +186,31 @@ class OutreachRead(BaseModel):
     created_at: datetime
 
 
+EmailKind = Literal["extension_nudge", "founder_note"]
+
+
 class EmailCompose(BaseModel):
-    """What the admin wrote. {first_name} is replaced for each person."""
+    """What the admin wrote. {first_name} is replaced for each person.
+
+    `kind` says what is added after the message: the extension's store link
+    and how to connect it (extension_nudge), or only the sign-off (founder_note).
+    """
 
     subject: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5000)]
+    kind: EmailKind = "extension_nudge"
+
+
+class EmailTemplate(BaseModel):
+    """A ready-made email for one person, already filled in with what they have done."""
+
+    id: str
+    label: str
+    hint: str
+    kind: EmailKind
+    subject: str
+    message: str
+    recommended: bool
 
 
 class EmailDefaults(BaseModel):

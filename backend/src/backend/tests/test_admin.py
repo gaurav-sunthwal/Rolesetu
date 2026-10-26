@@ -1,14 +1,17 @@
 """The admin panel's routes: who gets in, what they see, and that it is recorded."""
 
+import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import delete, select
 
+from backend.core import firebase_accounts, storage
 from backend.core.config import get_settings
 from backend.db.session import get_sessionmaker
 from backend.modules.admin.models import AdminAction
+from backend.modules.resumes.models import ResumeFile
 from backend.tests.conftest import ClientFactory
 
 ADMIN = "/api/v1/admin"
@@ -87,8 +90,10 @@ async def test_an_admin_finds_a_user_and_opening_them_is_recorded(
 
 
 async def test_deleting_an_account_needs_its_email_and_removes_its_data(
-    admin: AsyncClient, client: AsyncClient
+    admin: AsyncClient, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(get_settings(), "firebase_service_account_json", None)
+    monkeypatch.setattr(get_settings(), "firebase_service_account_path", None)
     await client.put("/api/v1/profile/me", json=PROFILE)
     users = (await admin.get(f"{ADMIN}/users", params={"q": email_of(client)})).json()["items"]
     user_id = users[0]["id"]
@@ -99,9 +104,30 @@ async def test_deleting_an_account_needs_its_email_and_removes_its_data(
     done = await admin.delete(
         f"{ADMIN}/users/{user_id}", params={"confirm_email": email_of(client)}
     )
-    assert done.status_code == 204
+    assert done.status_code == 200
+    # No Firebase key in tests: the data is gone and the admin is told to finish by hand.
+    assert done.json()["sign_in_removed"] is False
     assert (await admin.get(f"{ADMIN}/users/{user_id}")).status_code == 404
     assert ("user.delete", user_id) in await actions_by(admin)
+
+
+async def test_deleting_an_account_also_removes_its_sign_in(
+    admin: AsyncClient, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    removed: list[str] = []
+
+    async def remove(uid: str) -> None:
+        removed.append(uid)
+
+    monkeypatch.setattr(firebase_accounts, "delete_sign_in", remove)
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    users = (await admin.get(f"{ADMIN}/users", params={"q": email_of(client)})).json()["items"]
+
+    done = await admin.delete(
+        f"{ADMIN}/users/{users[0]['id']}", params={"confirm_email": email_of(client)}
+    )
+    assert done.json() == {"sign_in_removed": True, "note": None}
+    assert removed == [client.headers["x-test-uid"]]
 
 
 async def test_the_audit_log_lists_what_admins_did(admin: AsyncClient) -> None:
@@ -128,3 +154,49 @@ async def test_an_admin_sees_who_connected_the_extension(
     assert (await client.post("/api/v1/extension/connect")).status_code == 201
     assert (await user_row())["extension_connected"]
     assert (await admin.get(f"{ADMIN}/stats")).json()["extension_connected"] >= before + 1
+
+
+async def add_resume(client: AsyncClient) -> tuple[str, str]:
+    """A resume row for this user (the file itself is faked in storage)."""
+    user_id = (await client.get("/api/v1/users/me")).json()["id"]
+    resume = ResumeFile(
+        id=uuid.uuid4(),
+        user_id=uuid.UUID(user_id),
+        storage_key=f"resumes/{user_id}/test.pdf",
+        filename="Asha Rao CV.pdf",
+        size_bytes=12,
+    )
+    async with get_sessionmaker()() as db:
+        db.add(resume)
+        await db.commit()
+    return user_id, str(resume.id)
+
+
+async def test_an_admin_can_open_a_resume_and_it_is_recorded(
+    admin: AsyncClient, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fake_file(key: str) -> bytes:
+        return b"%PDF-1.7 test"
+
+    monkeypatch.setattr(storage, "get_file", fake_file)
+    user_id, resume_id = await add_resume(client)
+
+    opened = await admin.get(f"{ADMIN}/users/{user_id}/resumes/{resume_id}/file")
+    assert opened.status_code == 200
+    assert opened.headers["content-type"] == "application/pdf"
+    assert opened.headers["cache-control"] == "private, no-store"
+    assert opened.content == b"%PDF-1.7 test"
+    assert ("resume.view", user_id) in await actions_by(admin)
+
+    # A resume is only found under the account it belongs to.
+    other = await admin.get(f"{ADMIN}/users/{uuid.uuid4()}/resumes/{resume_id}/file")
+    assert other.status_code == 404
+
+
+async def test_an_ordinary_user_cannot_open_anyones_resume(
+    make_client: ClientFactory,
+) -> None:
+    owner, stranger = make_client(), make_client()
+    user_id, resume_id = await add_resume(owner)
+    refused = await stranger.get(f"{ADMIN}/users/{user_id}/resumes/{resume_id}/file")
+    assert refused.status_code == 403

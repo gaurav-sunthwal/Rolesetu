@@ -52,7 +52,7 @@ _CANNOT_EDIT = {
     ),
     "unreadable": "Your stored resume could not be opened. Please upload it again.",
 }
-_SKIPPED = {
+SKIPPED_MESSAGES = {
     "already_listed": "Already in your Skills section.",
     "no_room": (
         "No room: the row is full and the page has no space for another line. "
@@ -101,7 +101,7 @@ def _edit(
     )
 
 
-async def _remember_skills(db: AsyncSession, user_id: uuid.UUID, skills: list[str]) -> None:
+async def remember_skills(db: AsyncSession, user_id: uuid.UUID, skills: list[str]) -> None:
     """Puts skills that are now on the saved resume onto the profile, so the
     resume and the profile (which job scores are worked out from) always agree.
     """
@@ -157,7 +157,7 @@ async def create(db: AsyncSession, *, user_id: uuid.UUID, payload: TailorRequest
     result, before, after, readable_text, labels = await _edit_safely(original, payload)
 
     if not result.added and not any(change.applied for change in result.changes):
-        reasons = [f"{item.skill}: {_SKIPPED[item.reason]}" for item in result.skipped] + [
+        reasons = [f"{item.skill}: {SKIPPED_MESSAGES[item.reason]}" for item in result.skipped] + [
             f"{change.after}: {_why_not(change)}" for change in result.changes
         ]
         raise ValidationFailedError(
@@ -176,7 +176,9 @@ async def create(db: AsyncSession, *, user_id: uuid.UUID, payload: TailorRequest
             for item in result.added
         ],
         skipped=[
-            SkippedSkill(skill=item.skill, reason=item.reason, message=_SKIPPED[item.reason])
+            SkippedSkill(
+                skill=item.skill, reason=item.reason, message=SKIPPED_MESSAGES[item.reason]
+            )
             for item in result.skipped
         ],
         changes=[
@@ -217,7 +219,7 @@ async def keep(db: AsyncSession, *, user_id: uuid.UUID, payload: TailorRequest) 
         db, user_id=user_id, filename=resume.filename, data=result.pdf
     )
     added = [item.skill for item in result.added]
-    await _remember_skills(db, user_id, added)
+    await remember_skills(db, user_id, added)
     return KeptRead(filename=saved.filename, skills_added=added)
 
 

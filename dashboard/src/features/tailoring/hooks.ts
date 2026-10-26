@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { careerJobKeys } from '@/features/career-jobs/hooks';
 import { profileKeys } from '@/features/profile/hooks';
 import {
   createTailoredResume,
@@ -24,7 +25,8 @@ export function useTailorResume() {
 
 /**
  * Makes the previewed copy the saved resume. The resume, the profile and the
- * keyword checks all change together, so everything that shows them is refreshed.
+ * keyword checks all change together, so everything that shows them is refreshed,
+ * including the fresh-jobs scores, which are worked out from the profile.
  */
 export function useKeepTailoredResume() {
   const queryClient = useQueryClient();
@@ -34,6 +36,7 @@ export function useKeepTailoredResume() {
       void queryClient.invalidateQueries({ queryKey: profileKeys.profile });
       void queryClient.invalidateQueries({ queryKey: ['resume', 'latest'] });
       void queryClient.invalidateQueries({ queryKey: ['tailoring', 'keywords'] });
+      void queryClient.invalidateQueries({ queryKey: careerJobKeys.all });
     },
   });
 }

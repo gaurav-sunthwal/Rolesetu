@@ -10,7 +10,7 @@ const url = z
 export const SITE = {
   name: 'Rolesetu',
   url,
-  title: 'Rolesetu: job match score, resume tailoring and application tracker',
+  title: 'Rolesetu: job match score, tailored resumes and job tracker',
   tagline: 'Know your fit before you apply',
   // Where the extension is installed from. NEXT_PUBLIC_CHROME_EXTENSION_URL can point elsewhere.
   chromeExtensionUrl: z
@@ -45,7 +45,7 @@ export const SITE = {
     'skill gap analysis for jobs',
   ],
   // The day the public pages last changed. Bump it when their content does.
-  updated: '2026-10-16',
+  updated: '2026-10-25',
 } as const;
 
 export function absoluteUrl(path: string): string {

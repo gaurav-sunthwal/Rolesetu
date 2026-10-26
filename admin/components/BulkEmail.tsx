@@ -68,6 +68,7 @@ export function BulkEmail() {
           <>
             <EmailComposer
               initial={{ subject: defaults.data.subject, message: defaults.data.message }}
+              kind="extension_nudge"
               placeholder={defaults.data.placeholder}
               sending={send.isPending}
               sendLabel={`Send to ${Math.min(defaults.data.recipients, defaults.data.max_per_send)} people`}

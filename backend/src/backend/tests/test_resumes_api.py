@@ -1,9 +1,10 @@
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from backend.core import storage
+from backend.main import app
 from backend.tests.conftest import ClientFactory
 
 BASE = "/api/v1/resume"
@@ -166,3 +167,36 @@ async def test_resumes_are_private_to_their_owner(make_client: ClientFactory) ->
     assert (await bob.delete(url)).status_code == 404
     assert (await bob.get(f"{BASE}/latest")).json() is None
     assert (await bob.get("/api/v1/profile/me")).json()["full_name"] is None
+
+
+IDENTITY = "/api/v1/public/resume-identity"
+
+
+async def _read_identity(data: bytes) -> tuple[int, dict]:  # type: ignore[type-arg]
+    """Called by someone who is not signed in: no auth header at all."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as visitor:
+        response = await visitor.post(IDENTITY, files={"file": ("cv.pdf", data, "application/pdf")})
+    return response.status_code, response.json()
+
+
+@pytest.mark.parametrize(
+    ("data", "email", "first_name"),
+    [
+        (CLASSIC, "asha.rao@example.com", "Asha"),
+        # Two-column layout: the email sits in the sidebar, not the header.
+        (TWOCOL, "rahul.verma@example.com", "Rahul"),
+    ],
+)
+async def test_a_visitor_gets_the_email_on_their_resume_and_nothing_is_stored(
+    data: bytes, email: str, first_name: str, bucket: dict[str, bytes]
+) -> None:
+    status, body = await _read_identity(data)
+    assert status == 200
+    assert body == {"email": email, "first_name": first_name}
+    assert bucket == {}
+
+
+async def test_reading_the_email_rejects_files_that_are_not_pdfs() -> None:
+    status, body = await _read_identity(b"PK\x03\x04 this is a docx, not a pdf")
+    assert status == 422
+    assert "not a PDF" in str(body)

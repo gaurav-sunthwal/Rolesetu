@@ -5,11 +5,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.session import get_db
 from backend.modules.resumes import service
-from backend.modules.resumes.schemas import DownloadLink, ResumeApplied, ResumeApply, ResumeRead
+from backend.modules.resumes.schemas import (
+    DownloadLink,
+    ResumeApplied,
+    ResumeApply,
+    ResumeIdentity,
+    ResumeRead,
+)
 from backend.modules.users.dependencies import get_db_user
 from backend.modules.users.models import User
 
 router = APIRouter(prefix="/resume", tags=["resume"])
+public_router = APIRouter(prefix="/public", tags=["public"])
+
+
+@public_router.post("/resume-identity", response_model=ResumeIdentity)
+async def read_resume_identity(file: UploadFile) -> ResumeIdentity:
+    """No sign-in needed: the login page reads the email off a resume so the
+    visitor can sign up with it. The file is not kept.
+    """
+    data = await file.read(service.MAX_FILE_BYTES + 1)
+    return await service.read_identity(data)
 
 
 @router.post("", response_model=ResumeRead, status_code=201)

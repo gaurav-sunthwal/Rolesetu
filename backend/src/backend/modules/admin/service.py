@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core import storage
+from backend.core import firebase_accounts, storage
 from backend.core.config import get_settings
 from backend.core.email import is_configured as email_is_configured
 from backend.core.email import send_email
@@ -27,6 +27,7 @@ from backend.modules.admin import emails, repository
 from backend.modules.admin.dependencies import Admin
 from backend.modules.admin.models import AdminAction, OutreachEmail
 from backend.modules.admin.schemas import (
+    AccountDeleted,
     AdminActionRead,
     AdminApplication,
     AdminJobCheck,
@@ -36,6 +37,7 @@ from backend.modules.admin.schemas import (
     AdminUserRow,
     DayCount,
     EmailDefaults,
+    EmailTemplate,
     ErrorEventRead,
     ErrorGroup,
     ErrorSummary,
@@ -175,12 +177,10 @@ async def user_detail(db: AsyncSession, *, admin: Admin, user_id: uuid.UUID) -> 
 
 async def delete_user(
     db: AsyncSession, *, admin: Admin, user_id: uuid.UUID, confirm_email: str
-) -> None:
+) -> str:
     """Removes the account's data: the stored resume files, then the user row,
-    which takes every other row with it.
-
-    The Firebase sign-in itself is not removed (the API holds no credentials
-    for that), so the same Google account could sign up again from nothing.
+    which takes every other row with it. Returns the Firebase uid, whose
+    sign-in is removed once this is committed (see `remove_sign_in`).
     """
     user = await repository.get_user(db, user_id)
     if user is None:
@@ -193,8 +193,38 @@ async def delete_user(
         except AppError:
             # Deleting the account must not be blocked by one unreachable file.
             logger.exception("admin delete: could not remove a resume file user=%s", user_id)
+    firebase_uid = user.firebase_uid
     await db.delete(user)
     _record(db, admin, "user.delete", "user", str(user_id), f"Deleted {user.email}")
+    return firebase_uid
+
+
+async def resume_file(
+    db: AsyncSession, *, admin: Admin, user_id: uuid.UUID, resume_id: uuid.UUID
+) -> tuple[bytes, str]:
+    """The resume PDF itself, for support. Every opening is recorded, as the
+    privacy policy says. Returns (the file, its name).
+    """
+    resume = await repository.resume(db, user_id, resume_id)
+    if resume is None:
+        raise NotFoundError("That resume was not found.")
+    data = await storage.get_file(resume.storage_key)
+    _record(db, admin, "resume.view", "user", str(user_id), f"Opened the resume {resume.filename}")
+    return data, resume.filename
+
+
+async def remove_sign_in(firebase_uid: str) -> AccountDeleted:
+    """Deletes the person's Firebase sign-in. Run after their data is committed
+    as deleted, so a failure here can never leave data behind without a login.
+    """
+    try:
+        await firebase_accounts.delete_sign_in(firebase_uid)
+    except firebase_accounts.SignInNotRemovableError as exc:
+        return AccountDeleted(
+            sign_in_removed=False,
+            note=f"{exc} Remove the sign-in in the Firebase console: Authentication, Users.",
+        )
+    return AccountDeleted(sign_in_removed=True)
 
 
 async def list_waitlist(
@@ -271,7 +301,6 @@ async def clear_errors(db: AsyncSession, *, admin: Admin, fingerprint: str) -> N
 
 # --- Emailing users ---------------------------------------------------------
 
-NUDGE = "extension_nudge"
 # Most people one bulk send writes to. Gmail allows about 500 a day, shared with
 # every other email the API sends.
 MAX_PER_SEND = 50
@@ -313,20 +342,23 @@ async def _deliver(
     name: str | None,
     subject: str,
     message: str,
+    kind: str = emails.NUDGE,
 ) -> OutreachEmail:
     """Sends one email and records how it went. Never raises for a failed send."""
-    settings = get_settings()
-    email = emails.extension_nudge(
-        subject=subject,
-        message=message,
-        name=emails.first_name(name),
-        store_url=settings.extension_store_url,
-    )
+    if kind == emails.FOUNDER_NOTE:
+        email = emails.founder_note(subject=subject, message=message, name=emails.first_name(name))
+    else:
+        email = emails.extension_nudge(
+            subject=subject,
+            message=message,
+            name=emails.first_name(name),
+            store_url=get_settings().extension_store_url,
+        )
     record = OutreachEmail(
         id=uuid.uuid4(),
         user_id=user_id,
         admin_email=admin_email,
-        kind=NUDGE,
+        kind=kind,
         subject=email.subject[:200],
         status="sent",
     )
@@ -348,8 +380,32 @@ async def _deliver(
     return record
 
 
+async def email_templates(db: AsyncSession, user_id: uuid.UUID) -> list[EmailTemplate]:
+    """Ready-made notes for this person, filled in with what they have done."""
+    row = await repository.get_user_row(db, user_id)
+    if row is None:
+        raise NotFoundError("User not found")
+    user, _, _, job_checks, applications, _, extensions, _, _ = row
+    usage = emails.Usage(
+        joined_at=user.created_at,
+        job_checks=job_checks,
+        applications=applications,
+        has_extension=extensions > 0,
+    )
+    return [
+        EmailTemplate.model_validate(template.__dict__)
+        for template in emails.templates_for(usage, datetime.now(UTC))
+    ]
+
+
 async def email_user(
-    db: AsyncSession, *, admin: Admin, user_id: uuid.UUID, subject: str, message: str
+    db: AsyncSession,
+    *,
+    admin: Admin,
+    user_id: uuid.UUID,
+    subject: str,
+    message: str,
+    kind: str = emails.NUDGE,
 ) -> OutreachRead:
     _require_email_set_up()
     user = await repository.get_user(db, user_id)
@@ -368,6 +424,7 @@ async def email_user(
         name=name,
         subject=subject,
         message=message,
+        kind=kind,
     )
     _record(
         db, admin, "email.send", "user", str(user_id), f"Emailed {user.email} ({record.status})"

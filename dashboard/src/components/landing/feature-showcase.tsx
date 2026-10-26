@@ -7,7 +7,9 @@ import {
   ListChecks,
   MessageSquare,
   MousePointerClick,
+  Newspaper,
   PanelTop,
+  Sparkles,
   Target,
 } from 'lucide-react';
 import { useState, type ComponentType, type ReactNode } from 'react';
@@ -259,6 +261,66 @@ function ClaudePanel() {
   );
 }
 
+const FRESH = [
+  { role: 'Software Engineer II', company: 'Atlassian', fit: 'fits', score: 82, age: '1d' },
+  { role: 'Frontend Engineer', company: 'Freshworks', fit: 'fits', score: 74, age: '2d' },
+  { role: 'Senior Software Engineer', company: 'Microsoft', fit: 'stretch', score: 61, age: '3d' },
+] as const;
+
+function FreshPanel() {
+  return (
+    <div>
+      <ul>
+        {FRESH.map((job) => (
+          <li
+            key={job.role}
+            className="grid grid-cols-[1fr_auto_2rem] items-center gap-3 border-b py-2.5 last:border-b-0"
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">{job.role}</span>
+              <span className="text-muted-foreground block truncate text-xs">
+                {job.company} · {job.fit === 'fits' ? 'fits your experience' : 'stretch: +1 year'}
+              </span>
+            </span>
+            <span className="text-sm font-semibold tabular-nums">{job.score}</span>
+            <span className={cn(MONO, 'text-muted-foreground text-right')}>{job.age}</span>
+          </li>
+        ))}
+      </ul>
+      <p className={cn(MONO, 'text-muted-foreground mt-2 border-t pt-4')}>
+        company careers sites · last 7 days · picked for you
+      </p>
+    </div>
+  );
+}
+
+function EditorPanel() {
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="bg-primary text-primary-foreground ml-auto w-fit rounded-lg rounded-br-sm px-3 py-2">
+        Add my Rolesetu project
+      </p>
+      <div className="bg-muted w-fit max-w-full rounded-lg rounded-bl-sm px-3 py-2.5">
+        <p className="text-muted-foreground">Added under Projects, from your profile:</p>
+        <ul className="mt-2 space-y-1">
+          <li className="bg-success/12 rounded-md px-2 py-1">
+            <span className="font-medium">Rolesetu</span> | <i>Next.js, FastAPI</i>
+          </li>
+          <li className="bg-success/12 rounded-md px-2 py-1">
+            • Scores jobs against a resume ·{' '}
+            <span className="text-primary underline underline-offset-2">
+              github.com/priya/rolesetu
+            </span>
+          </li>
+        </ul>
+      </div>
+      <p className={cn(MONO, 'text-muted-foreground border-t pt-4')}>
+        your own pdf · same fonts · links kept · saved when you say so
+      </p>
+    </div>
+  );
+}
+
 type Feature = {
   id: string;
   icon: ComponentType<{ className?: string }>;
@@ -272,6 +334,15 @@ type Feature = {
 };
 
 const FEATURES: Feature[] = [
+  {
+    id: 'fresh',
+    icon: Newspaper,
+    title: 'Fresh jobs',
+    body: "This week's jobs from top companies' careers sites, picked for your experience.",
+    windowTitle: 'fresh-jobs / last 7 days',
+    meta: '3 new',
+    panel: <FreshPanel />,
+  },
   {
     id: 'score',
     icon: Target,
@@ -300,10 +371,19 @@ const FEATURES: Feature[] = [
     panel: <ResumePanel />,
   },
   {
+    id: 'editor',
+    icon: Sparkles,
+    title: 'Resume editor and AI',
+    body: 'Edit any line of your own PDF, or ask the AI in plain words. It never makes things up.',
+    windowTitle: 'resume editor / assistant',
+    meta: 'live preview',
+    panel: <EditorPanel />,
+  },
+  {
     id: 'autofill',
     icon: MousePointerClick,
     title: 'Autofill',
-    body: 'Fills empty fields from your profile and saved answers. You review and press submit.',
+    body: 'Fills empty fields from your profile and answers it has learned. You press submit.',
     windowTitle: 'application form',
     meta: '4 of 4 fields',
     panel: <AutofillPanel />,

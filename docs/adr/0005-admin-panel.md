@@ -38,3 +38,11 @@ Code: `admin/` (the panel) and `backend/src/backend/modules/admin/` (its API).
   Firebase admin credentials. The person could sign up again from nothing.
 - Admin routes read across all users. They live in one module so that exception is easy
   to review.
+
+## Update (2026-10-25)
+Admins can now open a user's resume PDF from their page, in a popup
+(react-pdf). The file goes through the API (`GET /admin/users/{id}/resumes/{rid}/file`,
+`Cache-Control: private, no-store`) instead of a storage link, so it can be
+drawn in the page without opening the bucket to the browser. Each opening is
+recorded as `resume.view` in the audit log, and the privacy policy says so.
+

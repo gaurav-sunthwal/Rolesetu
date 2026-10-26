@@ -33,3 +33,6 @@ next-env.d.ts
 
 # Generated API schema (regenerate with pnpm gen:api-types)
 dashboard/openapi.json
+
+# Demo recordings: too large for git
+video/

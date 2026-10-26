@@ -13,6 +13,7 @@ from backend.db.base import Base
 # which is what makes `alembic revision --autogenerate` pick them up.
 from backend.modules.admin import models as admin_models  # noqa: F401
 from backend.modules.applications import models as applications_models  # noqa: F401
+from backend.modules.career_jobs import models as career_jobs_models  # noqa: F401
 from backend.modules.errors import models as errors_models  # noqa: F401
 from backend.modules.extension import models as extension_models  # noqa: F401
 from backend.modules.inbox import models as inbox_models  # noqa: F401
@@ -22,6 +23,8 @@ from backend.modules.previews import models as previews_models  # noqa: F401
 from backend.modules.profiles import models as profiles_models  # noqa: F401
 from backend.modules.resumes import models as resumes_models  # noqa: F401
 from backend.modules.saved_answers import models as saved_answers_models  # noqa: F401
+from backend.modules.shares import models as shares_models  # noqa: F401
+from backend.modules.social import models as social_models  # noqa: F401
 from backend.modules.users import models as users_models  # noqa: F401
 from backend.modules.waitlist import models as waitlist_models  # noqa: F401
 

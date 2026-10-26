@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.pagination import Page
@@ -9,6 +10,7 @@ from backend.db.session import get_db
 from backend.modules.admin import service
 from backend.modules.admin.dependencies import Admin, get_admin
 from backend.modules.admin.schemas import (
+    AccountDeleted,
     AdminActionRead,
     AdminRead,
     AdminStats,
@@ -17,6 +19,7 @@ from backend.modules.admin.schemas import (
     BulkQueued,
     EmailCompose,
     EmailDefaults,
+    EmailTemplate,
     ErrorEventRead,
     ErrorSummary,
     OutreachRead,
@@ -64,17 +67,52 @@ async def read_user(
     return await service.user_detail(db, admin=admin, user_id=user_id)
 
 
-@router.delete("/users/{user_id}", status_code=204)
+@router.get(
+    "/users/{user_id}/resumes/{resume_id}/file",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def read_resume_file(
+    user_id: uuid.UUID,
+    resume_id: uuid.UUID,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The resume PDF, served through the API (not a storage link) so the panel
+    can draw it in the page. Recorded in the audit log each time.
+    """
+    data, filename = await service.resume_file(
+        db, admin=admin, user_id=user_id, resume_id=resume_id
+    )
+    # Headers carry plain ASCII only; a name with other letters loses them here.
+    safe_name = filename.encode("ascii", "ignore").decode().replace('"', "").replace("\\", "")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_name}"',
+            # A resume must not be kept in any shared cache.
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.delete("/users/{user_id}", response_model=AccountDeleted)
 async def delete_user(
     user_id: uuid.UUID,
     confirm_email: Annotated[str, Query(max_length=320)],
     admin: Admin = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
-) -> None:
-    """Deletes the account and everything stored for it. Cannot be undone, so
-    the caller must repeat the account's email address.
+) -> AccountDeleted:
+    """Deletes the account, everything stored for it, and its Firebase sign-in.
+    Cannot be undone, so the caller must repeat the account's email address.
     """
-    await service.delete_user(db, admin=admin, user_id=user_id, confirm_email=confirm_email)
+    firebase_uid = await service.delete_user(
+        db, admin=admin, user_id=user_id, confirm_email=confirm_email
+    )
+    # The data is deleted for good before the sign-in is touched.
+    await db.commit()
+    return await service.remove_sign_in(firebase_uid)
 
 
 @router.get("/waitlist", response_model=Page[WaitlistRow])
@@ -135,6 +173,14 @@ async def read_email_defaults(
     return await service.email_defaults(db)
 
 
+@router.get("/users/{user_id}/email-templates", response_model=list[EmailTemplate])
+async def read_email_templates(
+    user_id: uuid.UUID, _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> list[EmailTemplate]:
+    """Ready-made notes for this person, filled in with what they have done."""
+    return await service.email_templates(db, user_id)
+
+
 @router.post("/users/{user_id}/email", response_model=OutreachRead)
 async def email_user(
     user_id: uuid.UUID,
@@ -144,7 +190,12 @@ async def email_user(
 ) -> OutreachRead:
     """Sends one email to one person now. The answer says whether it went."""
     return await service.email_user(
-        db, admin=admin, user_id=user_id, subject=payload.subject, message=payload.message
+        db,
+        admin=admin,
+        user_id=user_id,
+        subject=payload.subject,
+        message=payload.message,
+        kind=payload.kind,
     )
 
 

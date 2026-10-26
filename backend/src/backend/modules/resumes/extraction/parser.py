@@ -1,6 +1,8 @@
 """Runs the whole local pipeline: PDF bytes in, `ParsedResume` out."""
 
-from backend.modules.resumes.extraction.contact import parse_contact
+from dataclasses import dataclass
+
+from backend.modules.resumes.extraction.contact import find_email, parse_contact
 from backend.modules.resumes.extraction.education import parse_education
 from backend.modules.resumes.extraction.experience import parse_experience
 from backend.modules.resumes.extraction.lines import Line
@@ -20,6 +22,14 @@ class NoTextInPdfError(Exception):
     """The PDF has no selectable text (it is a scan or a picture)."""
 
 
+@dataclass(frozen=True)
+class Identity:
+    """Who the resume belongs to: enough to start an account, nothing more."""
+
+    full_name: str | None
+    email: str | None
+
+
 def parse_lines(lines: list[Line]) -> ParsedResume:
     sections = split_sections(lines)
     contact = parse_contact(sections.get("header", []), lines)
@@ -36,8 +46,21 @@ def parse_lines(lines: list[Line]) -> ParsedResume:
     return resume
 
 
-def parse_pdf(pdf: bytes) -> ParsedResume:
+def _text_lines(pdf: bytes) -> list[Line]:
     lines = extract_lines(pdf)
     if sum(len(line.flat) for line in lines) < MIN_TEXT_CHARACTERS:
         raise NoTextInPdfError
-    return parse_lines(lines)
+    return lines
+
+
+def parse_pdf(pdf: bytes) -> ParsedResume:
+    return parse_lines(_text_lines(pdf))
+
+
+def read_identity(pdf: bytes) -> Identity:
+    lines = _text_lines(pdf)
+    header = split_sections(lines).get("header", [])
+    return Identity(
+        full_name=parse_contact(header, lines)["full_name"],
+        email=find_email(header, lines),
+    )

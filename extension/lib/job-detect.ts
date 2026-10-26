@@ -308,6 +308,84 @@ function appearsOnPage(doc: Document, words: string): boolean {
   return page.includes(words.replace(/\s+/g, ' ').trim().toLowerCase());
 }
 
+// Pop-ups a site can show a job in. Internshala opens most jobs in one, over the results list.
+const DIALOGS = 'dialog[open], [role="dialog"], [aria-modal="true"], [class*="modal" i]';
+const DIALOG_TITLES =
+  'h1, h2, h3, h4, [role="heading"], [class*="title" i], [class*="heading" i], [class*="profile" i]';
+const DIALOG_COMPANIES =
+  'a[href*="/company/"], a[href*="/companies/"], [class*="company" i], [data-company-name], [data-testid*="company" i]';
+// Headings of the application form that follows the job in the same pop-up.
+const FORM_HEADING = /^(?:apply|additional question|your resume|cover letter|confirm your|custom resume)/i;
+// "Applying to Full Stack Developer job" is the pop-up's own heading for the job.
+const APPLYING_TO = /^applying (?:to|for) (.+?)(?: (?:job|internship|role|position))?$/i;
+
+function isOnTop(element: Element): boolean {
+  if (!isShown(element)) return false;
+  const style = getComputedStyle(element);
+  return style.visibility !== 'hidden' && style.opacity !== '0';
+}
+
+/**
+ * The job pop-up open on the page, if any: a dialog in front of the page whose
+ * text reads like a job listing. A pop-up about anything else (sign in, a
+ * newsletter, cookies) has none of that wording, so it is passed over even
+ * when its button says "Submit".
+ *
+ * Sites with their own reader are left out: their pop-ups are application
+ * forms (LinkedIn's Easy Apply), and must not replace the job behind them.
+ */
+export function openJobDialog(doc: Document): Element | null {
+  const host = (doc.location?.hostname ?? '').replace(/^www\./, '');
+  if (SITE_SELECTORS.some((site) => site.host.test(host))) return null;
+  for (const dialog of doc.querySelectorAll(DIALOGS)) {
+    if (!isOnTop(dialog)) continue;
+    // A class name with "modal" in it is only a pop-up when it sits in front of the page.
+    const declared = dialog.matches('dialog, [role="dialog"], [aria-modal="true"]');
+    if (!declared && getComputedStyle(dialog).position !== 'fixed') continue;
+    const words = visibleText(dialog);
+    if (words.length < MIN_DESCRIPTION * 2) continue;
+    if (JOB_CUES.filter((cue) => cue.test(words)).length >= 2) return dialog;
+  }
+  return null;
+}
+
+/** A heading in a job pop-up as the job's title: "Applying to X job" is just X. */
+export function dialogTitle(label: string): string {
+  const plain = label.replace(/\s+/g, ' ').trim();
+  return (APPLYING_TO.exec(plain)?.[1] ?? plain).replace(TITLE_EXTRA, '');
+}
+
+/**
+ * The job in a pop-up. Its title is the largest heading above the first
+ * section ("About the job"); the headings further down belong to the
+ * application form, and are often larger.
+ */
+function fromDialog(dialog: Element): Omit<DetectedJob, 'url'> {
+  let best: { text: string; size: number } | null = null;
+  for (const heading of dialog.querySelectorAll(DIALOG_TITLES)) {
+    if (!isShown(heading)) continue;
+    const label = dialogTitle(firstLine(heading));
+    if (SECTION_HEADING.test(label) || FORM_HEADING.test(label)) break;
+    // "Applying for ..." is a placeholder until the pop-up fills in.
+    if (label.length < 3 || label.length > 140 || !/\p{L}{2}/u.test(label)) continue;
+    const size = Number.parseFloat(getComputedStyle(heading).fontSize);
+    if (best === null || size > best.size) best = { text: label, size };
+  }
+  const title = best?.text ?? null;
+
+  let company: string | null = null;
+  for (const candidate of dialog.querySelectorAll(DIALOG_COMPANIES)) {
+    if (!isShown(candidate)) continue;
+    const label = firstLine(candidate);
+    if (label.length < 2 || label.length > 80 || NOT_A_COMPANY.test(label)) continue;
+    // A block holding both the title and the company starts with the title.
+    if (SECTION_HEADING.test(label) || (title !== null && sameTitle(label, title))) continue;
+    company = label;
+    break;
+  }
+  return { title, company, description: visibleText(dialog) };
+}
+
 function fromKnownSite(doc: Document, host: string): Omit<DetectedJob, 'url'> | null {
   const site = SITE_SELECTORS.find((entry) => entry.host.test(host));
   if (!site) return null;
@@ -361,6 +439,14 @@ function fromPageText(
  */
 export function detectJob(doc: Document, url: string, strict = false): DetectedJob | null {
   const host = new URL(url).hostname.replace(/^www\./, '');
+
+  // A job open in a pop-up is the one the user is looking at, whatever the
+  // page behind it lists.
+  const dialog = openJobDialog(doc);
+  if (dialog) {
+    const job = fromDialog(dialog);
+    return { ...job, description: job.description.slice(0, MAX_DESCRIPTION), url };
+  }
 
   const seen = byApplyButton(doc);
 

@@ -7,7 +7,7 @@ import { useEffect, type ReactNode } from 'react';
 
 import { NavLinks } from '@/components/NavLinks';
 import { firebaseAuth } from '@/lib/firebase';
-import { useAdmin, useGoogleAccount } from '@/lib/session';
+import { useAdmin, useApiTarget, useGoogleAccount } from '@/lib/session';
 
 /**
  * Every panel page sits behind this: a signed-in Google account that the API
@@ -19,6 +19,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const account = useGoogleAccount();
   const admin = useAdmin(account?.uid ?? null);
+  const apiTarget = useApiTarget();
   const turnedAway = account === null || admin.isError;
 
   useEffect(() => {
@@ -52,6 +53,14 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
           <p className="truncate text-xs text-zinc-500" title={admin.data.email}>
             {admin.data.email}
           </p>
+          {apiTarget.data && (
+            <p
+              className={`mt-1 truncate text-xs font-semibold ${apiTarget.data.local ? 'text-amber-700' : 'text-zinc-500'}`}
+              title={apiTarget.data.url}
+            >
+              {apiTarget.data.local ? 'Local backend' : 'Production backend'}
+            </p>
+          )}
           <button
             onClick={leave}
             className="mt-2 text-sm font-semibold text-zinc-700 hover:text-black"

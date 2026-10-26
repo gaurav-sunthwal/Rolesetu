@@ -2,14 +2,19 @@ from fastapi import APIRouter
 
 from backend.modules.admin.router import router as admin_router
 from backend.modules.applications.router import router as applications_router
+from backend.modules.career_jobs.router import router as career_jobs_router
 from backend.modules.extension.router import router as extension_router
 from backend.modules.inbox.router import router as inbox_router
 from backend.modules.llm_keys.router import router as llm_keys_router
 from backend.modules.matches.router import router as matches_router
 from backend.modules.previews.router import router as previews_router
 from backend.modules.profiles.router import router as profiles_router
+from backend.modules.resume_editor.router import router as resume_editor_router
+from backend.modules.resumes.router import public_router as resumes_public_router
 from backend.modules.resumes.router import router as resumes_router
 from backend.modules.saved_answers.router import router as saved_answers_router
+from backend.modules.shares.router import router as shares_router
+from backend.modules.social.router import router as social_router
 from backend.modules.tailoring.router import router as tailoring_router
 from backend.modules.users.router import router as users_router
 from backend.modules.waitlist.router import router as waitlist_router
@@ -20,11 +25,16 @@ api_router.include_router(llm_keys_router)
 api_router.include_router(profiles_router)
 api_router.include_router(saved_answers_router)
 api_router.include_router(applications_router)
+api_router.include_router(career_jobs_router)
 api_router.include_router(matches_router)
+api_router.include_router(shares_router)
 api_router.include_router(resumes_router)
+api_router.include_router(resumes_public_router)
+api_router.include_router(resume_editor_router)
 api_router.include_router(extension_router)
 api_router.include_router(tailoring_router)
 api_router.include_router(inbox_router)
 api_router.include_router(previews_router)
 api_router.include_router(waitlist_router)
 api_router.include_router(admin_router)
+api_router.include_router(social_router)

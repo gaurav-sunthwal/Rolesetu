@@ -100,12 +100,17 @@ function Steps({ profile, initial }: { profile: Profile; initial: Step }) {
         <>
           <StepIntro
             title="Check your details"
-            body="The extension uses these to score jobs and fill in application forms, so make sure your name, phone and links are right. Save any changes before you continue."
+            body="We filled these in from your resume. The extension uses them to score jobs and fill in application forms, so check your name, phone and links, or skip and fix them later on your profile page."
           />
           <BasicsCard key={importCount} profile={profile} />
           <SkillsCard profile={profile} />
           <FoundSummary profile={profile} />
-          <Footer back={() => setStep(0)} next={() => setStep(2)} />
+          <Footer
+            back={() => setStep(0)}
+            skipLabel="Skip, I'll check later"
+            onSkip={finish}
+            next={() => setStep(2)}
+          />
         </>
       ) : (
         <>

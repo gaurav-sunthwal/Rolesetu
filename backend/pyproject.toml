@@ -70,7 +70,13 @@ explicit_package_bases = true
 module = [
     "backend.modules.tailoring.pdf.*",
     "backend.modules.tailoring.service",
+    "backend.modules.resume_editor.*",
+    "backend.modules.social.images",
+    "backend.evals.*",
     "backend.tests.test_resume_editing",
+    "backend.tests.test_resume_editor",
+    "backend.tests.test_resume_assistant",
+    "backend.tests.test_social_platforms",
 ]
 disallow_untyped_calls = false
 
@@ -88,4 +94,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 pythonpath = ["src"]
-markers = ["records_errors: the test checks error recording, so events are really written"]
+markers = [
+    "records_errors: the test checks error recording, so events are really written",
+    "signup_alerts: the test checks the new sign-up email, so it catches that email itself",
+]

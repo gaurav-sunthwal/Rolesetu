@@ -5,11 +5,22 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { ResumeModal } from '@/components/ResumeModal';
 import { UserEmail } from '@/components/UserEmail';
-import { Badge, Card, Empty, ErrorNote, Loading, PageHeader, td, th } from '@/components/ui';
+import {
+  Badge,
+  button,
+  Card,
+  Empty,
+  ErrorNote,
+  Loading,
+  PageHeader,
+  td,
+  th,
+} from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { formatBytes, formatDate, formatDateTime, timeAgo } from '@/lib/format';
-import type { UserDetail } from '@/lib/types';
+import type { AccountDeleted, UserDetail } from '@/lib/types';
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -79,27 +90,89 @@ function ProfileSection({ profile }: { profile: UserDetail['profile'] }) {
 }
 
 /** Deleting is final, so the admin has to type the account's email address first. */
+const FIREBASE_USERS_URL = `https://console.firebase.google.com/project/${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/authentication/users`;
+
+function ResumeFiles({ userId, resumes }: { userId: string; resumes: UserDetail['resumes'] }) {
+  const [open, setOpen] = useState<UserDetail['resumes'][number] | null>(null);
+
+  return (
+    <Section title={`Resume files (${resumes.length})`}>
+      {resumes.length === 0 ? (
+        <Empty>No resume uploaded.</Empty>
+      ) : (
+        <ul className="divide-y divide-zinc-100 text-sm">
+          {resumes.map((resume) => (
+            <li key={resume.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+              <span className="font-semibold">{resume.filename}</span>
+              <span className="text-zinc-500">{formatBytes(resume.size_bytes)}</span>
+              <span className="text-zinc-500">{formatDateTime(resume.created_at)}</span>
+              <Badge>{resume.status}</Badge>
+              <button onClick={() => setOpen(resume)} className={`${button} ml-auto`}>
+                View resume
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="border-t border-zinc-200 px-4 py-2.5 text-xs text-zinc-500">
+        Opening a resume is recorded in the audit log. Open it only to help this person.
+      </p>
+      {open && <ResumeModal userId={userId} resume={open} onClose={() => setOpen(null)} />}
+    </Section>
+  );
+}
+
 function DeleteAccount({ id, email }: { id: string; email: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [typed, setTyped] = useState('');
+  const [leftover, setLeftover] = useState<string | null>(null);
   const remove = useMutation({
     mutationFn: () =>
-      api<void>(`/admin/users/${id}`, { method: 'DELETE', params: { confirm_email: typed } }),
-    onSuccess: async () => {
+      api<AccountDeleted>(`/admin/users/${id}`, {
+        method: 'DELETE',
+        params: { confirm_email: typed },
+      }),
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
-      router.replace('/users');
+      // The data is gone either way; stay here only to say what is left to do by hand.
+      if (result.sign_in_removed) router.replace('/users');
+      else setLeftover(result.note ?? 'Remove the sign-in in the Firebase console.');
     },
   });
   const matches = typed.trim().toLowerCase() === email.toLowerCase();
+
+  if (leftover) {
+    return (
+      <Card className="p-4 ring-amber-200">
+        <h2 className="font-bold text-amber-900">Data deleted, sign-in still there</h2>
+        <p className="mt-1 max-w-2xl text-sm text-zinc-700">
+          Everything Rolesetu stored for {email} is gone. Their Firebase sign-in was not removed:{' '}
+          {leftover}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={FIREBASE_USERS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+          >
+            Open Firebase users
+          </a>
+          <button onClick={() => router.replace('/users')} className={button}>
+            Back to users
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-4 ring-red-200">
       <h2 className="font-bold text-red-800">Delete this account</h2>
       <p className="mt-1 max-w-2xl text-sm text-zinc-600">
         Removes the profile, resume files, job checks, applications, saved answers and the Gmail
-        connection. It cannot be undone. Their Google sign-in is not removed, so they could sign up
-        again from nothing.
+        connection, then their Google sign-in. It cannot be undone.
       </p>
       <form
         className="mt-4 flex flex-wrap items-center gap-2"
@@ -184,28 +257,7 @@ export default function UserPage() {
 
       <ProfileSection profile={profile} />
 
-      <Section title={`Resume files (${resumes.length})`}>
-        {resumes.length === 0 ? (
-          <Empty>No resume uploaded.</Empty>
-        ) : (
-          <ul className="divide-y divide-zinc-100 text-sm">
-            {resumes.map((resume) => (
-              <li
-                key={`${resume.filename}-${resume.created_at}`}
-                className="flex flex-wrap gap-x-4 px-4 py-3"
-              >
-                <span className="font-semibold">{resume.filename}</span>
-                <span className="text-zinc-500">{formatBytes(resume.size_bytes)}</span>
-                <span className="text-zinc-500">{formatDateTime(resume.created_at)}</span>
-                <Badge>{resume.status}</Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="border-t border-zinc-200 px-4 py-2.5 text-xs text-zinc-500">
-          Only details of the file are shown here. The resume itself is not opened from the panel.
-        </p>
-      </Section>
+      <ResumeFiles userId={user.id} resumes={resumes} />
 
       <Section title="Recent job checks">
         {job_checks.length === 0 ? (
@@ -296,11 +348,7 @@ export default function UserPage() {
         )}
       </Section>
 
-      <UserEmail
-        userId={user.id}
-        extensionConnected={user.extension_connected}
-        sent={detail.data.panel_emails}
-      />
+      <UserEmail userId={user.id} sent={detail.data.panel_emails} />
 
       <DeleteAccount id={user.id} email={user.email} />
     </div>

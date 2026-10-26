@@ -2,21 +2,23 @@
 
 import { useState } from 'react';
 
-import type { EmailCompose } from '@/lib/types';
+import type { EmailCompose, EmailKind } from '@/lib/types';
 
 /**
  * Subject and message, prefilled with the suggested email. {first_name} is
- * replaced for each person. The Chrome Web Store link, how to connect the
- * extension and the founder's sign-off are added by the server, not typed here.
+ * replaced for each person. What the server adds after the message depends on
+ * `kind`: the extension's store link and the sign-off, or only the sign-off.
  */
 export function EmailComposer({
   initial,
+  kind,
   placeholder,
   sending,
   sendLabel,
   onSend,
 }: {
-  initial: EmailCompose;
+  initial: Pick<EmailCompose, 'subject' | 'message'>;
+  kind: EmailKind;
   placeholder: string;
   sending: boolean;
   sendLabel: string;
@@ -33,7 +35,7 @@ export function EmailComposer({
       className="space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (ready) onSend({ subject: subject.trim(), message: message.trim() });
+        if (ready) onSend({ subject: subject.trim(), message: message.trim(), kind });
       }}
     >
       <label className="block">
@@ -57,8 +59,10 @@ export function EmailComposer({
       </label>
       <p className="text-xs text-zinc-500">
         <code className="rounded bg-zinc-100 px-1">{placeholder}</code> becomes each person&apos;s
-        first name. It goes as plain text from Gaurav Sunthwal. The Chrome Web Store link, how to
-        connect the extension and your sign-off are added below your message.
+        first name. It goes as plain text from Gaurav Sunthwal.{' '}
+        {kind === 'extension_nudge'
+          ? 'The Chrome Web Store link, how to connect the extension and your sign-off are added below your message.'
+          : 'Your sign-off is added below your message.'}
       </p>
       <button
         disabled={!ready || sending}

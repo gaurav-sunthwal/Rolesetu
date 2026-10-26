@@ -56,6 +56,19 @@ def _phone(text: str) -> str | None:
     return None
 
 
+def find_email(header: list[Line], all_lines: list[Line]) -> str | None:
+    """The first email address near the top, else anywhere on the first page
+    (sidebar layouts keep contact details further down).
+    """
+    first_page = [line for line in all_lines if line.page == 0]
+    for lines in (header, first_page):
+        for line in lines:
+            match = _EMAIL.search(line.flat)
+            if match:
+                return match.group(0).rstrip(".").lower()
+    return None
+
+
 def _is_plain_words(text: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z][A-Za-z .'’-]*", text))
 

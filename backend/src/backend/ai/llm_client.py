@@ -5,10 +5,11 @@ Two fallbacks, because two different things go wrong:
 - Models: when a model is overloaded (5xx) or times out, that is true for every
   key, so we move to the next model in `llm_model` + `llm_fallback_models` and
   use the first one that answers.
-- Keys: when a key is rejected, or out of quota on this model, we move to the
-  next key: server key 1, server key 2, then the caller's own saved key (if
-  they added one in Settings). A rejected key is not tried again; a key that
-  is only out of quota is, because quota is counted per model.
+- Keys: the caller's own saved key (if they added one in Settings) is always
+  tried first, so their quota is spent before ours. When a key is rejected, or
+  out of quota on this model, we move to the next key: server key 1, then
+  server key 2. A rejected key is not tried again; a key that is only out of
+  quota is, because quota is counted per model.
 
 Only once every model has failed do we raise, and the message points the user
 at adding their own key.
@@ -117,8 +118,10 @@ def _candidate_models() -> list[str]:
 
 
 def _candidate_keys(user_api_key: str | None) -> list[str]:
+    """The user's own key first; Rolesetu's keys only when theirs cannot answer."""
     settings = get_settings()
-    return [k for k in (settings.llm_api_key_1, settings.llm_api_key_2, user_api_key) if k]
+    keys = (user_api_key, settings.llm_api_key_1, settings.llm_api_key_2)
+    return list(dict.fromkeys(k for k in keys if k))
 
 
 async def _call_once[T: BaseModel](

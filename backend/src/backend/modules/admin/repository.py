@@ -206,6 +206,13 @@ async def resumes(db: AsyncSession, user_id: uuid.UUID) -> list[ResumeFile]:
     return list(result.scalars())
 
 
+async def resume(db: AsyncSession, user_id: uuid.UUID, resume_id: uuid.UUID) -> ResumeFile | None:
+    result = await db.execute(
+        select(ResumeFile).where(ResumeFile.user_id == user_id, ResumeFile.id == resume_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def gmail_last_synced(db: AsyncSession, user_id: uuid.UUID) -> datetime | None:
     result = await db.execute(
         select(func.max(Integration.last_synced_at)).where(Integration.user_id == user_id)

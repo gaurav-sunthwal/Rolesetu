@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   type ApplyMode,
   getResumeDownloadLink,
-  MAX_RESUME_BYTES,
+  fileProblem,
   type Resume,
 } from '@/features/resume/api';
 import {
@@ -36,15 +36,6 @@ function summaryOf(parsed: NonNullable<Resume['parsed']>): string {
     plural(parsed.projects?.length ?? 0, 'project', 'projects'),
     plural(parsed.education?.length ?? 0, 'education entry', 'education entries'),
   ].join(' · ');
-}
-
-function fileProblem(file: File): string | null {
-  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-    return 'That is not a PDF. Export your resume as a PDF and upload that.';
-  }
-  if (file.size > MAX_RESUME_BYTES) return 'That file is larger than 5 MB. Export a smaller PDF.';
-  if (file.size === 0) return 'That file is empty. Choose your resume PDF and try again.';
-  return null;
 }
 
 /**

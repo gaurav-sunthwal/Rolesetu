@@ -36,6 +36,25 @@ def compute_score(results: Sequence[Judged]) -> int:
     return round(earned / possible * 100)
 
 
+def score_gains(results: Sequence[Judged], *, current: int, cap: int | None) -> list[int]:
+    """For each skill, how many points the score would rise if the candidate
+    showed strong evidence for it, with everything else unchanged. Skills
+    already strong gain 0, and an experience cap limits every gain, so the
+    numbers never promise what the shown score could not reach.
+    """
+    gains: list[int] = []
+    for index, result in enumerate(results):
+        if result.verdict == "strong":
+            gains.append(0)
+            continue
+        improved = [*results[:index], Judged(required=result.required, verdict="strong")]
+        raised = compute_score([*improved, *results[index + 1 :]])
+        if cap is not None:
+            raised = min(raised, cap)
+        gains.append(max(raised - current, 0))
+    return gains
+
+
 def _month_index(year_month: str) -> int:
     year, month = year_month.split("-")
     return int(year) * 12 + int(month) - 1

@@ -4,6 +4,7 @@ from backend.modules.matches.scoring import (
     Judged,
     apply_seniority_cap,
     compute_score,
+    score_gains,
     years_of_experience,
 )
 
@@ -52,3 +53,23 @@ def test_low_score_is_not_raised_by_the_cap() -> None:
     score, note = apply_seniority_cap(40, min_years=5, candidate_years=1)
     assert score == 40
     assert note is not None and "capped" not in note
+
+
+def test_gains_say_what_each_skill_would_add() -> None:
+    results = [
+        Judged(required=True, verdict="strong"),
+        Judged(required=True, verdict="missing"),
+        Judged(required=True, verdict="partial"),
+        Judged(required=False, verdict="missing"),
+    ]
+    current = compute_score(results)  # 3 of 7 points
+    assert current == 43
+    # Strong gains nothing; a missing required skill adds the most.
+    assert score_gains(results, current=current, cap=None) == [0, 28, 14, 14]
+
+
+def test_gains_never_pass_the_experience_cap() -> None:
+    results = [Judged(required=True, verdict="strong"), Judged(required=True, verdict="missing")]
+    assert score_gains(results, current=50, cap=60) == [0, 10]
+    # Already at the cap: no skill can raise the shown score.
+    assert score_gains(results, current=60, cap=60) == [0, 0]

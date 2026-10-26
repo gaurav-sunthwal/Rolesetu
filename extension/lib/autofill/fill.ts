@@ -5,6 +5,7 @@
  */
 
 import type { AutofillData } from '../messages';
+import { birthDateText } from './dates';
 import { type Field, type Fillable, findFields } from './fields';
 
 type Profile = AutofillData['profile'];
@@ -34,6 +35,11 @@ function dateValues(yearMonth: string | null | undefined, element: Fillable, lab
   if (/month/.test(label) && !/year/.test(label)) return [name, name.slice(0, 3), month, String(Number(month))];
   if (element instanceof HTMLSelectElement) return [year, name, name.slice(0, 3)];
   return [`${month}/${year}`];
+}
+
+/** The words the form shows beside a field, as written, for reading a date format from. */
+export function formatHint(field: Field): string {
+  return `${field.element.getAttribute('placeholder') ?? ''} ${field.label}`;
 }
 
 function yearsText(years: number): string {
@@ -94,8 +100,15 @@ function valuesFor(field: Field, data: AutofillData): string[] {
       return one(school?.start_year);
     case 'edu_end':
       return one(school?.end_year);
+    case 'date_of_birth': {
+      const saved = answers[field.key];
+      const type = field.element instanceof HTMLInputElement ? field.element.type : '';
+      // An answer saved some other way (typed in on the dashboard) is used as it is.
+      return one(saved && (birthDateText(saved, formatHint(field), navigator.language, type) ?? saved));
+    }
     default:
-      return one(answers[field.kind]);
+      // Saved answers, including every one learned from an earlier form.
+      return one(answers[field.key]);
   }
 }
 

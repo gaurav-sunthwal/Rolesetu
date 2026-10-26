@@ -150,7 +150,7 @@ function LlmKeyCard() {
   return (
     <SectionCard
       title="Your own Gemini key"
-      description="Optional. Job checks and resume reading run without AI, so no key is needed for them. This is kept for AI features such as tailored resumes and emails."
+      description="Optional. Job checks and resume reading run without AI, so no key is needed for them. When you add a key, AI features such as the resume assistant use it first, and Rolesetu's own keys only if yours cannot answer."
     >
       {status.isPending ? (
         <Skeleton className="h-10 w-full" />

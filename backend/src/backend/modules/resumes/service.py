@@ -1,6 +1,7 @@
 import asyncio
 import re
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ from backend.modules.resumes.extraction import parser
 from backend.modules.resumes.extraction.pdf_lines import UnreadablePdfError
 from backend.modules.resumes.merge import ApplyMode, apply_resume
 from backend.modules.resumes.models import ResumeFile
-from backend.modules.resumes.schemas import DownloadLink, ResumeRead
+from backend.modules.resumes.schemas import DownloadLink, ResumeIdentity, ResumeRead
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_UPLOADS_PER_HOUR = 10
@@ -67,11 +68,10 @@ async def _remove(db: AsyncSession, resume: ResumeFile) -> None:
     await db.delete(resume)
 
 
-async def read_pdf(data: bytes) -> ProfileWrite:
-    """Reads a resume locally (no model call) into a cleaned profile."""
+async def _run_parser[T](read: Callable[[bytes], T], data: bytes) -> T:
     try:
         # CPU-bound and blocking, so it runs off the event loop.
-        raw = await asyncio.to_thread(parser.parse_pdf, data)
+        return await asyncio.to_thread(read, data)
     except parser.NoTextInPdfError as exc:
         raise ValidationFailedError(
             "This PDF has no selectable text, so it looks like a scan or a photo. "
@@ -83,6 +83,10 @@ async def read_pdf(data: bytes) -> ProfileWrite:
             "This PDF could not be opened. It may be damaged or password-protected."
         ) from exc
 
+
+async def read_pdf(data: bytes) -> ProfileWrite:
+    """Reads a resume locally (no model call) into a cleaned profile."""
+    raw = await _run_parser(parser.parse_pdf, data)
     profile = normalize.to_profile(raw)
     if not normalize.has_content(profile):
         raise ValidationFailedError(
@@ -91,6 +95,16 @@ async def read_pdf(data: bytes) -> ProfileWrite:
             "such as Experience, Education and Skills."
         )
     return profile
+
+
+async def read_identity(data: bytes) -> ResumeIdentity:
+    """The email and first name on a resume, for signing up with it. Runs
+    before sign-in, so the file is read in memory and never stored.
+    """
+    validate_pdf(data)
+    identity = await _run_parser(parser.read_identity, data)
+    first_name = identity.full_name.split()[0] if identity.full_name else None
+    return ResumeIdentity(email=identity.email, first_name=first_name)
 
 
 async def create_upload(

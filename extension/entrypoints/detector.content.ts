@@ -4,6 +4,7 @@ import { detectJob } from '@/lib/job-detect';
 import { ask } from '@/lib/messages';
 
 const LOOK_AGAIN_MS = [1500, 4000];
+const AFTER_CLICK_MS = [800, 2500];
 const MIN_FRAME = { width: 320, height: 240 };
 
 /**
@@ -42,6 +43,19 @@ export default defineContentScript({
       look();
       for (const delay of LOOK_AGAIN_MS) ctx.setTimeout(look, delay);
     });
+    // A job opened in a pop-up (Internshala opens most jobs this way) changes
+    // neither the address nor anything else watched here, so a click is the sign.
+    let lastClickLook = 0;
+    ctx.addEventListener(
+      document,
+      'click',
+      () => {
+        if (asked || Date.now() - lastClickLook < 1000) return;
+        lastClickLook = Date.now();
+        for (const delay of AFTER_CLICK_MS) ctx.setTimeout(look, delay);
+      },
+      { capture: true, passive: true },
+    );
     // A form opened later (an "Apply" pop-up) is caught when the user steps into it.
     let lastFocusLook = 0;
     ctx.addEventListener(document, 'focusin', (event) => {

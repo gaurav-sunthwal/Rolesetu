@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 
-import { api } from '@/lib/api';
+import { api, apiTarget } from '@/lib/api';
 import { firebaseAuth } from '@/lib/firebase';
 import type { Admin } from '@/lib/types';
 
@@ -24,4 +24,9 @@ export function useAdmin(uid: string | null) {
     retry: false,
     staleTime: 60_000,
   });
+}
+
+/** Which backend the panel is using, for the label in the sidebar. */
+export function useApiTarget() {
+  return useQuery({ queryKey: ['api-target'], queryFn: apiTarget, staleTime: Infinity });
 }

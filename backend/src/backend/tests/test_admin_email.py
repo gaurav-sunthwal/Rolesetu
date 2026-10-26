@@ -2,9 +2,10 @@
 service is replaced by a stand-in that remembers what it was given.
 """
 
+import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -173,3 +174,57 @@ def test_the_note_is_plain_text_with_the_store_link_and_sign_off() -> None:
     assert note.text.startswith("Hi Asha,\n\nOne <b>bold</b> line\n")
     assert "https://store.example/x" in note.text and "Gaurav Sunthwal" in note.text
     assert emails.first_name("  Asha  Rao ") == "Asha" and emails.first_name(None) == "there"
+
+
+async def test_templates_are_filled_in_for_the_person(
+    admin: AsyncClient, client: AsyncClient
+) -> None:
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    target = await user_id(admin, client)
+    found = await admin.get(f"{ADMIN}/users/{target}/email-templates")
+    assert found.status_code == 200
+    by_id = {t["id"]: t for t in found.json()}
+    # A new account: nothing checked yet, and no extension.
+    assert set(by_id) == {"stuck", "extension"}
+    assert by_id["stuck"]["recommended"] and "signed up today" in by_id["stuck"]["message"]
+    assert by_id["extension"]["kind"] == "extension_nudge"
+
+
+async def test_a_founder_note_has_no_store_link(
+    admin: AsyncClient, client: AsyncClient, outbox: Outbox
+) -> None:
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    target = await user_id(admin, client)
+    note = {**NOTE, "kind": "founder_note"}
+    sent = await admin.post(f"{ADMIN}/users/{target}/email", json=note)
+    assert sent.status_code == 200 and sent.json()["kind"] == "founder_note"
+    text = str(outbox.sent[0]["text"])
+    assert get_settings().extension_store_url not in text
+    assert text.rstrip().endswith("Founder, Rolesetu")
+
+
+async def test_only_an_admin_sees_templates(client: AsyncClient) -> None:
+    found = await client.get(f"{ADMIN}/users/{uuid.uuid4()}/email-templates")
+    assert found.status_code == 403
+
+
+def test_templates_follow_what_the_person_did() -> None:
+    now = datetime(2026, 10, 24, tzinfo=UTC)
+    usage = emails.Usage(
+        joined_at=now - timedelta(days=9), job_checks=23, applications=4, has_extension=True
+    )
+    found = {t.id: t for t in emails.templates_for(usage, now)}
+    assert set(found) == {"experience", "improve", "applications"}
+    assert [t.id for t in found.values() if t.recommended] == ["applications"]
+    assert "joined 9 days ago and have checked 23 jobs" in found["experience"].message
+    assert "tracked 4 applications" in found["applications"].message
+
+
+def test_a_subject_without_a_name_drops_the_greeting() -> None:
+    note = emails.founder_note(
+        subject="{first_name}, how has Rolesetu been so far?",
+        message="Hi {first_name},",
+        name="there",
+    )
+    assert note.subject == "How has Rolesetu been so far?"
+    assert note.text.startswith("Hi there,")

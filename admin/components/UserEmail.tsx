@@ -1,26 +1,24 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { EmailComposer } from '@/components/EmailComposer';
 import { Badge, Card, Empty, ErrorNote, Loading } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
-import { useEmailDefaults } from '@/lib/outreach';
-import type { EmailCompose, OutreachEmail } from '@/lib/types';
+import { useEmailDefaults, useEmailTemplates } from '@/lib/outreach';
+import type { EmailCompose, EmailTemplate, OutreachEmail } from '@/lib/types';
 
-/** Write to one person now, and see what they were already sent from the panel. */
-export function UserEmail({
-  userId,
-  extensionConnected,
-  sent,
-}: {
-  userId: string;
-  extensionConnected: boolean;
-  sent: OutreachEmail[];
-}) {
+/**
+ * Write to one person now, starting from a template filled in with what they
+ * have done, and see what they were already sent from the panel.
+ */
+export function UserEmail({ userId, sent }: { userId: string; sent: OutreachEmail[] }) {
   const queryClient = useQueryClient();
   const defaults = useEmailDefaults();
+  const templates = useEmailTemplates(userId);
+  const [picked, setPicked] = useState<string | null>(null);
   const send = useMutation({
     mutationFn: (email: EmailCompose) =>
       api<OutreachEmail>(`/admin/users/${userId}/email`, { method: 'POST', body: email }),
@@ -31,16 +29,12 @@ export function UserEmail({
     <Card>
       <h2 className="border-b border-zinc-200 px-4 py-3 font-bold">Email this person</h2>
       <div className="p-4">
-        {extensionConnected && (
-          <p className="mb-3 text-sm text-zinc-600">
-            They have already connected the extension, so the suggested email may not fit. Edit it
-            first.
-          </p>
-        )}
-        {defaults.isPending ? (
+        {defaults.isPending || templates.isPending ? (
           <Loading rows={4} />
         ) : defaults.isError ? (
           <ErrorNote message={errorMessage(defaults.error)} onRetry={() => defaults.refetch()} />
+        ) : templates.isError ? (
+          <ErrorNote message={errorMessage(templates.error)} onRetry={() => templates.refetch()} />
         ) : !defaults.data.configured ? (
           <p className="text-sm font-medium text-red-700">
             Email is not set up on the server. Add GMAIL_SENDER_REFRESH_TOKEN to the API to send
@@ -52,8 +46,16 @@ export function UserEmail({
           </p>
         ) : (
           <>
+            <TemplatePicker
+              templates={templates.data}
+              picked={chosen(templates.data, picked)?.id ?? null}
+              onPick={setPicked}
+            />
             <EmailComposer
-              initial={{ subject: defaults.data.subject, message: defaults.data.message }}
+              // A new template starts the form again from its text.
+              key={chosen(templates.data, picked)?.id ?? 'blank'}
+              initial={chosen(templates.data, picked) ?? { subject: '', message: '' }}
+              kind={chosen(templates.data, picked)?.kind ?? 'founder_note'}
               placeholder={defaults.data.placeholder}
               sending={send.isPending}
               sendLabel="Send email"
@@ -94,5 +96,50 @@ export function UserEmail({
         )}
       </div>
     </Card>
+  );
+}
+
+/** The template picked, or the recommended one until the admin picks. */
+function chosen(templates: EmailTemplate[], picked: string | null): EmailTemplate | undefined {
+  return templates.find((t) => t.id === picked) ?? templates.find((t) => t.recommended);
+}
+
+function TemplatePicker({
+  templates,
+  picked,
+  onPick,
+}: {
+  templates: EmailTemplate[];
+  picked: string | null;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <fieldset className="mb-4">
+      <legend className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+        Start from
+      </legend>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {templates.map((template) => {
+          const active = template.id === picked;
+          return (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => onPick(template.id)}
+              aria-pressed={active}
+              className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                active ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-400'
+              }`}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                {template.label}
+                {template.recommended && <Badge tone="green">Best fit</Badge>}
+              </span>
+              <span className="mt-0.5 block text-xs text-zinc-500">{template.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }

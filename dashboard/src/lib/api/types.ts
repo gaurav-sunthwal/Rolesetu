@@ -24,7 +24,18 @@ export type MatchPage = Schemas['Page_MatchRead_'];
 export type SkillResult = Schemas['SkillResult'];
 export type Verdict = SkillResult['verdict'];
 
+export type ShareCard = Schemas['ShareRead'];
+export type ShareCreate = Schemas['ShareCreate'];
+
 export type JobPreview = Schemas['JobPreviewRead'];
 export type WaitlistJoin = Schemas['WaitlistJoin'];
 
 export type LlmKeyStatus = Schemas['LlmKeyStatus'];
+
+export type CareerCompany = Schemas['CareerCompany'];
+export type CareerCompanyList = Schemas['CareerCompanyList'];
+export type CareerJob = Schemas['CareerJobRead'];
+export type CareerJobPage = Schemas['CareerJobPage'];
+export type CareerFit = CareerJob['fit'];
+export type WorkMode = CareerJob['work_mode'];
+export type ScoreBoost = Schemas['ScoreBoost'];

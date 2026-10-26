@@ -28,9 +28,9 @@ export const FEATURE_PAGES: FeaturePage[] = [
     slug: 'job-match-score',
     name: 'Job match score',
     summary: 'Check your resume against any job description and see your fit skill by skill.',
-    title: 'Job match score: check your resume against any job description',
+    title: 'Job match score: compare your resume to any job',
     description:
-      'Paste a job link or description and get a match score out of 100. Every required skill is marked strong, partial or missing, with the line from your resume that proves it.',
+      'Paste a job link and get a match score out of 100. Each skill is marked strong, partial or missing, with the resume line that proves it.',
     heading: 'A job match score you can check line by line',
     intro:
       'Rolesetu compares a job description with your resume and gives you a score out of 100. It is not a black box: every skill the job asks for is listed with a verdict and the exact part of your profile it came from, so you know whether a job is worth applying to before you spend an hour on it.',
@@ -88,9 +88,9 @@ export const FEATURE_PAGES: FeaturePage[] = [
     slug: 'resume-keyword-match',
     name: 'Resume keyword match',
     summary: 'Put the job’s wording into your own resume PDF. Fonts and layout stay as they were.',
-    title: 'Tailor your resume to a job description without changing its design',
+    title: 'Tailor your resume to a job description',
     description:
-      'See which keywords from a job description are missing from your resume or written differently. Tick the ones that are true and Rolesetu edits your own PDF in place, in the same fonts and layout.',
+      'See which job keywords your resume is missing. Tick the ones that are true and Rolesetu edits your own PDF in place, in the same fonts and layout.',
     heading: 'Tailor your resume to the job, and keep it your resume',
     intro:
       'Recruiters and keyword filters look for the job’s own words. Rolesetu compares a job description with your resume, shows what is missing or spelled differently, and adds what you confirm to the PDF you uploaded. Nothing is rebuilt from a template, so the result looks exactly like the resume you made.',
@@ -150,12 +150,137 @@ export const FEATURE_PAGES: FeaturePage[] = [
     ],
   },
   {
+    slug: 'resume-editor',
+    name: 'Resume editor and AI',
+    summary: 'Change any line of your resume, or ask the AI in plain words. Your design stays.',
+    title: 'Edit your resume PDF online, with AI help',
+    description:
+      'Edit any line of your resume PDF and see it redrawn live in its own fonts and layout. Or ask the AI assistant, which never makes things up.',
+    heading: 'Edit any line of your resume, or just ask',
+    intro:
+      'Most resume editors make you start again in their template. Rolesetu edits the PDF you already have. Change a bullet, fix a date, add a project or remove an old role, and the page is redrawn in its own fonts as you type. Or tell the assistant what you want in plain words and it makes the edits for you, using only what is in your resume and profile.',
+    steps: [
+      {
+        title: 'Open the editor',
+        body: 'Your resume is shown as its own page, with every line grouped under its heading: name and contact, experience, projects, education, skills.',
+      },
+      {
+        title: 'Edit, or ask',
+        body: 'Click any line to change it, press Enter to add a line below, or ask the assistant: “Add my Rolesetu project”, “Put Docker in my skills”, “Remove my school”.',
+      },
+      {
+        title: 'Check the page, then save',
+        body: 'The preview is your own PDF, redrawn after every change. Download it, or save it as your resume so job checks and autofill use it.',
+      },
+    ],
+    details: [
+      {
+        title: 'Your design, untouched',
+        body: 'Changed words are written in the line’s own font, size and colour. A new bullet copies the bullets around it; a new project title looks like your other titles. Removing a line closes the gap, as a word processor would.',
+      },
+      {
+        title: 'Links keep working',
+        body: 'Your LinkedIn, GitHub and project links are shown under their lines and can be changed. When you edit a link’s words, the link moves with them, and an address you type into a new line becomes a link.',
+      },
+      {
+        title: 'An assistant that does not make things up',
+        body: 'It reads your resume and profile and edits only the lines you ask about. A skill, number or address in its wording that you never gave is held back until you say it is true. It asks when it does not know.',
+      },
+      {
+        title: 'Nothing changes until you save',
+        body: 'Every edit, yours or the assistant’s, is a draft you can undo. Your saved resume is replaced only when you press Save and confirm.',
+      },
+    ],
+    faqs: [
+      {
+        question: 'Will editing change how my resume looks?',
+        answer:
+          'No. Rolesetu edits the PDF you uploaded instead of rebuilding it from a template. Only the words you change are different; fonts, spacing, colours and links stay as they were.',
+      },
+      {
+        question: 'Does the AI assistant need my own AI key?',
+        answer:
+          'No. It works without one. If you add your own Gemini key in Settings, the assistant uses your key first and Rolesetu’s only if yours cannot answer.',
+      },
+      {
+        question: 'Can the AI add experience I do not have?',
+        answer:
+          'It is told never to, and the edits are checked: a skill, number or link that appears nowhere in your messages, resume or profile is held back and shown to you, not added. When you ask for something it knows nothing about, it asks you for the details.',
+      },
+      {
+        question: 'Which resumes can be edited?',
+        answer:
+          'Resumes saved as text PDFs, which is what most resume tools and word processors export. Scanned resumes cannot be edited. On pages laid out in two columns you can change and remove lines, but not add new ones yet.',
+      },
+    ],
+  },
+  {
+    slug: 'fresh-jobs',
+    name: 'Fresh jobs',
+    summary: 'Jobs in India posted this week on top companies’ own careers sites, picked for you.',
+    title: 'Fresh jobs in India from company career pages',
+    description:
+      'Jobs in India posted in the last 7 days on careers sites like Google, Microsoft and Atlassian, matched to your experience and scored against your resume.',
+    heading: 'This week’s jobs, straight from company careers sites',
+    intro:
+      'Job boards are full of reposts and listings that closed weeks ago. Rolesetu reads companies’ own careers sites every morning and shows the jobs in India posted in the last 7 days: only the ones that fit your experience, each with a match score.',
+    steps: [
+      {
+        title: 'Read every morning',
+        body: 'Each company’s careers site is read where the company publishes its jobs: Workday, Greenhouse, Lever, Ashby, SmartRecruiters or the company’s own site.',
+      },
+      {
+        title: 'Picked for your experience',
+        body: 'A job that asks for what you have is marked as a fit. One that asks for a year more is shown as a stretch. Roles far above or below your level are left out.',
+      },
+      {
+        title: 'Scored, then one click to apply',
+        body: 'Each job gets the same skill-by-skill match score as any job check. Open it on the company’s own site to apply, with the extension there to help.',
+      },
+    ],
+    details: [
+      {
+        title: 'Only the last 7 days',
+        body: 'Every job shows when it was posted. Nothing older than a week is listed.',
+      },
+      {
+        title: 'Companies you choose',
+        body: 'Follow all of them, or pick the companies and cities you care about. The choice stays on your device.',
+      },
+      {
+        title: 'Honest about experience',
+        body: 'A stretch is always labelled as one. A job that asks for much more than you have is not shown.',
+      },
+      {
+        title: 'No AI key needed',
+        body: 'Picking and scoring jobs runs without an AI model, so the list is ready the moment you open it.',
+      },
+    ],
+    faqs: [
+      {
+        question: 'Where do the fresh jobs come from?',
+        answer:
+          'From each company’s own careers site, read every morning: more than 50 companies today, including Google, Microsoft, Amazon, Atlassian, NVIDIA and Freshworks. Only jobs in India are listed for now.',
+      },
+      {
+        question: 'Why am I not shown some jobs?',
+        answer:
+          'Jobs that ask for well over your years of experience, or are aimed far below your level, are left out. A job asking for one year more than you have is shown, labelled as a stretch.',
+      },
+      {
+        question: 'Do I need to upload a resume?',
+        answer:
+          'Yes. The list is picked for your experience and scored against your skills, so it needs your profile.',
+      },
+    ],
+  },
+  {
     slug: 'autofill-job-applications',
     name: 'Autofill applications',
     summary: 'Fill application forms from your profile and saved answers. You press submit.',
     title: 'Autofill job applications from your resume profile',
     description:
-      'The Rolesetu browser extension fills job application forms with your details, work history, education and saved answers. It only fills empty fields and never submits for you.',
+      'The Rolesetu extension fills job application forms with your details, work history and saved answers. It only fills empty fields and never submits.',
     heading: 'Autofill job applications, and stay in control of them',
     intro:
       'Most application forms ask for the same things your resume already says. The Rolesetu extension recognises an application form, offers to fill it from your profile, and outlines every field it filled so you can check the form before you send it yourself.',
@@ -175,8 +300,8 @@ export const FEATURE_PAGES: FeaturePage[] = [
     ],
     details: [
       {
-        title: 'Saved answers',
-        body: 'Answer the questions most forms repeat once: notice period, current and expected salary, relocation, work authorisation and why you are looking. They are reused on every form.',
+        title: 'Saved answers that learn',
+        body: 'Answer the questions most forms repeat once: notice period, salary, relocation, work authorisation. When you type an answer autofill had nothing for, like your date of birth, it is saved for the next form, with dates in each form’s own format. You can change or remove any of them on your Profile.',
       },
       {
         title: 'Only empty fields',
@@ -215,7 +340,7 @@ export const FEATURE_PAGES: FeaturePage[] = [
     summary: 'Every job you apply to in one list that keeps itself up to date.',
     title: 'Job application tracker that updates itself',
     description:
-      'Track every job application in one place. Rolesetu saves a job when you press Apply, marks it as applied when the site confirms, and moves it forward when a recruiter replies.',
+      'Track every job application in one place. Rolesetu saves a job when you press Apply and updates it when the site confirms or a recruiter replies.',
     heading: 'A job application tracker you do not have to fill in',
     intro:
       'Spreadsheets go stale because updating them is a chore. Rolesetu keeps the list for you: the extension adds a job when you start applying and marks it as applied when the site says the application went through, with the match score it had at the time.',
@@ -268,9 +393,9 @@ export const FEATURE_PAGES: FeaturePage[] = [
     slug: 'job-email-tracker',
     name: 'Gmail job tracking',
     summary: 'Interview invites, rejections and offers in Gmail update your tracker for you.',
-    title: 'Track job application emails in Gmail: interviews, rejections and offers',
+    title: 'Job application email tracker for Gmail',
     description:
-      'Connect Gmail with read-only access and Rolesetu finds your job emails, updates each application’s status, and lists upcoming interviews. Only the sender, subject and date are stored.',
+      'Connect Gmail read-only and Rolesetu finds your job emails, updates each application’s status and lists interviews. Only sender, subject and date are kept.',
     heading: 'Let your inbox update your job tracker',
     intro:
       'Replies to job applications arrive between everything else in your inbox. With read-only Gmail access, Rolesetu picks out the mails about your applications, works out what each one means, and updates the matching application so nothing goes quiet unnoticed.',
@@ -323,9 +448,9 @@ export const FEATURE_PAGES: FeaturePage[] = [
     name: 'Browser extension',
     summary:
       'Your match score beside the Apply button on LinkedIn, Naukri, Indeed and career pages.',
-    title: 'Job match score on LinkedIn, Naukri, Indeed and company career pages',
+    title: 'Job match score on LinkedIn, Naukri and Indeed',
     description:
-      'The Rolesetu Chrome extension shows how well you fit a job right on the job page, beside the Apply button, then helps you tailor your resume, autofill the form and track the application.',
+      'The Rolesetu Chrome extension shows your fit beside the Apply button, then helps you tailor your resume, autofill the form and track the application.',
     heading: 'See your match score on the job page itself',
     intro:
       'You should not have to copy a job description into another tab to know whether to apply. The Rolesetu extension reads the job you are looking at and puts your match score beside the Apply button, on the big job boards and on companies’ own career pages.',
@@ -380,7 +505,7 @@ export const HOME_FAQS: Faq[] = [
   {
     question: 'What is Rolesetu?',
     answer:
-      'Rolesetu is a job application assistant. It scores a job description against your resume skill by skill, adds the job’s keywords to your own resume PDF, autofills application forms from your profile, and tracks every application, including the replies that arrive in Gmail.',
+      'Rolesetu is a job application assistant. It finds fresh jobs in India on company careers sites, scores any job against your resume skill by skill, lets you edit your own resume PDF directly or with an AI assistant, autofills application forms from your profile, and tracks every application, including the replies that arrive in Gmail.',
   },
   {
     question: 'Can I check a job without creating an account?',
@@ -398,14 +523,19 @@ export const HOME_FAQS: Faq[] = [
       'No. Rolesetu never submits an application and never sends an email. It fills forms and prepares your resume, and you review and send everything yourself.',
   },
   {
+    question: 'Can I edit my resume in Rolesetu?',
+    answer:
+      'Yes. The resume editor lets you change, remove or add any line of the PDF you uploaded and shows it redrawn live, in its own fonts and layout, with its links still working. You can also ask the AI assistant in plain words, such as “add my Rolesetu project”, and review its edits before you save.',
+  },
+  {
     question: 'Will it add skills I do not have to my resume?',
     answer:
-      'No. Rolesetu shows which of the job’s keywords are missing from your resume and you tick only the ones that are true. It never changes the job titles you held, your employers or your dates.',
+      'No. Rolesetu shows which of the job’s keywords are missing from your resume and you tick only the ones that are true. The resume assistant holds back any skill, number or link you never gave until you confirm it, and nothing changes your job titles, employers or dates unless you ask.',
   },
   {
     question: 'Which job sites does Rolesetu work with?',
     answer:
-      'The browser extension reads jobs on LinkedIn, Naukri, Indeed and company career pages that publish standard job posting data. For a job anywhere else, paste its link or its description into the dashboard.',
+      'The browser extension reads jobs on LinkedIn, Naukri, Indeed, Internshala and company career pages that publish standard job posting data, including jobs opened in a pop-up. Fresh jobs come straight from more than 50 companies’ careers sites. For a job anywhere else, paste its link or its description into the dashboard.',
   },
   {
     question: 'What happens to my resume and my data?',
@@ -415,7 +545,7 @@ export const HOME_FAQS: Faq[] = [
   {
     question: 'Do I need an AI subscription or an API key?',
     answer:
-      'No. Reading your resume and checking jobs do not need an AI model, so there is no key to set up and no waiting.',
+      'No. Reading your resume, checking jobs and fresh jobs run without an AI model, and the resume assistant works without a key of your own. If you add your own Gemini key in Settings, AI features use it first.',
   },
   {
     question: 'Is Rolesetu free?',

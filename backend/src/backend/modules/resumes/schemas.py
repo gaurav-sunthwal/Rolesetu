@@ -33,3 +33,10 @@ class ResumeApplied(BaseModel):
 class DownloadLink(BaseModel):
     url: str
     expires_in: int
+
+
+class ResumeIdentity(BaseModel):
+    """Read from a resume before sign-in, to start the account. Nothing is stored."""
+
+    email: str | None
+    first_name: str | None
