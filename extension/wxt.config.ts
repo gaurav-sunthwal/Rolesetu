@@ -21,9 +21,15 @@ export default defineConfig({
     ? '{{browser}}-mv{{manifestVersion}}-live'
     : '{{browser}}-mv{{manifestVersion}}',
   manifest: ({ browser }) => ({
-    name: 'Rolesetu',
+    // The name and summary are what the stores search, so they carry the words
+    // job seekers type. Mozilla caps a name at 50 characters, Chrome a summary at 132.
+    name:
+      browser === 'firefox'
+        ? 'Rolesetu – Job Match Score & Autofill'
+        : 'Rolesetu – Job Match Score, Resume Checker & Autofill',
+    short_name: 'Rolesetu',
     description:
-      'See your match score on any job page, fill application forms from your profile, and track the jobs you apply to.',
+      'Job match score for LinkedIn, Naukri & Indeed: check your resume against any job, see skill gaps, autofill applications, track jobs.',
     permissions: ['storage', 'scripting'],
     // Every site: a job can be on any company's own pages. This also covers the API.
     host_permissions: ['http://*/*', 'https://*/*'],

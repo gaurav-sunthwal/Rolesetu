@@ -31,35 +31,54 @@ email blocks publishing.
 
 | Field | Value |
 |---|---|
-| Name | Rolesetu |
-| Summary | Taken from the manifest description. |
+| Name | From the manifest: `Rolesetu – Job Match Score, Resume Checker & Autofill` (Firefox: `Rolesetu – Job Match Score & Autofill`, as Mozilla caps names at 50 characters) |
+| Summary | From the manifest description (Chrome caps it at 132 characters). |
 | Category | Workflow & Planning |
 | Language | English |
 | Homepage URL | `https://rolesetu.vercel.app` |
 | Support URL | `https://rolesetu.vercel.app/privacy` (it carries the contact address) |
 
+**Search.** The store ranks a listing mostly on its name, summary and description, then
+on installs, active users and ratings. So the words job seekers search for ("job match
+score", "resume checker", "resume keywords", "ATS", "autofill job applications", "job
+tracker", the job sites) are in the name, summary and the first lines of the description,
+each used where it describes a real feature. Do not add a list of keywords or of sites the
+extension does not support: Chrome's spam policy rejects keyword stuffing.
+
 **Description**
 
 ```
-Rolesetu shows how well you fit a job, right on the job page.
+Know if you are a good fit before you apply. Rolesetu is a job match score and resume
+checker that works right on the job page: on LinkedIn, Naukri, Indeed, Internshala and
+company careers pages.
 
-Open a job on LinkedIn, Naukri, Indeed or a company's careers page and Rolesetu scores it
-against your resume out of 100. Every skill the job asks for is marked strong, partial or
-missing, with the line from your profile that proves it, so you know whether the job is
-worth an application before you spend an hour on it.
+Open any job listing and Rolesetu checks your resume against it, gives you a match score
+out of 100, and shows the skill gaps. Every skill the job asks for is marked strong,
+partial or missing, with the line from your resume that proves it. No guessing, and no
+hour spent on an application that was never a fit.
 
-What it does
-• Match score on the job page, with the skills you have and the ones you are missing.
-• Autofill for application forms, from your profile and your saved answers.
-• Adds the jobs you apply to into your tracker.
+WHAT YOU GET
+• Job match score on every job page, with the skills you have and the ones you are missing.
+• Resume keyword check: see which keywords from the job description are missing from your
+  resume, the way an ATS (applicant tracking system) would.
+• Tailored resume: add the skills you really have to a copy of your resume for this job,
+  and download it as a PDF.
+• Autofill job applications: fill application forms (including Greenhouse and Lever forms)
+  from your profile, and reuse your answers to common questions.
+• Job application tracker: the jobs you apply to are added to your tracker by themselves.
 
-What it never does
+WHAT IT NEVER DOES
 • It never submits an application. You review the form and press Submit yourself.
 • It never replaces something you have already typed.
 • It sends nothing from pages that are not job listings or application forms.
 
-To use it, create a free account at rolesetu.vercel.app, upload your resume, then open
-Settings and press "Connect extension".
+GET STARTED IN A MINUTE
+1. Install Rolesetu. A page opens for you to upload your resume (PDF).
+2. Create your free account. The extension connects by itself.
+3. Open any job. Your match score appears on the Apply button.
+
+Free for job seekers, freshers and experienced professionals, for full-time jobs and
+internships.
 ```
 
 **Images** (the store will not accept the listing without the first two)
