@@ -23,14 +23,14 @@ import {
   type TrackedJob,
 } from '@/lib/messages';
 
-import { type PillState, removeApplyPills, showApplyPills } from './apply-pill';
+import { type PillState, removeApplyPills, setPillText, showApplyPills } from './apply-pill';
 import { applyActionOf, PENDING_FOR_MS, watchForConfirmation } from './apply-tracking';
 
 type Phase =
   | { name: 'looking' }
   | { name: 'no-job' }
   | { name: 'disconnected' }
-  | { name: 'scoring'; job: DetectedJob }
+  | { name: 'scoring'; job: DetectedJob; startedAt: number }
   | { name: 'ready'; job: DetectedJob; match: Match }
   | { name: 'error'; message: string };
 
@@ -55,8 +55,25 @@ function bandColor(score: number): string {
   return '#d98a00';
 }
 
+const TICK_MS = 100;
+
+function checkingLabel(startedAt: number): string {
+  const seconds = Math.max(Date.now() - startedAt, 0) / 1000;
+  return `Checking your fit… ${seconds.toFixed(1)}s`;
+}
+
+/** "Checking your fit… 1.4s", counting up while the score is worked out. */
+function CheckingFit({ startedAt }: { startedAt: number }) {
+  const [label, setLabel] = useState(() => checkingLabel(startedAt));
+  useEffect(() => {
+    const timer = window.setInterval(() => setLabel(checkingLabel(startedAt)), TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+  return <>{label}</>;
+}
+
 function pillFor(phase: Phase): PillState {
-  if (phase.name === 'scoring') return { text: 'Checking your fit…', color: '#9aa0ac' };
+  if (phase.name === 'scoring') return { text: checkingLabel(phase.startedAt), color: '#9aa0ac' };
   if (phase.name !== 'ready') return null;
   const score = phase.match.score ?? 0;
   // Falling short on experience is said on the button itself: it matters more
@@ -90,8 +107,18 @@ const EXPERIENCE_TITLE = {
   not_stated: 'Experience: not stated',
 } as const;
 
-const SETTLE_MS = 700;
-const LOOK_EVERY_MS = 2000;
+const LIMIT_TITLE: Record<Match['limits'][number]['kind'], string> = {
+  experience: 'Not enough experience',
+  field: 'Different line of work',
+  must_have: 'Missing a must-have',
+  thin: 'Too little to be sure',
+};
+
+// After a click in a results list, the new job is read once the page has been
+// still this long, and at most this long after the click however busy the page
+// stays (LinkedIn keeps changing small things, so the limit is what usually decides).
+const SETTLE_MS = 400;
+const LOOK_EVERY_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -354,30 +381,45 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // an updated resume the user has not downloaded or saved yet.
   const [tailoring, setTailoring] = useState<Tailoring>({ name: 'idle' });
 
-  const check = useCallback(async () => {
-    const id = (run.current += 1);
-    const stale = () => id !== run.current || ctx.isInvalid;
-    busy.current = true;
-    setPhase({ name: 'looking' });
+  const check = useCallback(
+    async (forceUrl = false) => {
+      const id = (run.current += 1);
+      const stale = () => id !== run.current || ctx.isInvalid;
+      busy.current = true;
+      setPhase({ name: 'looking' });
 
-    // Asked for by the user: take the page's word. Found by ourselves: be sure.
-    const job = await findJob(!manual);
-    if (stale()) return;
-    shown.current = job;
-    busy.current = false;
-    if (!job) return setPhase({ name: 'no-job' });
+      // Asked for by the user: take the page's word. Found by ourselves: be sure.
+      let job = forceUrl ? null : await findJob(!manual);
+      if (stale()) return;
 
-    const connection = await ask({ type: 'connection' });
-    if (stale()) return;
-    if (!connection.ok || !connection.data.connected) return setPhase({ name: 'disconnected' });
+      // If local detection found nothing, but this is a manual check or forceUrl was requested,
+      // fall back to checking the URL via the server's reader (Context.dev).
+      if (!job && (manual || forceUrl) && /^https?:\/\//i.test(window.location.href)) {
+        job = {
+          title: null,
+          company: null,
+          description: '',
+          url: window.location.href,
+        };
+      }
 
-    setPhase({ name: 'scoring', job });
-    const result = await ask({ type: 'check-job', job });
-    if (stale()) return;
-    if (result.ok) setPhase({ name: 'ready', job, match: result.data });
-    else if (result.status === 401) setPhase({ name: 'disconnected' });
-    else setPhase({ name: 'error', message: result.message });
-  }, [ctx, manual]);
+      shown.current = job;
+      busy.current = false;
+      if (!job) return setPhase({ name: 'no-job' });
+
+      const connection = await ask({ type: 'connection' });
+      if (stale()) return;
+      if (!connection.ok || !connection.data.connected) return setPhase({ name: 'disconnected' });
+
+      setPhase({ name: 'scoring', job, startedAt: Date.now() });
+      const result = await ask({ type: 'check-job', job });
+      if (stale()) return;
+      if (result.ok) setPhase({ name: 'ready', job, match: result.data });
+      else if (result.status === 401) setPhase({ name: 'disconnected' });
+      else setPhase({ name: 'error', message: result.message });
+    },
+    [ctx, manual],
+  );
 
   // The profile changed (skills were added), so the same job is scored again
   // in the background. The panel stays as it is until the new score arrives.
@@ -428,7 +470,12 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     const onVisible = () => !document.hidden && lookSoon();
     document.addEventListener('visibilitychange', onVisible);
 
-    const reopen = () => setOpen(true);
+    const reopen = () => {
+      setOpen(true);
+      if (shown.current === null || shown.current.description === '') {
+        void check(true);
+      }
+    };
     window.addEventListener('rolesetu:open', reopen);
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
     window.addEventListener('keydown', onKey);
@@ -457,6 +504,12 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     const place = () => setPills(showApplyPills(state, () => setOpen(true)));
     place();
 
+    // While scoring, the pill counts the seconds without being rebuilt.
+    const ticking =
+      phase.name === 'scoring'
+        ? window.setInterval(() => setPillText(checkingLabel(phase.startedAt)), TICK_MS)
+        : undefined;
+
     const replace = whenSettled(
       () => {
         if (document.querySelector('[data-rolesetu-pill]') === null) place();
@@ -475,6 +528,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
+      window.clearInterval(ticking);
       observer.disconnect();
       replace.cancel();
       removeApplyPills();
@@ -572,9 +626,9 @@ function Badge({ phase, onOpen }: { phase: Phase; onOpen: () => void }) {
     );
   }
   const label =
-    phase.name === 'scoring'
-      ? 'Checking your fit…'
-      : phase.name === 'disconnected'
+    phase.name === 'scoring' ? (
+      <CheckingFit startedAt={phase.startedAt} />
+    ) : phase.name === 'disconnected'
         ? 'Connect Rolesetu'
         : 'Could not score this job';
   return (
@@ -625,7 +679,11 @@ function Panel({
               <>
                 <span className="spin" />
                 <strong>
-                  {phase.name === 'looking' ? 'Reading this page…' : 'Checking your fit…'}
+                  {phase.name === 'looking' ? (
+                    'Reading this page…'
+                  ) : (
+                    <CheckingFit startedAt={phase.startedAt} />
+                  )}
                 </strong>
               </>
             ) : phase.name === 'disconnected' ? (
@@ -650,6 +708,16 @@ function Panel({
                 <span className="muted">
                   Open a single job listing (not a list of results) and try again.
                 </span>
+                {/^https?:\/\//i.test(window.location.href) ? (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    style={{ marginTop: 12, padding: '0 20px' }}
+                    onClick={() => void check(true)}
+                  >
+                    Check page using URL reader
+                  </button>
+                ) : null}
               </>
             ) : (
               <>
@@ -749,6 +817,7 @@ function Result({
             <span className="muted small">{company}</span>
           </div>
         </div>
+        {match.summary ? <p className="why">{match.summary}</p> : null}
         {score > current ? (
           <p className="gain" role="status">
             <b>
@@ -759,10 +828,26 @@ function Result({
           </p>
         ) : heldBack ? (
           <p className="muted small">
-            The skills you ticked will not raise this score: it is held at {match.score_cap} by the
-            experience this job asks for.
+            The skills you ticked will not raise this score: it is held at {match.score_cap} for the
+            reasons below.
           </p>
         ) : null}
+        {/* An older server sends no limits. */}
+        {(match.limits ?? [])
+          .filter((limit) => limit.kind !== 'experience')
+          .map((limit) => (
+            <section
+              key={limit.kind}
+              className={`note ${limit.kind === 'thin' ? 'short' : 'well_short'}`}
+              aria-label="Why this score is limited"
+            >
+              <strong>
+                {LIMIT_TITLE[limit.kind]} · held at {limit.limit}
+              </strong>
+              <p>{limit.reason}</p>
+            </section>
+          ))}
+        {match.field_fit?.status === 'related' ? <p className="note">{match.field_fit.summary}</p> : null}
         {match.experience ? (
           <section className={`note ${match.experience.status}`} aria-label="Experience">
             <strong>{EXPERIENCE_TITLE[match.experience.status]}</strong>
@@ -779,6 +864,7 @@ function Result({
               </span>
               <span>
                 You have <b>{yearsLabel(match.experience.candidate_years)}</b>
+                {match.experience.total_years ? ' in this field' : ''}
               </span>
             </div>
             <p>{match.experience.summary}</p>
@@ -866,7 +952,8 @@ function ResumeMatcher({
         return setKeywords({
           name: 'failed',
           message: result.message,
-          noResume: result.status === 404,
+          // "Not found" is also what a missing job check says: only this one means no resume.
+          noResume: result.status === 404 && result.message.startsWith('Upload your resume'),
         });
       }
       setKeywords({ name: 'ready', check: result.data });

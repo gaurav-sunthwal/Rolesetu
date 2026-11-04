@@ -77,8 +77,15 @@ export function ExperienceNote({ match }: { match: Match }) {
           <dd className="text-lg font-bold">{asked}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground text-xs">You have</dt>
+          <dt className="text-muted-foreground text-xs">
+            {experience.total_years ? 'You have, in this field' : 'You have'}
+          </dt>
           <dd className="text-lg font-bold">{years(experience.candidate_years)}</dd>
+          {experience.total_years ? (
+            <dd className="text-muted-foreground text-xs">
+              {years(experience.total_years)} in all
+            </dd>
+          ) : null}
         </div>
       </dl>
     </section>

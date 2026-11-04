@@ -27,6 +27,12 @@ from backend.modules.matches.scoring import check_experience, score_cap
         ),
         ("24 months of experience required.", None, (2, None, "stated")),
         ("0-1 years of experience", None, (0, 1, "stated")),
+        # Standalone range or metadata badge/pill without the word "experience"
+        ("3-6 Years", None, (3, 6, "stated")),
+        ("Bangalore 3-6 Years\nJob Description", None, (3, 6, "stated")),
+        ("Bangalore | 3 - 6 Yrs", None, (3, 6, "stated")),
+        ("0 - 2 years\nFull-time", None, (0, 2, "stated")),
+        ("5+ years\nJob Description", None, (5, None, "stated")),
         # A number about something else is not an experience requirement.
         (
             "We have built payments for 10 years. 4+ years of experience in Go.",

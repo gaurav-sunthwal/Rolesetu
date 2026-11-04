@@ -9,7 +9,6 @@ from sqlalchemy import delete, func, select
 
 from backend.core.config import get_settings
 from backend.db.session import get_sessionmaker
-from backend.modules.admin.models import AdminAction
 from backend.modules.errors import service as errors_service
 from backend.modules.errors.models import ErrorEvent
 from backend.modules.profiles import service as profiles_service
@@ -39,9 +38,6 @@ async def admin(
     email = f"{client.headers['x-test-uid']}@example.com"
     monkeypatch.setattr(get_settings(), "admin_emails", [email])
     yield client
-    async with get_sessionmaker()() as db:
-        await db.execute(delete(AdminAction).where(AdminAction.admin_email == email))
-        await db.commit()
 
 
 def boom() -> None:
@@ -86,9 +82,7 @@ async def test_a_problem_repeating_fast_stops_being_written(
     assert await count(source) == 2
 
 
-async def test_clearing_a_problem_removes_it_and_is_recorded(
-    admin: AsyncClient, source: str
-) -> None:
+async def test_clearing_a_problem_removes_it(admin: AsyncClient, source: str) -> None:
     await record_boom(source)
     fingerprint = (await admin.get(ERRORS, params={"source": source})).json()["groups"][0][
         "fingerprint"
@@ -96,8 +90,6 @@ async def test_clearing_a_problem_removes_it_and_is_recorded(
     assert (await admin.delete(f"{ERRORS}/{fingerprint}")).status_code == 204
     assert await count(source) == 0
     assert (await admin.get(f"{ERRORS}/{fingerprint}")).status_code == 404
-    logged = (await admin.get("/api/v1/admin/audit")).json()["items"]
-    assert any(item["action"] == "errors.clear" for item in logged)
 
 
 async def test_a_crash_in_a_request_is_recorded_with_its_route(

@@ -14,23 +14,35 @@ pnpm dev                     # http://localhost:3003
 
 The API must list your Google account in `ADMIN_EMAILS` and allow this address in `CORS_ORIGINS`.
 
+## Hosting
+
+Live at https://rolesetu-admin.vercel.app (Vercel project `rolesetu-admin`). Deploy with
+`vercel deploy --prod --yes` from this folder. The `NEXT_PUBLIC_*` values are set in the Vercel
+project. The address must also be listed in the API's `CORS_ORIGINS` (Railway) and in Firebase
+Authentication's authorized domains, or Google sign-in fails.
+
 ## How it works
 
 - It is a separate app from the public site, so it can live on its own private address.
 - It never touches the database. Every page calls the Rolesetu API (`/api/v1/admin/*`).
 - **The API decides who is an admin**, on every request: a verified Google email listed in
   `ADMIN_EMAILS`. The sign-in screen here is a convenience, not the lock.
-- Opening a user, opening the waiting list and deleting an account are written to the audit log.
 - Not shown, on purpose: anything read from a user's Gmail, and the resume file itself.
 
 ## Pages
 
-| Page             |                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------- |
-| **Dashboard**    | Totals, 14 days of sign-ups and job checks, landing-page job links by site, paid page reads |
-| **Users**        | Search by email or name; profile, job checks, applications, Gmail connected                 |
-| **User**         | Profile, resume file details, recent job checks and applications; delete account            |
-| **Waiting list** | Emails to write to when the extension launches; copy them all                               |
-| **Audit log**    | Who opened or deleted what, and when                                                        |
+| Page                 |                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Dashboard**        | Totals, 14 days of sign-ups and job checks, landing-page job links by site. Every count opens the list behind it |
+| **Activity**         | Sign-ups, job checks and applications per day for any dates (up to a year); each day opens its list              |
+| **Users**            | Search by email or name; filter by profile, extension, Gmail, day joined                                         |
+| **User**             | Profile, resume file details, recent job checks and applications; delete account                                 |
+| **Job checks**       | Every user's job checks; filter by period and paid page reads                                                    |
+| **Applications**     | Every application users are tracking                                                                             |
+| **Landing previews** | Job links pasted on the landing page in the last day; filter by site, failed, paid                               |
+| **Paid page reads**  | Pages read through the paid reader, by users and by visitors                                                     |
+| **AI calls**         | Every model call: where it came from, who it was for, tokens, time                                               |
+| **Waiting list**     | Emails to write to when the extension launches; copy them all                                                    |
+| **Errors**           | What went wrong, grouped by problem                                                                              |
 
 After the API's admin routes change, run `pnpm gen:api-types`.

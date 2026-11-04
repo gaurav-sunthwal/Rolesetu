@@ -18,6 +18,9 @@ from backend.ai.prompts import load_prompt
 EXTRACT_PROMPT_VERSION = 1
 JUDGE_PROMPT_VERSION = 1
 PROMPT_VERSIONS = f"extract_job.v{EXTRACT_PROMPT_VERSION}+judge_skills.v{JUDGE_PROMPT_VERSION}"
+# Someone is waiting on a job check: a model that has not answered in this long
+# is left for the next one rather than waited on for the default 30 seconds.
+CALL_TIMEOUT_SECONDS = 15.0
 
 Verdict = Literal["strong", "partial", "missing"]
 
@@ -48,8 +51,10 @@ async def extract_job(jd_text: str, *, user_api_key: str | None) -> ExtractedJob
     result = await generate_structured(
         f"JOB DESCRIPTION:\n<<<\n{jd_text}\n>>>",
         ExtractedJob,
+        purpose="job-read",
         user_api_key=user_api_key,
         system_instruction=load_prompt("extract_job", EXTRACT_PROMPT_VERSION),
+        timeout_seconds=CALL_TIMEOUT_SECONDS,
     )
     assert isinstance(result, ExtractedJob)
     return result
@@ -64,8 +69,10 @@ async def judge_skills(
     result = await generate_structured(
         f"SKILLS:\n{skill_lines}\n\nEVIDENCE:\n<<<\n{evidence_lines}\n>>>",
         list[SkillJudgement],
+        purpose="skill-judge",
         user_api_key=user_api_key,
         system_instruction=load_prompt("judge_skills", JUDGE_PROMPT_VERSION),
+        timeout_seconds=CALL_TIMEOUT_SECONDS,
     )
     assert isinstance(result, list)
 

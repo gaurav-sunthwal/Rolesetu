@@ -61,6 +61,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline
 .gain .up { color: var(--good); font-weight: 700; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
+.why { margin: 12px 0 0; font-size: 13px; line-height: 1.45; }
 .note { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--soft); font-size: 13px;
   border-left: 4px solid var(--muted); }
 .note strong { display: block; }

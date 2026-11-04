@@ -15,7 +15,6 @@ from sqlalchemy import delete, text
 from backend.core.config import get_settings
 from backend.db.session import get_sessionmaker
 from backend.main import app
-from backend.modules.admin.models import AdminAction
 from backend.modules.matches.models import Job, Match
 from backend.modules.social import publisher
 from backend.modules.social.models import SocialAccount, SocialPost
@@ -126,7 +125,6 @@ async def admin(
     async with get_sessionmaker()() as db:
         await db.execute(delete(SocialPost).where(SocialPost.created_by == email))
         await db.execute(delete(SocialAccount).where(SocialAccount.connected_by == email))
-        await db.execute(delete(AdminAction).where(AdminAction.admin_email == email))
         await db.commit()
 
 

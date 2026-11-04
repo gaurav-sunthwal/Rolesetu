@@ -65,9 +65,7 @@ export default function ErrorPage() {
             <button onClick={() => clear.mutate()} disabled={clear.isPending} className={button}>
               {clear.isPending ? 'Clearing…' : 'Mark as dealt with'}
             </button>
-            <p className="mt-1 text-xs text-zinc-500">
-              Removes these events. Recorded in the audit log.
-            </p>
+            <p className="mt-1 text-xs text-zinc-500">Removes these events.</p>
           </div>
         </PageHeader>
         {clear.isError && (

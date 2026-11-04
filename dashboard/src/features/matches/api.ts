@@ -5,7 +5,11 @@ import type { Match, MatchCreate, MatchPage } from '@/lib/api/types';
 const CREATE_TIMEOUT_MS = 60_000;
 
 export async function createMatch(body: MatchCreate): Promise<Match> {
-  const { data } = await api.post<Match>('/matches', body, { timeout: CREATE_TIMEOUT_MS });
+  const { data } = await api.post<Match>('/matches', body, {
+    timeout: CREATE_TIMEOUT_MS,
+    // Answer at once; the result page polls until a model-read job is scored.
+    headers: { Prefer: 'respond-async' },
+  });
   return data;
 }
 

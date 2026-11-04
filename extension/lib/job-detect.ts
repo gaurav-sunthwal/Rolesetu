@@ -251,27 +251,33 @@ function byApplyButton(
 
   let scope = button.parentElement;
   for (let depth = 0; scope && depth < 10; depth += 1, scope = scope.parentElement) {
-    let best: { element: Element; label: string; size: number } | null = null;
-    for (const heading of scope.querySelectorAll('h1, h2, h3, [role="heading"]')) {
-      if (!comesBefore(heading, button) || !isShown(heading)) continue;
+    let best: { element: Element; label: string; size: number; before: boolean } | null = null;
+    for (const heading of scope.querySelectorAll(
+      'h1, h2, h3, [role="heading"], [class*="jobTitle" i], [class*="job-title" i]',
+    )) {
+      if (!isShown(heading)) continue;
       const label = firstLine(heading).replace(TITLE_EXTRA, '').trim();
       if (label.length < 3 || label.length > 140 || SECTION_HEADING.test(label)) continue;
-      const size = Number.parseFloat(getComputedStyle(heading).fontSize);
-      // The largest heading wins; between equals, the one nearest the button.
-      if (size >= 16 && (best === null || size >= best.size)) best = { element: heading, label, size };
+      const size = Number.parseFloat(getComputedStyle(heading).fontSize) || 16;
+      const before = comesBefore(heading, button);
+      // Prefer headings before the button; between equals, the larger heading wins.
+      if (
+        size >= 16 &&
+        (best === null || (before && !best.before) || (before === best.before && size >= best.size))
+      ) {
+        best = { element: heading, label, size, before };
+      }
     }
     if (!best) continue;
 
     let company: string | null = null;
-    const title = best.element;
     for (const candidate of scope.querySelectorAll(
       'a, [class*="company" i], [data-company-name], [data-testid*="company" i]',
     )) {
-      if (!comesBefore(title, candidate) || !comesBefore(candidate, button)) continue;
       if (!isShown(candidate) || candidate.hasAttribute('data-rolesetu-pill')) continue;
       const label = firstLine(candidate);
       if (label.length < 2 || label.length > 80 || NOT_A_COMPANY.test(label)) continue;
-      company = label;
+      company = label.replace(/\s+at a glance$/i, '').trim();
       break;
     }
     return { title: best.label, company, pane: paneAround(button) };
@@ -380,7 +386,7 @@ function fromDialog(dialog: Element): Omit<DetectedJob, 'url'> {
     if (label.length < 2 || label.length > 80 || NOT_A_COMPANY.test(label)) continue;
     // A block holding both the title and the company starts with the title.
     if (SECTION_HEADING.test(label) || (title !== null && sameTitle(label, title))) continue;
-    company = label;
+    company = label.replace(/\s+at a glance$/i, '').trim();
     break;
   }
   return { title, company, description: visibleText(dialog) };
@@ -403,13 +409,35 @@ function fromPane(pane: Element | null, strict: boolean): Omit<DetectedJob, 'url
   return { title: null, company: null, description: words };
 }
 
+function cuesIn(text: string): number {
+  return JOB_CUES.filter((cue) => cue.test(text)).length;
+}
+
+/**
+ * The block around the Apply button, unless it holds only part of the job.
+ * Career sites (Oracle, Workday) often put the button under "About us" and
+ * "Job info", away from the requirements, and a score needs the requirements.
+ * Then the larger block of the page that reads more like a job is used.
+ */
+export function fullerThan(
+  pane: Omit<DetectedJob, 'url'> | null,
+  page: Omit<DetectedJob, 'url'> | null,
+): Omit<DetectedJob, 'url'> | null {
+  if (!pane) return page;
+  // A block that already reads like a whole job is kept: on a results page the
+  // larger block is the list of every job, not this one.
+  if (cuesIn(pane.description) >= 2) return pane;
+  if (!page || page.description.length <= pane.description.length) return pane;
+  return cuesIn(page.description) > cuesIn(pane.description) ? page : pane;
+}
+
 function fromPageText(
   doc: Document,
   host: string,
   strict: boolean,
 ): Omit<DetectedJob, 'url'> | null {
   const candidates = doc.querySelectorAll(
-    '[class*="description" i], [id*="description" i], [class*="job-detail" i], [id*="job-detail" i], article, main',
+    '[class*="description" i], [id*="description" i], [class*="job-detail" i], [id*="job-detail" i], [class*="job" i], article, main',
   );
   let best: Element | null = null;
   let bestLength = 0;
@@ -460,8 +488,9 @@ export function detectJob(doc: Document, url: string, strict = false): DetectedJ
     if (stale) structured = null;
   }
 
+  const pane = fromPane(seen?.pane ?? null, strict);
   const found =
-    structured ?? fromKnownSite(doc, host) ?? fromPane(seen?.pane ?? null, strict) ?? fromPageText(doc, host, strict);
+    structured ?? fromKnownSite(doc, host) ?? fullerThan(pane, fromPageText(doc, host, strict));
   if (!found) return null;
 
   // What is shown above the Apply button is what the user reads as the job's

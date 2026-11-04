@@ -56,6 +56,7 @@ class FakeGemini:
 def _no_backoff_and_no_memory(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(llm_client, "wait_exponential_jitter", lambda **_: lambda *_: 0)
     monkeypatch.setattr(llm_client, "_cooling_until", {})
+    monkeypatch.setattr(llm_client, "_out_of_quota_until", {})
 
 
 async def test_primary_model_is_used_when_it_works(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -135,6 +136,19 @@ async def test_a_model_that_just_failed_is_skipped_next_time(
     result = await generate_structured("hi", Answer)
     assert isinstance(result, Answer) and result.text == "k1/backup"
     assert gemini.calls == [("k1", "backup")]
+
+
+async def test_a_key_out_of_quota_on_a_model_is_not_asked_again_at_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gemini = FakeGemini(monkeypatch, {("k1", "primary"): _error(errors.ClientError, 429)})
+    await generate_structured("hi", Answer)
+    gemini.calls.clear()
+
+    result = await generate_structured("hi", Answer)
+    # Straight to the key that has quota left, without the refused round trip.
+    assert isinstance(result, Answer) and result.text == "k2/primary"
+    assert gemini.calls == [("k2", "primary")]
 
 
 async def test_cooling_models_are_still_tried_as_a_last_resort(

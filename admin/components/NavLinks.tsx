@@ -7,11 +7,15 @@ import { SOCIAL_ENABLED } from '@/lib/features';
 
 const LINKS = [
   { href: '/', label: 'Dashboard' },
+  { href: '/activity', label: 'Activity' },
   { href: '/users', label: 'Users' },
+  { href: '/job-checks', label: 'Job checks' },
+  { href: '/applications', label: 'Applications' },
+  { href: '/previews', label: 'Landing previews' },
   ...(SOCIAL_ENABLED ? [{ href: '/social', label: 'Social' }] : []),
   { href: '/waitlist', label: 'Waiting list' },
+  { href: '/ai-calls', label: 'AI calls' },
   { href: '/errors', label: 'Errors' },
-  { href: '/audit', label: 'Audit log' },
 ];
 
 export function NavLinks() {

@@ -3,7 +3,7 @@ explainable: the model supplies verdicts, this file turns them into a score.
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Literal
 
@@ -18,10 +18,22 @@ _SLIGHTLY_SHORT_CAP = 75
 _WELL_SHORT_CAP = 60
 
 
+# The highest score shown when something other than skills rules the job out.
+# Each comes with a sentence saying why (see `Cap`).
+FIELD_CAP = 35  # the job is in a different line of work from the person's
+MUST_HAVE_CAP = 45  # a licence, certification or degree the job requires is missing
+THIN_CAP = 60  # too few requirements could be checked to trust a high score
+MIN_CHECKED = 3
+# A skill the job title names ("React Developer" -> React) is the core of the
+# job, so it counts this many times over.
+TITLE_WEIGHT = 2.0
+
+
 @dataclass(frozen=True)
 class Judged:
     required: bool
     verdict: Verdict
+    weight: float = 1.0
 
 
 def compute_score(results: Sequence[Judged]) -> int:
@@ -29,8 +41,8 @@ def compute_score(results: Sequence[Judged]) -> int:
     possible = 0.0
     for result in results:
         table = REQUIRED_POINTS if result.required else NICE_TO_HAVE_POINTS
-        earned += table[result.verdict]
-        possible += table["strong"]
+        earned += table[result.verdict] * result.weight
+        possible += table["strong"] * result.weight
     if possible == 0:
         return 0
     return round(earned / possible * 100)
@@ -47,12 +59,31 @@ def score_gains(results: Sequence[Judged], *, current: int, cap: int | None) -> 
         if result.verdict == "strong":
             gains.append(0)
             continue
-        improved = [*results[:index], Judged(required=result.required, verdict="strong")]
+        improved = [*results[:index], replace(result, verdict="strong")]
         raised = compute_score([*improved, *results[index + 1 :]])
         if cap is not None:
             raised = min(raised, cap)
         gains.append(max(raised - current, 0))
     return gains
+
+
+CapKind = Literal["experience", "field", "must_have", "thin"]
+
+
+@dataclass(frozen=True)
+class Cap:
+    """A limit on the score, and the reason shown to the user."""
+
+    kind: CapKind
+    limit: int
+    reason: str
+
+
+def apply_caps(score: int, caps: Sequence[Cap]) -> tuple[int, list[Cap]]:
+    """The score after every limit, and the limits that actually lowered it."""
+    lowest = min((cap.limit for cap in caps), default=score)
+    final = min(score, lowest)
+    return final, [cap for cap in caps if cap.limit < score]
 
 
 def _month_index(year_month: str) -> int:
@@ -121,6 +152,8 @@ class ExperienceResult:
     source: str | None
     quote: str | None
     summary: str
+    # All years of work, when `candidate_years` counts only the job's field.
+    total_years: float | None = None
 
 
 def _years(value: float) -> str:
@@ -151,16 +184,33 @@ def check_experience(
     quote: str | None = None,
     candidate_years: float,
     includes_internships: bool = False,
+    field_label: str | None = None,
+    total_years: float | None = None,
 ) -> tuple[int, ExperienceResult]:
     """Compares the experience a job asks for with the candidate's, caps the
     score when they fall short, and always returns a sentence saying so.
+
+    With `field_label`, `candidate_years` is the time spent in that field and
+    `total_years` all of it: ten years of data work are not ten years of
+    electrical engineering.
     """
-    have = (
-        "no dated work experience yet"
-        if candidate_years <= 0
-        else f"about {_years(candidate_years)}"
-        + (", internships included" if includes_internships else "")
+    elsewhere = (
+        field_label is not None and total_years is not None and total_years > candidate_years
     )
+    if candidate_years <= 0 and elsewhere:
+        assert total_years is not None
+        have = f"no work in {field_label} yet (about {_years(total_years)} in other fields)"
+    elif candidate_years <= 0:
+        have = "no dated work experience yet"
+    elif elsewhere:
+        assert total_years is not None
+        have = (
+            f"about {_years(candidate_years)} in {field_label} (about {_years(total_years)} in all)"
+        )
+    else:
+        have = f"about {_years(candidate_years)}" + (
+            ", internships included" if includes_internships else ""
+        )
 
     def result(
         status: ExperienceStatus, summary: str, capped: int = score
@@ -173,6 +223,7 @@ def check_experience(
             source=source,
             quote=quote,
             summary=summary,
+            total_years=total_years if elsewhere else None,
         )
 
     if source is None or required_min is None:

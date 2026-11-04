@@ -9,13 +9,16 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
-from backend.modules.matches.local.catalog_data import CATALOG, IMPLIES
+from backend.modules.matches.local.catalog_data import CATALOG, FIELD_SHOWS, IMPLIES
 
 
 @dataclass(frozen=True)
 class Skill:
     name: str
     group: str | None = None
+    # Read from the posting's wording ("knowledge of X"), not from the
+    # dictionary (see `phrases`). Judged by the words it shares with the profile.
+    phrase: bool = False
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,14 @@ def find_skills(text: str, extra_names: tuple[str, ...] = ()) -> list[Mention]:
     return mentions
 
 
+def in_dictionary(skill: Skill) -> bool:
+    """True for a skill the dictionary itself knows, as opposed to one only
+    recognised because the candidate listed it. Only these show that the job
+    was understood: a candidate's own names can only ever find what they have.
+    """
+    return _index(()).by_name.get(skill.name.lower()) == skill
+
+
 def lookup(name: str, extra_names: tuple[str, ...] = ()) -> Skill | None:
     """The dictionary entry for a skill name or alias, if there is one."""
     return _index(extra_names).by_term.get(name.strip().lower())
@@ -121,3 +132,14 @@ def _implications() -> dict[Skill, tuple[Skill, ...]]:
 def implied_by(skill: Skill) -> tuple[Skill, ...]:
     """Skills that using `skill` demonstrates (Tailwind CSS shows CSS)."""
     return _implications().get(skill, ())
+
+
+@lru_cache(maxsize=1)
+def _field_skills() -> dict[str, tuple[Skill, ...]]:
+    by_name = _index(()).by_name
+    return {field: tuple(by_name[n.lower()] for n in names) for field, names in FIELD_SHOWS.items()}
+
+
+def shown_by_field(field_key: str) -> tuple[Skill, ...]:
+    """Skills that working in a line of work shows: a developer has done software development."""
+    return _field_skills().get(field_key, ())

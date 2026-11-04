@@ -13,6 +13,8 @@ class Application(IdMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="uq_applications_user_idempotency"),
         Index("ix_applications_user_created", "user_id", "created_at", "id"),
+        # The admin panel's list of everyone's applications, newest first.
+        Index("ix_applications_created", "created_at", "id"),
         Index("ix_applications_user_status", "user_id", "status"),
     )
 

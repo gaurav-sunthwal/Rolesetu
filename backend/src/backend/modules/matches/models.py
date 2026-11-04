@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Text
+from sqlalchemy import ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,7 +12,12 @@ class Job(IdMixin, TimestampMixin, Base):
     """A job description a user checked. Scoped to the user who pasted it."""
 
     __tablename__ = "jobs"
-    __table_args__ = (Index("ix_jobs_user_hash", "user_id", "content_hash"),)
+    __table_args__ = (
+        Index("ix_jobs_user_hash", "user_id", "content_hash"),
+        # Find the same posting again: its text, or its id from a known site.
+        Index("ix_jobs_content_hash", "content_hash"),
+        Index("ix_jobs_job_key", text("(job_json ->> 'job_key')")),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
@@ -30,6 +35,8 @@ class Match(IdMixin, TimestampMixin, Base):
     __tablename__ = "matches"
     __table_args__ = (
         Index("ix_matches_user_created", "user_id", "created_at", "id"),
+        # The admin panel's list of everyone's checks, newest first.
+        Index("ix_matches_created", "created_at", "id"),
         Index("ix_matches_job_version", "job_id", "profile_version"),
     )
 

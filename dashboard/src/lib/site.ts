@@ -42,10 +42,16 @@ export const SITE = {
     'LinkedIn job match score',
     'Naukri resume match',
     'Indeed job match',
+    'Instahyre job match',
+    'Wipro career job check',
+    'career page job match score',
+    'AI resume match calculator',
     'skill gap analysis for jobs',
+    'ATS resume scan free',
+    'experience requirement checker',
   ],
   // The day the public pages last changed. Bump it when their content does.
-  updated: '2026-10-25',
+  updated: '2026-11-04',
 } as const;
 
 export function absoluteUrl(path: string): string {

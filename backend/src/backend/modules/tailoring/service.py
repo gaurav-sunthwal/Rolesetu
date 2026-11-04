@@ -290,7 +290,7 @@ async def check_keywords(
     db: AsyncSession, *, user_id: uuid.UUID, match_id: uuid.UUID
 ) -> KeywordCheck:
     """How the job's title and skills compare with the words on the resume."""
-    match = await matches_repository.get(db, user_id, match_id)
+    match = await matches_repository.get_when_saved(db, user_id, match_id)
     if match is None:
         raise NotFoundError("That job check no longer exists.")
     resume = await resumes_repository.latest(db, user_id)

@@ -12,7 +12,7 @@ from backend.modules.profiles.schemas import ProfileRead
 
 # Bump when the dictionary or the rules change, so stored results record
 # which version produced them.
-ENGINE_VERSION = "local.v4"
+ENGINE_VERSION = "local.v5"
 
 
 @dataclass(frozen=True)

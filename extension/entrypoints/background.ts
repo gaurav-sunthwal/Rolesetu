@@ -1,4 +1,4 @@
-import { fitJob, fitUrl, messageFor, UNREACHABLE } from '@/lib/api-errors';
+import { fitJob, fitUrl, type JobRequest, messageFor, UNREACHABLE } from '@/lib/api-errors';
 import { type Badge, badgeForMatch, NO_BADGE, NOT_CONNECTED_BADGE } from '@/lib/badge';
 import { API_BASE_URL, DASHBOARD_URL, SETUP_PATH } from '@/lib/config';
 import type {
@@ -12,6 +12,14 @@ import type {
   Tailored,
   TrackedJob,
 } from '@/lib/messages';
+import {
+  AUTOFILL_FOR_MS,
+  cached,
+  digest,
+  forget,
+  JOB_FOR_MS,
+  KEYWORDS_FOR_MS,
+} from '@/lib/response-cache';
 import { pendingApply } from '@/lib/session-storage';
 import { accessKey } from '@/lib/storage';
 
@@ -108,6 +116,51 @@ async function recordApplication(
   });
 }
 
+// Asked again soon at first, when most model reads finish, then less often.
+const POLL_AFTER_MS = [800, 1200, 1500, 2000];
+const POLL_FOR_MS = 90_000;
+
+/**
+ * Scores a job. Most come back scored at once; a job the server hands to the
+ * model (one outside tech, or one it reads from the link) comes back pending,
+ * so this waits for it here and the page only ever sees a finished result.
+ */
+async function checkJob(job: JobRequest): Promise<Result<Match>> {
+  const started = await api<Match>('/matches', {
+    method: 'POST',
+    // "Answer at once, I will poll": without it the server holds the request
+    // until the result is ready, for older versions that could not poll.
+    headers: { Prefer: 'respond-async' },
+    body: JSON.stringify(job),
+  });
+  if (!started.ok || started.data.status !== 'pending') return settle(started);
+
+  const deadline = Date.now() + POLL_FOR_MS;
+  for (let attempt = 0; Date.now() < deadline; attempt += 1) {
+    const wait = POLL_AFTER_MS[Math.min(attempt, POLL_AFTER_MS.length - 1)];
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    const current = await api<Match>(`/matches/${started.data.id}`);
+    if (!current.ok || current.data.status !== 'pending') return settle(current);
+  }
+  return {
+    ok: false,
+    status: null,
+    message: 'Reading this job is taking longer than usual. Try again in a minute.',
+  };
+}
+
+/** A check that finished but failed is shown as the failure it is, with its reason. */
+function settle(result: Result<Match>): Result<Match> {
+  if (result.ok && result.data.status === 'failed') {
+    return {
+      ok: false,
+      status: 422,
+      message: result.data.error ?? 'This job could not be scored. Try again.',
+    };
+  }
+  return result;
+}
+
 /** Loads the score and autofill UI into the frame whose detector found something. */
 async function activate(sender: Browser.runtime.MessageSender): Promise<Result<null>> {
   const tabId = sender.tab?.id;
@@ -129,22 +182,34 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return activate(sender);
 
     case 'autofill-data':
-      return api<AutofillData>('/extension/autofill');
+      return cached('autofill', AUTOFILL_FOR_MS, () => api<AutofillData>('/extension/autofill'));
 
-    case 'learn-answers':
-      return api<LearnedAnswerRead[]>('/extension/learned-answers', {
+    case 'learn-answers': {
+      const learned = await api<LearnedAnswerRead[]>('/extension/learned-answers', {
         method: 'POST',
         body: JSON.stringify({ answers: request.answers }),
       });
+      // The saved answers changed, so the next form must not get the old ones.
+      if (learned.ok) await forget('autofill');
+      return learned;
+    }
 
-    case 'forget-answer':
-      return api<null>(`/extension/learned-answers/${encodeURIComponent(request.key)}`, {
-        method: 'DELETE',
-      });
+    case 'forget-answer': {
+      const forgotten = await api<null>(
+        `/extension/learned-answers/${encodeURIComponent(request.key)}`,
+        { method: 'DELETE' },
+      );
+      if (forgotten.ok) await forget('autofill');
+      return forgotten;
+    }
 
     case 'keyword-check':
-      return api<KeywordCheck>(
-        `/tailored-resumes/keywords?match_id=${encodeURIComponent(request.matchId)}`,
+      // Reading the resume PDF is the slowest part of opening a job: once per job result.
+      // (The server waits for a job check that is still being saved, so no retry here.)
+      return cached(`keywords:${request.matchId}`, KEYWORDS_FOR_MS, () =>
+        api<KeywordCheck>(
+          `/tailored-resumes/keywords?match_id=${encodeURIComponent(request.matchId)}`,
+        ),
       );
 
     case 'tailor-resume':
@@ -153,12 +218,16 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
         body: JSON.stringify(request.changes),
       });
 
-    case 'keep-resume':
+    case 'keep-resume': {
       // The choices are sent, not a file: the server repeats the edit on the saved resume.
-      return api('/tailored-resumes/keep', {
+      const kept = await api('/tailored-resumes/keep', {
         method: 'POST',
         body: JSON.stringify(request.changes),
       });
+      // New skills on the profile change every score and the resume itself.
+      if (kept.ok) await Promise.all([forget('job:'), forget('keywords:')]);
+      return kept;
+    }
 
     case 'connection':
       return { ok: true, data: { connected: (await accessKey.getValue()) !== null } };
@@ -168,7 +237,9 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       const result: Result<Match> =
         'problem' in job
           ? { ok: false, status: 422, message: job.problem }
-          : await api<Match>('/matches', { method: 'POST', body: JSON.stringify(job) });
+          : await cached(`job:${await digest(job.jd_text ?? job.url ?? '')}`, JOB_FOR_MS, () =>
+              checkJob(job),
+            );
       if (sender.tab?.id !== undefined) await showBadge(badgeForMatch(result), sender.tab.id);
       return result;
     }
@@ -248,7 +319,11 @@ export default defineBackground(() => {
   // A "!" on the icon until the browser is connected, so it is clear setup is needed.
   const resting = (key: string | null) => (key === null ? NOT_CONNECTED_BADGE : NO_BADGE);
   void accessKey.getValue().then((key) => showBadge(resting(key)));
-  accessKey.watch((key) => void showBadge(resting(key)));
+  accessKey.watch((key) => {
+    void showBadge(resting(key));
+    // Another account, or none: nothing kept for the last one may be shown.
+    void forget();
+  });
 
   // A tab's score belongs to the page it was given for: reset it when the tab moves on.
   browser.tabs.onUpdated.addListener((tabId, change) => {

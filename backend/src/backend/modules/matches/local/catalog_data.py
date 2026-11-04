@@ -264,7 +264,160 @@ Code review | code reviews |
 API design | API development |
 Security | application security, OWASP, cybersecurity |
 Technical writing | documentation |
+Software development | software engineering, software engineering principles, software development principles, software development life cycle, SDLC, application development, software solutions, coding |
+Debugging | troubleshooting code |
+Project management | project planning, project coordination, PMP |
+Stakeholder management | stakeholder communication |
+
+# --- office tools
+Microsoft Office | MS Office, Microsoft Office Suite, Office 365, Microsoft 365 | office
+PowerPoint | MS PowerPoint, Microsoft PowerPoint | office
+Microsoft Word | MS Word | office
+
+# --- electrical and automation
+Electrical design | electrical drawings, electrical systems design, electrical systems, designing electrical systems | elec-design
+Power distribution | power distribution systems, electrical distribution, medium voltage, low voltage, high voltage | elec-power
+Load calculations | load calculation, load flow, load flow analysis | elec-study
+Short circuit analysis | short circuit studies, short circuit study, short circuit | elec-study
+Arc flash studies | arc flash, arc flash study, arc flash analysis | elec-study
+One-line diagrams | single line diagrams, single-line diagrams, one line diagrams, one-line diagram |
+ETAP | | elec-tool
+SKM PowerTools | SKM | elec-tool
+!NEC | National Electrical Code |
+AutoCAD | AutoCAD Electrical, AutoCAD MEP, Auto CAD | cad-2d
+Revit | Revit MEP | bim
+MEP coordination | MEP, MEP teams, mechanical electrical and plumbing |
+PLC programming | PLC, PLCs, programmable logic controllers, programmable logic controller | automation
+SCADA | | automation
+DCS | distributed control system, distributed control systems | automation
+Embedded systems | embedded C, embedded software, firmware, microcontrollers, microcontroller, RTOS | embedded
+PCB design | PCB layout, Altium, KiCad |
+Circuit design | circuit analysis |
+
+# --- mechanical and manufacturing
+SolidWorks | Solid Works | cad-3d
+CATIA | | cad-3d
+Creo | PTC Creo, Pro/E, Pro Engineer | cad-3d
+Siemens NX | Unigraphics, NX CAD | cad-3d
+Fusion 360 | | cad-3d
+GD&T | geometric dimensioning and tolerancing |
+Tolerance analysis | tolerance stack-up, tolerance stack up, stack-up analysis, tolerance stack-up analysis |
+FEA | finite element analysis, ANSYS, Abaqus | simulation
+CFD | computational fluid dynamics | simulation
+DFM | design for manufacturing, design for manufacturability, DFMA, design for assembly |
+Sheet metal design | sheet metal |
+Casting design | castings, cast parts |
+BOM | bill of materials, BOMs |
+Mechanical design | product design, designing parts, part design |
+HVAC | |
+Lean manufacturing | Six Sigma, Lean Six Sigma, Kaizen |
+
+# --- construction and civil
+Construction management | construction projects, commercial construction, construction schedules |
+Primavera P6 | Primavera | scheduling
+Microsoft Project | MS Project | scheduling
+RFIs | RFI, requests for information |
+Submittals | submittal |
+Change orders | change order |
+Subcontractor management | subcontractors, subcontractor |
+Site management | site meetings, site supervision, site execution |
+OSHA | OSHA 30, OSHA 10 |
+Quantity surveying | quantity takeoff, BOQ, bill of quantities |
+Structural analysis | STAAD Pro, STAAD, ETABS |
+Cost control | cost management, budget management, budget control |
+
+# --- healthcare
+Patient care | patient monitoring, patient assessment, bedside care |
+Critical care | ICU, intensive care, critical care nursing |
+Ventilator management | ventilators, ventilated patients, mechanical ventilation |
+Medication administration | administering medications, administered medications, administer medications, medication management |
+BLS | Basic Life Support | life-support
+ACLS | Advanced Cardiac Life Support | life-support
+!Epic | Epic EMR | emr
+EMR | EHR, electronic medical records, electronic health records | emr
+Infection control | |
+Wound care | |
+Phlebotomy | |
+
+# --- accounting and finance
+General ledger | general ledger accounting, ledger |
+Month-end close | month end close, month-end closing, financial close, books closing |
+Account reconciliation | account reconciliations, reconciliations, bank reconciliation, reconciliation |
+Financial statements | financial reporting, financial statement preparation, balance sheet |
+Accounts payable | | ap-ar
+Accounts receivable | | ap-ar
+GAAP | US GAAP, Ind AS | acct-standard
+IFRS | | acct-standard
+GST | GST filing, GST filings, GST returns, goods and services tax | tax
+Taxation | tax filings, tax filing, income tax, TDS, direct tax, indirect tax, tax returns | tax
+Auditing | statutory audit, statutory audits, internal audit, external audit |
+Tally | Tally ERP, Tally Prime, TallyPrime | accounting-software
+QuickBooks | | accounting-software
+Zoho Books | | accounting-software
+SAP | SAP FICO, SAP FI, SAP MM, SAP ERP, SAP S/4HANA | erp
+Financial modeling | financial modelling, financial models |
+Budgeting | budgeting and forecasting, FP&A |
+Forecasting | forecasts, sales forecasting, demand forecasting |
+Payroll | payroll processing |
+Bookkeeping | |
+
+# --- marketing
+SEO | search engine optimization, search engine optimisation |
+SEM | search engine marketing, PPC, pay per click |
+Google Ads | Google AdWords, AdWords | paid-ads
+Meta Ads | Facebook Ads, Instagram Ads | paid-ads
+Paid campaigns | performance marketing, paid marketing, paid media, paid acquisition |
+Content marketing | content strategy, content creation |
+Social media marketing | social media, SMM |
+Email marketing | Mailchimp, email campaigns |
+Google Analytics | GA4, Google Analytics 4 | web-analytics
+Digital marketing | online marketing |
+Conversion rate optimization | CRO, landing pages, landing page optimization |
+Brand management | branding, brand strategy |
+Copywriting | copy writing |
+Market research | competitor analysis, competitive analysis |
+HubSpot | | crm
+Salesforce | Salesforce CRM, SFDC | crm
+CRM | CRM software, Zoho CRM, customer relationship management | crm
+
+# --- sales
+B2B sales | enterprise sales, inside sales, field sales, solution selling, B2B enterprise sales | sales
+Lead generation | prospecting, cold calling, cold outreach, outbound sales |
+Sales cycle | full sales cycle, closing deals, deal closing, contract closing |
+Negotiation | negotiating, negotiations |
+Account management | key account management, client relationships, relationship management |
+Quota attainment | quota, sales targets, revenue targets |
+
+# --- HR
+Recruitment | recruiting, talent acquisition, end-to-end recruitment, sourcing candidates |
+Employee onboarding | onboarding new hires |
+HRIS | Workday, SuccessFactors, BambooHR |
+Employee relations | |
+Performance management | performance appraisals, appraisals |
+Labour law | labor law, employment law, statutory compliance |
+
+# --- operations
+Supply chain management | supply chain, SCM |
+Procurement | purchasing |
+Vendor management | vendor relations, supplier management, suppliers |
+Inventory management | inventory control, stock management |
+Logistics | warehousing, warehouse management |
 """
+
+# Lines of work that show a skill without the profile naming it: someone whose
+# role title is in the field on the left has done the skills on the right.
+# The field keys are the ones in `fields.FIELDS`.
+FIELD_SHOWS = {
+    "software": ("Software development", "Debugging"),
+    "electrical": ("Electrical design",),
+    "mechanical": ("Mechanical design",),
+    "construction": ("Construction management",),
+    "healthcare": ("Patient care",),
+    "marketing": ("Digital marketing",),
+    "sales": ("B2B sales",),
+    "hr": ("Recruitment",),
+    "operations": ("Supply chain management",),
+}
 
 
 # Using the skill on the left is using the skill on the right: someone who
@@ -336,4 +489,10 @@ Drizzle -> SQL
 SQLAlchemy -> SQL, Python
 Sequelize -> SQL
 dbt -> SQL
+Epic -> EMR
+Salesforce -> CRM
+HubSpot -> CRM
+Google Ads -> Paid campaigns
+Meta Ads -> Paid campaigns
+SEM -> Paid campaigns
 """

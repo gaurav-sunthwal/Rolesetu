@@ -6,6 +6,11 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'same-origin' },
   // The Google sign-in popup needs to report back to this window.
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+  // Hosted on a public address: HTTPS only, kept out of search results, and
+  // no access to the camera, microphone or location.
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
 ];
 
 const nextConfig: NextConfig = {

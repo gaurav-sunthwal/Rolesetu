@@ -164,8 +164,8 @@ def test_each_kind_of_verdict_and_its_reason() -> None:
     )
     # Using Tailwind CSS is using CSS.
     assert found["CSS"].verdict == "strong" and "Tailwind CSS" in found["CSS"].reason
-    # Named in the skills list: counts in full.
-    assert found["Git"].verdict == "strong" and "Listed" in found["Git"].reason
+    # Named in the skills list but never shown in use: a claim, so only partial.
+    assert found["Git"].verdict == "partial" and "no role or project" in found["Git"].reason
     # A close substitute, said plainly.
     assert found["PostgreSQL"].verdict == "partial" and "MySQL" in found["PostgreSQL"].reason
     # Either option satisfies an "or".
@@ -177,8 +177,9 @@ def test_each_kind_of_verdict_and_its_reason() -> None:
     score = scoring.compute_score(
         [scoring.Judged(item.required, item.verdict) for item in result.judgements]
     )
-    # required: 8 strong, 1 partial, 1 missing = 17 of 20; nice: 2 strong = 2 of 4
-    assert score == 79
+    # required: 7 strong, 2 partial, 1 missing = 16 of 20;
+    # nice: 1 strong, 1 partial (Figma, only listed) = 1.5 of 4
+    assert score == 73
 
 
 def test_same_input_always_gives_the_same_result() -> None:
@@ -190,7 +191,8 @@ def test_same_input_always_gives_the_same_result() -> None:
 def test_a_skill_only_the_candidate_names_is_still_recognised() -> None:
     skills = [*PROFILE["skills"], {"id": "9", "name": "Zeebe"}]
     result = score_locally(profile(skills=skills), "Requirements: Python and Zeebe workflows.")
-    assert verdicts(result) == {"Python": "missing", "Zeebe": "strong"}
+    # Found because the candidate lists it, but only listed, so partial.
+    assert verdicts(result) == {"Python": "missing", "Zeebe": "partial"}
 
 
 def test_text_with_no_recognisable_skills_gives_nothing() -> None:
@@ -257,7 +259,7 @@ async def test_a_check_completes_in_the_request_without_a_model(client: AsyncCli
 
     assert response.status_code == 202
     assert body["status"] == "completed"  # nothing to poll for
-    assert body["score"] == 79
+    assert body["score"] == 73
     assert (body["role"], body["company"]) == ("Frontend Engineer", "Northwind")
     assert body["gaps"] == ["Docker", "GraphQL", "AWS"]
     assert body["seniority_note"] is None  # about 3 years against a 2+ requirement
@@ -271,7 +273,7 @@ async def test_seniority_cap_still_applies(client: AsyncClient) -> None:
     await client.put("/api/v1/profile/me", json=SAVED_PROFILE)
     senior = FRONTEND_JD.replace("2+ years", "8+ years")
     body = (await client.post(BASE, json={"jd_text": senior})).json()
-    assert body["raw_score"] == 79 and body["score"] == 60
+    assert body["raw_score"] == 73 and body["score"] == 60
     assert "8+ years" in body["seniority_note"]
 
 
@@ -281,7 +283,7 @@ async def test_text_without_skills_is_rejected(client: AsyncClient) -> None:
     prose = "We are a friendly team that loves coffee and long walks on the beach. " * 4
     response = await client.post(BASE, json={"jd_text": prose})
     assert response.status_code == 422
-    assert "could not find any skills" in response.json()["detail"]
+    assert "does not look like a job description" in response.json()["detail"]
     assert (await client.get(BASE)).json()["items"] == []
 
 

@@ -1,13 +1,9 @@
-"""What the admin panel can see and do.
-
-Reading one person's data and deleting an account are both written to the
-audit log, in the same transaction as the read or the delete.
-"""
+"""What the admin panel can see and do."""
 
 import asyncio
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,16 +21,21 @@ from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.db.session import get_sessionmaker
 from backend.modules.admin import emails, repository
 from backend.modules.admin.dependencies import Admin
-from backend.modules.admin.models import AdminAction, OutreachEmail
+from backend.modules.admin.models import OutreachEmail
 from backend.modules.admin.schemas import (
     AccountDeleted,
-    AdminActionRead,
     AdminApplication,
+    AdminApplicationRow,
     AdminJobCheck,
+    AdminJobCheckRow,
+    AdminPreviewRow,
     AdminResume,
     AdminStats,
     AdminUserDetail,
     AdminUserRow,
+    AiCallRead,
+    AiCallSummary,
+    DailyActivity,
     DayCount,
     EmailDefaults,
     EmailTemplate,
@@ -45,29 +46,16 @@ from backend.modules.admin.schemas import (
     SiteReads,
     WaitlistRow,
 )
+from backend.modules.ai_calls import repository as ai_calls_repository
 from backend.modules.errors import repository as errors_repository
-from backend.modules.matches.models import Match
 from backend.modules.profiles import service as profiles_service
-from backend.modules.users.models import User
 
 logger = logging.getLogger(__name__)
 
 DAYS_CHARTED = 14
+# "Used the extension lately" on the dashboard means in this long.
+ACTIVE_FOR = timedelta(days=7)
 RECENT_ROWS = 25
-
-
-def _record(
-    db: AsyncSession, admin: Admin, action: str, target_type: str, target_id: str, summary: str
-) -> None:
-    db.add(
-        AdminAction(
-            admin_email=admin.email,
-            action=action,
-            target_type=target_type,
-            target_id=target_id,
-            summary=summary[:500],
-        )
-    )
 
 
 def _to_user_row(row: repository.Fields) -> AdminUserRow:
@@ -101,12 +89,20 @@ def _to_user_row(row: repository.Fields) -> AdminUserRow:
 async def stats(db: AsyncSession) -> AdminStats:
     now = datetime.now(UTC)
     since = now - timedelta(days=DAYS_CHARTED - 1)
-    signups = await repository.per_day(db, User, since)
-    checks = await repository.per_day(db, Match, since)
+    found = await repository.dashboard(
+        db,
+        since=now - timedelta(days=1),
+        active_since=now - ACTIVE_FOR,
+        chart_since=since,
+    )
+    signups, checks, sites = (
+        found.pop("signups_per_day"),
+        found.pop("checks_per_day"),
+        found.pop("sites"),
+    )
     days = [(since + timedelta(days=offset)).date() for offset in range(DAYS_CHARTED)]
-    sites = await repository.preview_sites(db, now - timedelta(days=1))
     return AdminStats(
-        **await repository.totals(db, now - timedelta(days=1), now - timedelta(days=7)),
+        **found,
         daily=[
             DayCount(day=day, signups=signups.get(day, 0), job_checks=checks.get(day, 0))
             for day in days
@@ -123,12 +119,21 @@ async def list_users(
     *,
     search: str | None,
     extension_missing: bool,
+    has: repository.UserFilter | None = None,
+    joined_on: date | None = None,
     cursor: str | None,
     limit: int,
 ) -> Page[AdminUserRow]:
     after = decode_cursor(cursor) if cursor else None
     rows = await repository.list_users(
-        db, search=search, extension_missing=extension_missing, after=after, limit=limit + 1
+        db,
+        search=search,
+        extension_missing=extension_missing,
+        has=has,
+        active_since=datetime.now(UTC) - ACTIVE_FOR,
+        joined=_day_bounds(joined_on) if joined_on else None,
+        after=after,
+        limit=limit + 1,
     )
     has_more = len(rows) > limit
     rows = rows[:limit]
@@ -139,7 +144,157 @@ async def list_users(
     )
 
 
-async def user_detail(db: AsyncSession, *, admin: Admin, user_id: uuid.UUID) -> AdminUserDetail:
+# The longest period the activity chart shows at once.
+MAX_DAYS_CHARTED = 366
+
+
+def _day_bounds(day: date) -> tuple[datetime, datetime]:
+    """The start of the day and of the next, in UTC: the days the charts count by."""
+    start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+    return start, start + timedelta(days=1)
+
+
+async def daily_activity(db: AsyncSession, *, start: date, end: date) -> list[DailyActivity]:
+    """One row per day from `start` to `end`, both included, oldest first."""
+    if end < start:
+        raise ValidationFailedError("The end date is before the start date.")
+    days = (end - start).days + 1
+    if days > MAX_DAYS_CHARTED:
+        raise ValidationFailedError(f"Pick at most {MAX_DAYS_CHARTED} days at a time.")
+    found = await repository.daily(db, since=_day_bounds(start)[0], until=_day_bounds(end)[1])
+    return [
+        DailyActivity(
+            day=day,
+            signups=found["signups"].get(day, 0),
+            job_checks=found["job_checks"].get(day, 0),
+            applications=found["applications"].get(day, 0),
+        )
+        for day in (start + timedelta(days=offset) for offset in range(days))
+    ]
+
+
+def _since(hours: int | None) -> datetime | None:
+    return datetime.now(UTC) - timedelta(hours=hours) if hours else None
+
+
+async def list_job_checks(
+    db: AsyncSession,
+    *,
+    hours: int | None,
+    day: date | None = None,
+    paid: bool,
+    cursor: str | None,
+    limit: int,
+) -> Page[AdminJobCheckRow]:
+    since, until = _day_bounds(day) if day else (_since(hours), None)
+    rows = await repository.all_job_checks(
+        db,
+        since=since,
+        until=until,
+        paid=paid,
+        after=decode_cursor(cursor) if cursor else None,
+        limit=limit + 1,
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    return Page(
+        items=[
+            AdminJobCheckRow(
+                id=match.id,
+                created_at=match.created_at,
+                user_id=match.user_id,
+                user_email=email,
+                role=job.role,
+                company=job.company,
+                url=job.url,
+                status=match.status,
+                score=match.score,
+                error=match.error,
+                paid_read=((job.job_json or {}).get("listing") or {}).get("reader") == "rendered",
+            )
+            for match, job, email in rows
+        ],
+        next_cursor=(
+            encode_cursor(rows[-1][0].created_at, rows[-1][0].id) if has_more and rows else None
+        ),
+    )
+
+
+async def list_applications(
+    db: AsyncSession, *, day: date | None = None, cursor: str | None, limit: int
+) -> Page[AdminApplicationRow]:
+    since, until = _day_bounds(day) if day else (None, None)
+    rows = await repository.all_applications(
+        db,
+        since=since,
+        until=until,
+        after=decode_cursor(cursor) if cursor else None,
+        limit=limit + 1,
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    return Page(
+        items=[
+            AdminApplicationRow(
+                id=item.id,
+                created_at=item.created_at,
+                user_id=item.user_id,
+                user_email=email,
+                role=item.role,
+                company=item.company,
+                status=item.status,
+                match_score=item.match_score,
+                applied_at=item.applied_at,
+            )
+            for item, email in rows
+        ],
+        next_cursor=(
+            encode_cursor(rows[-1][0].created_at, rows[-1][0].id) if has_more and rows else None
+        ),
+    )
+
+
+async def list_previews(
+    db: AsyncSession,
+    *,
+    hours: int,
+    host: str | None,
+    paid: bool,
+    failed: bool,
+    cursor: str | None,
+    limit: int,
+) -> Page[AdminPreviewRow]:
+    rows = await repository.previews(
+        db,
+        since=datetime.now(UTC) - timedelta(hours=hours),
+        host=host,
+        paid=paid,
+        failed=failed,
+        after=decode_cursor(cursor) if cursor else None,
+        limit=limit + 1,
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    return Page(
+        items=[
+            AdminPreviewRow(
+                id=row.id,
+                created_at=row.created_at,
+                host=row.host,
+                title=(row.page or {}).get("title"),
+                company=(row.page or {}).get("company"),
+                read=row.page is not None,
+                reader=row.reader,
+            )
+            for row in rows
+        ],
+        next_cursor=(
+            encode_cursor(rows[-1].created_at, rows[-1].id) if has_more and rows else None
+        ),
+    )
+
+
+async def user_detail(db: AsyncSession, *, user_id: uuid.UUID) -> AdminUserDetail:
     row = await repository.get_user_row(db, user_id)
     if row is None:
         raise NotFoundError("User not found")
@@ -147,7 +302,6 @@ async def user_detail(db: AsyncSession, *, admin: Admin, user_id: uuid.UUID) -> 
     profile = await profiles_service.get_profile(db, user_id=user_id) if user.has_profile else None
     checks = await repository.recent_job_checks(db, user_id, RECENT_ROWS)
     applications = await repository.recent_applications(db, user_id, RECENT_ROWS)
-    _record(db, admin, "user.view", "user", str(user_id), f"Opened {user.email}")
     return AdminUserDetail(
         user=user,
         profile=profile,
@@ -175,9 +329,7 @@ async def user_detail(db: AsyncSession, *, admin: Admin, user_id: uuid.UUID) -> 
     )
 
 
-async def delete_user(
-    db: AsyncSession, *, admin: Admin, user_id: uuid.UUID, confirm_email: str
-) -> str:
+async def delete_user(db: AsyncSession, *, user_id: uuid.UUID, confirm_email: str) -> str:
     """Removes the account's data: the stored resume files, then the user row,
     which takes every other row with it. Returns the Firebase uid, whose
     sign-in is removed once this is committed (see `remove_sign_in`).
@@ -195,21 +347,17 @@ async def delete_user(
             logger.exception("admin delete: could not remove a resume file user=%s", user_id)
     firebase_uid = user.firebase_uid
     await db.delete(user)
-    _record(db, admin, "user.delete", "user", str(user_id), f"Deleted {user.email}")
     return firebase_uid
 
 
 async def resume_file(
-    db: AsyncSession, *, admin: Admin, user_id: uuid.UUID, resume_id: uuid.UUID
+    db: AsyncSession, *, user_id: uuid.UUID, resume_id: uuid.UUID
 ) -> tuple[bytes, str]:
-    """The resume PDF itself, for support. Every opening is recorded, as the
-    privacy policy says. Returns (the file, its name).
-    """
+    """The resume PDF itself, for support. Returns (the file, its name)."""
     resume = await repository.resume(db, user_id, resume_id)
     if resume is None:
         raise NotFoundError("That resume was not found.")
     data = await storage.get_file(resume.storage_key)
-    _record(db, admin, "resume.view", "user", str(user_id), f"Opened the resume {resume.filename}")
     return data, resume.filename
 
 
@@ -227,31 +375,63 @@ async def remove_sign_in(firebase_uid: str) -> AccountDeleted:
     return AccountDeleted(sign_in_removed=True)
 
 
-async def list_waitlist(
-    db: AsyncSession, *, admin: Admin, cursor: str | None, limit: int
-) -> Page[WaitlistRow]:
+async def list_waitlist(db: AsyncSession, *, cursor: str | None, limit: int) -> Page[WaitlistRow]:
     after = decode_cursor(cursor) if cursor else None
     rows = await repository.list_waitlist(db, after=after, limit=limit + 1)
     has_more = len(rows) > limit
     rows = rows[:limit]
-    if cursor is None:
-        _record(db, admin, "waitlist.view", "waitlist", "extension", "Opened the waiting list")
     return Page(
         items=[WaitlistRow.model_validate(row) for row in rows],
         next_cursor=encode_cursor(rows[-1].created_at, rows[-1].id) if has_more else None,
     )
 
 
-async def list_actions(
-    db: AsyncSession, *, cursor: str | None, limit: int
-) -> Page[AdminActionRead]:
+async def ai_call_summary(db: AsyncSession, *, hours: int) -> AiCallSummary:
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    return AiCallSummary(**await ai_calls_repository.summary(db, since))
+
+
+async def list_ai_calls(
+    db: AsyncSession,
+    *,
+    hours: int,
+    source: str | None,
+    user_id: uuid.UUID | None,
+    cursor: str | None,
+    limit: int,
+) -> Page[AiCallRead]:
     after = decode_cursor(cursor) if cursor else None
-    rows = await repository.list_actions(db, after=after, limit=limit + 1)
+    rows = await ai_calls_repository.list_calls(
+        db,
+        since=datetime.now(UTC) - timedelta(hours=hours),
+        source=source,
+        user_id=user_id,
+        after=after,
+        limit=limit + 1,
+    )
     has_more = len(rows) > limit
     rows = rows[:limit]
+    last = rows[-1][0] if rows else None
     return Page(
-        items=[AdminActionRead.model_validate(row) for row in rows],
-        next_cursor=encode_cursor(rows[-1].created_at, rows[-1].id) if has_more else None,
+        items=[
+            AiCallRead(
+                id=call.id,
+                created_at=call.created_at,
+                user_id=call.user_id,
+                user_email=email,
+                source=call.source,
+                purpose=call.purpose,
+                model=call.model,
+                own_key=call.own_key,
+                ok=call.ok,
+                error=call.error,
+                input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens,
+                duration_ms=call.duration_ms,
+            )
+            for call, email in rows
+        ],
+        next_cursor=encode_cursor(last.created_at, last.id) if has_more and last else None,
     )
 
 
@@ -293,10 +473,8 @@ async def error_events(db: AsyncSession, *, fingerprint: str) -> list[ErrorEvent
     return [ErrorEventRead.model_validate(event) for event in events]
 
 
-async def clear_errors(db: AsyncSession, *, admin: Admin, fingerprint: str) -> None:
-    removed = await errors_repository.delete_group(db, fingerprint)
-    if removed:
-        _record(db, admin, "errors.clear", "error", fingerprint, f"Cleared {removed} events")
+async def clear_errors(db: AsyncSession, *, fingerprint: str) -> None:
+    await errors_repository.delete_group(db, fingerprint)
 
 
 # --- Emailing users ---------------------------------------------------------
@@ -426,32 +604,17 @@ async def email_user(
         message=message,
         kind=kind,
     )
-    _record(
-        db, admin, "email.send", "user", str(user_id), f"Emailed {user.email} ({record.status})"
-    )
     await db.flush()
     return OutreachRead.model_validate(record)
 
 
-async def start_extension_nudges(
-    db: AsyncSession, *, admin: Admin, subject: str, message: str
-) -> int:
+async def start_extension_nudges(db: AsyncSession, *, subject: str, message: str) -> int:
     """How many people the send will reach. The sending itself runs after the
     response (see send_extension_nudges), since it takes a while.
     """
     _require_email_set_up()
     count = await repository.count_nudge_recipients(db, datetime.now(UTC) - QUIET_FOR)
-    queued = min(count, MAX_PER_SEND)
-    if queued:
-        _record(
-            db,
-            admin,
-            "email.bulk",
-            "users",
-            "extension_missing",
-            f"Emailing {queued} people without the extension",
-        )
-    return queued
+    return min(count, MAX_PER_SEND)
 
 
 async def send_extension_nudges(admin_email: str, subject: str, message: str) -> None:

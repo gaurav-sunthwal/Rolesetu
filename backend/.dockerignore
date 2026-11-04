@@ -1,0 +1,11 @@
+.env*
+.venv/
+.model_cache/
+.career_jobs/
+.git/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+src/backend/tests/

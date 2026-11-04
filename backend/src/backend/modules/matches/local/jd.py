@@ -8,13 +8,15 @@ qualifications") or a cue in the same sentence ("... is a plus").
 import re
 from dataclasses import dataclass, field
 
-from backend.modules.matches.local.catalog import Mention, Skill, find_skills
+from backend.modules.matches.local.catalog import Mention, Skill, find_skills, in_dictionary
 from backend.modules.matches.local.experience import read_experience
+from backend.modules.matches.local.phrases import find_phrases
 from backend.modules.matches.local.title import find_title
 
 MAX_REQUIRED = 20
 MAX_NICE_TO_HAVE = 12
 MAX_UNKNOWN = 5
+MAX_PHRASES = 6
 
 _NICE = re.compile(
     r"nice[- ]to[- ]haves?|good[- ]to[- ]haves?|preferred|bonus(?:es)?|"
@@ -22,7 +24,8 @@ _NICE = re.compile(
     r"(?:big |huge |strong |definite |added )?(?:plus|advantage)|"
     r"\ba plus\b|\bpluses\b|desirable|desired|ideally|advantageous|optional(?:ly)?|"
     r"not (?:required|mandatory|a must)|would be (?:great|nice|helpful)|brownie points|"
-    r"extra credit|helpful but|familiarity with .* (?:helps|is helpful)",
+    r"extra credit|helpful but|familiarity with .* (?:helps|is helpful)|"
+    r"\bwe (?:also )?value\b|we(?:'d| would) love|bonus points|nice if you",
     re.IGNORECASE,
 )
 _REQUIRED_HEADING = re.compile(
@@ -81,6 +84,19 @@ class ParsedJob:
     company: str | None = None
     min_years: int | None = None
     requirements: list[Requirement] = field(default_factory=list)
+
+    @property
+    def understood(self) -> int:
+        """Requirements read from the posting itself: ones the dictionary knows
+        (see `in_dictionary`) or the posting's own wording named (see `phrases`).
+        A skill found only because the candidate lists it does not count: the
+        candidate's own names can only ever find what they already have.
+        """
+        return sum(
+            1
+            for item in self.requirements
+            if any(in_dictionary(o) or o.phrase for o in item.options)
+        )
 
 
 def _sentences(line: str) -> list[str]:
@@ -150,6 +166,7 @@ def parse_job(jd_text: str, extra_names: tuple[str, ...] = (), url: str | None =
 
     seen: dict[Skill, int] = {}
     unknown_count = 0
+    phrase_count = 0
     mode = "required"
     for line in lines:
         heading = re.sub(r"[^A-Za-z' /&-]+", " ", line).strip(" :-").strip()
@@ -176,6 +193,10 @@ def parse_job(jd_text: str, extra_names: tuple[str, ...] = (), url: str | None =
                 if unknown_count < MAX_UNKNOWN and tool not in seen:
                     groups.append((tool,))
                     unknown_count += 1
+            for phrase in find_phrases(sentence, mentions):
+                if phrase_count < MAX_PHRASES and phrase not in seen:
+                    groups.append((phrase,))
+                    phrase_count += 1
             for group in groups:
                 options = tuple(skill for skill in group if skill not in seen)
                 if not options:

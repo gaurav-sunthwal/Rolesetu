@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from backend.modules.matches.local import fields
 from backend.modules.matches.local.catalog import find_skills
 from backend.modules.tailoring.pdf.section import Line
 
@@ -102,6 +103,18 @@ _TITLE_LEAD_IN = re.compile(
     re.IGNORECASE,
 )
 _TITLE_TAIL = re.compile(r"\s+(?:jobs?|vacanc(?:y|ies)|openings?)(?:\s+in\b.*)?$", re.IGNORECASE)
+# Short forms careers sites use in titles ("Intern Bachelors Software Eng").
+_ABBREVIATIONS = (
+    (re.compile(r"\b(?:eng|engr)\b\.?", re.IGNORECASE), "Engineer"),
+    (re.compile(r"\bdev\b\.?", re.IGNORECASE), "Developer"),
+    (re.compile(r"\bmgr\b\.?", re.IGNORECASE), "Manager"),
+)
+# Words about who may apply, not about the role: "Bachelors", "Graduate", "Campus".
+_WHO_MAY_APPLY = re.compile(
+    r"\b(?:bachelor'?s?|master'?s?|phd|graduate|grad|campus|fresher|new grad|university|"
+    r"under ?graduate|post ?graduate)\b\s*",
+    re.IGNORECASE,
+)
 
 
 def clean_title(title: str) -> str:
@@ -111,7 +124,18 @@ def clean_title(title: str) -> str:
     text = re.sub(r"\s*[\[(].*?[\])]", "", title)
     text = _TITLE_TAIL.sub("", _TITLE_LEAD_IN.sub("", text.strip()))
     text = re.split(r"\s+[-–—|@,/]\s+|\s+at\s+", text)[0]
+    for short, full in _ABBREVIATIONS:
+        text = short.sub(full, text)
+    text = _WHO_MAY_APPLY.sub("", text)
     return _flat(text)[:_MAX_TITLE]
+
+
+def _same_field(wanted: str, current: str) -> bool:
+    """False when the two titles name different lines of work. A title that
+    names no field (just "Engineer") is not counted against.
+    """
+    ours, theirs = fields.field_of(current), fields.field_of(wanted)
+    return ours is None or theirs is None or ours.key == theirs.key
 
 
 def _family(text: str) -> int | None:
@@ -133,6 +157,10 @@ def suggest_headline(current: str, job_title: str) -> str | None:
     # Rank words stay only if the resume already claims them.
     wanted = _flat(_SENIORITY.sub(earned, wanted))
     if len(wanted) < 3 or _family(wanted) is None or _family(wanted) != _family(current):
+        return None
+    # "Developer" and "Mechanical Engineer" are both engineering words, but
+    # calling a developer a mechanical engineer is a claim the resume cannot back.
+    if not _same_field(wanted, current):
         return None
     if current.isupper():
         wanted = wanted.upper()

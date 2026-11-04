@@ -86,7 +86,7 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
       'Gmail tokens and API keys are encrypted before they are stored.',
       'Only a hash of the extension’s access key is kept on the server.',
       'Every record is tied to your account, and no other user can read it.',
-      'Rolesetu staff can open an account’s profile, job checks, applications and uploaded resume file when that is needed to give support or to act on a deletion request. Each time is recorded, and opening a resume file is recorded separately. Nothing read from your Gmail is shown to them.',
+      'Rolesetu staff can open an account’s profile, job checks, applications and uploaded resume file when that is needed to give support or to act on a deletion request. Only the few accounts on Rolesetu’s admin list can do this. Nothing read from your Gmail is shown to them.',
     ],
   },
   {

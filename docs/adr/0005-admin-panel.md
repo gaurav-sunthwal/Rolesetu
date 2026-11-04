@@ -46,3 +46,10 @@ Admins can now open a user's resume PDF from their page, in a popup
 drawn in the page without opening the bucket to the browser. Each opening is
 recorded as `resume.view` in the audit log, and the privacy policy says so.
 
+## Update (2026-10-27)
+The audit log is gone: the panel no longer writes to `admin_actions`, and its
+Audit log page and `/admin/audit` route were removed. The privacy policy no longer
+says each opening is recorded; it says only accounts on the admin list can open
+account data. The table and its rows are kept for now. Dropping them is a separate,
+deliberate step (`db/migrations/held/c9f3d5e7b1a2_drop_admin_actions.py`, with
+backup steps), so the code change can ship first.

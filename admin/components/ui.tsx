@@ -108,3 +108,7 @@ export const th =
 export const td = 'px-4 py-3 align-middle';
 export const button =
   'rounded-lg bg-white px-3 py-1.5 text-sm font-semibold ring-1 ring-zinc-200 hover:bg-zinc-50 disabled:opacity-60';
+
+/** A filter button; `active` is the one in use. */
+export const pill = (active: boolean) =>
+  `rounded-lg px-3 py-1.5 text-sm font-semibold ${active ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:text-black'}`;

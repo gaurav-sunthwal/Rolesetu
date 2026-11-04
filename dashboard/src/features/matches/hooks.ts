@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { createMatch, getMatch, listMatches } from '@/features/matches/api';
 
-const POLL_INTERVAL_MS = 2500;
+// Most model-read jobs finish in a few seconds, so ask often.
+const POLL_INTERVAL_MS = 1500;
 
 export const matchKeys = {
   all: ['matches'] as const,
@@ -27,6 +28,9 @@ export function useMatch(id: string | null) {
     queryKey: matchKeys.detail(id ?? ''),
     queryFn: () => getMatch(id as string),
     enabled: id !== null,
+    // A finished check never changes, and the one just created may not be saved
+    // yet (the server answers first, then saves): it is not asked for again.
+    staleTime: (query) => (query.state.data?.status === 'completed' ? Infinity : 0),
     refetchInterval: (query) => (query.state.data?.status === 'pending' ? POLL_INTERVAL_MS : false),
   });
 }

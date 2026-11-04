@@ -36,6 +36,8 @@ class FakeModel:
 
     def __init__(self) -> None:
         self.calls = 0
+        self.judged: list[str] = []
+        self.required = ["React", "Docker"]
         self.judgements = [
             SkillJudgement(
                 skill_id="K1", verdict="strong", evidence_id="E1", reason="Used at Acme"
@@ -53,9 +55,10 @@ class FakeModel:
                 role="Frontend Engineer",
                 company="Acme Labs",
                 min_years_experience=3,
-                required_skills=["React", "Docker"],
+                required_skills=self.required,
                 nice_to_have_skills=["GraphQL"],
             )
+        self.judged.append(prompt)
         return self.judgements
 
 
@@ -93,9 +96,42 @@ async def test_scores_a_job_and_explains_it(client: AsyncClient, model: FakeMode
     assert "admin app in React" in react["evidence_text"]
 
 
+async def test_a_client_that_cannot_poll_gets_the_finished_result(
+    client: AsyncClient, model: FakeModel
+) -> None:
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    started = await client.post(BASE, json={"jd_text": JD})
+    assert started.json()["status"] == "completed"
+    assert started.json()["summary"] == (
+        "Your profile shows 1 of the 2 skills this job requires. Missing: Docker."
+    )
+
+
+async def test_a_client_that_polls_gets_the_pending_match_at_once(
+    client: AsyncClient, model: FakeModel
+) -> None:
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    started = await client.post(BASE, json={"jd_text": JD}, headers={"Prefer": "respond-async"})
+    assert started.json()["status"] == "pending"
+    assert started.headers["Preference-Applied"] == "respond-async"
+    body = (await client.get(f"{BASE}/{started.json()['id']}")).json()
+    assert body["status"] == "completed"
+
+
+async def test_skills_the_dictionary_knows_are_judged_without_the_model(
+    client: AsyncClient, model: FakeModel
+) -> None:
+    await client.put("/api/v1/profile/me", json=PROFILE)
+    await client.post(BASE, json={"jd_text": JD})
+    # React, Docker and GraphQL are all known: the model only read the job.
+    assert model.judged == []
+
+
 async def test_verdict_without_real_evidence_becomes_missing(
     client: AsyncClient, model: FakeModel
 ) -> None:
+    # A skill the dictionary does not know, so the model judges it.
+    model.required = ["Temporal workflows", "Docker"]
     model.judgements[0] = SkillJudgement(
         skill_id="K1", verdict="strong", evidence_id="E99", reason="Made up"
     )
@@ -103,18 +139,21 @@ async def test_verdict_without_real_evidence_becomes_missing(
     started = await client.post(BASE, json={"jd_text": JD})
     body = (await client.get(f"{BASE}/{started.json()['id']}")).json()
 
-    react = body["skill_results"][0]
-    assert react["verdict"] == "missing" and react["evidence_text"] is None
-    assert "React" in body["gaps"]
+    temporal = body["skill_results"][0]
+    assert temporal["name"] == "Temporal workflows"
+    assert temporal["verdict"] == "missing" and temporal["evidence_text"] is None
+    assert "Temporal workflows" in body["gaps"]
 
 
 async def test_seniority_cap_is_applied_and_explained(
     client: AsyncClient, model: FakeModel
 ) -> None:
-    model.judgements[1] = SkillJudgement(
-        skill_id="K2", verdict="strong", evidence_id="E1", reason="Used"
-    )
-    junior = {**PROFILE, "experience": [{**PROFILE["experience"][0], "start": "2025-01"}]}
+    role = {
+        **PROFILE["experience"][0],
+        "start": "2025-01",
+        "description": "Built the admin app in React and shipped it with Docker.",
+    }
+    junior = {**PROFILE, "experience": [role]}
     await client.put("/api/v1/profile/me", json=junior)
     started = await client.post(BASE, json={"jd_text": JD})
     body = (await client.get(f"{BASE}/{started.json()['id']}")).json()

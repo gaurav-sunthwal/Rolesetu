@@ -285,6 +285,18 @@ async def test_without_a_key_the_paid_reader_is_off(
     assert readers.rendered_calls == 0
 
 
+async def test_the_extension_never_spends_a_paid_read(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The extension has the page open and sends its text, so a link it sends
+    is only read our own way, for free.
+    """
+    readers = use_readers(monkeypatch, BLOCKED, page_with(POSTING))
+    client.headers["x-test-extension"] = "1"
+    assert (await check_link(client)).status_code == 422
+    assert readers.rendered_calls == 0
+
+
 async def test_paid_reads_stop_at_the_daily_allowance(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

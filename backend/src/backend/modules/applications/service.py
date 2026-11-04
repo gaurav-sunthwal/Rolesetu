@@ -107,7 +107,7 @@ async def create_application(
     job_id: uuid.UUID | None = None
     match_score: int | None = None
     if payload.match_id is not None:
-        match = await matches_repository.get(db, user_id, payload.match_id)
+        match = await matches_repository.get_when_saved(db, user_id, payload.match_id)
         if match is None:
             raise NotFoundError("Match not found")
         job_id, match_score = match.job_id, match.score

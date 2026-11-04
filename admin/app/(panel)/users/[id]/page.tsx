@@ -115,7 +115,7 @@ function ResumeFiles({ userId, resumes }: { userId: string; resumes: UserDetail[
         </ul>
       )}
       <p className="border-t border-zinc-200 px-4 py-2.5 text-xs text-zinc-500">
-        Opening a resume is recorded in the audit log. Open it only to help this person.
+        Open a resume only to help this person.
       </p>
       {open && <ResumeModal userId={userId} resume={open} onClose={() => setOpen(null)} />}
     </Section>
@@ -210,7 +210,7 @@ export default function UserPage() {
   const detail = useQuery({
     queryKey: ['admin', 'user', id],
     queryFn: () => api<UserDetail>(`/admin/users/${id}`),
-    // Each read is written to the audit log, so it is not repeated in the background.
+    // One person's data: read when the page opens, not again in the background.
     staleTime: Infinity,
   });
 
@@ -237,9 +237,6 @@ export default function UserPage() {
           ← Users
         </Link>
         <PageHeader title={user.name ?? user.email} subtitle={user.name ? user.email : undefined} />
-        <p className="-mt-3 text-xs text-zinc-500">
-          Opening this page was recorded in the audit log.
-        </p>
       </div>
 
       <Card>

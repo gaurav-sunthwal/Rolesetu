@@ -3,68 +3,69 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 
+import { ActivityChart } from '@/components/ActivityChart';
 import { Card, Empty, ErrorNote, Loading, PageHeader, td, th } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
-import { formatDay } from '@/lib/format';
-import type { Stats } from '@/lib/types';
+import type { AiCallSummary, Stats } from '@/lib/types';
 
-function Stat({ label, value, note }: { label: string; value: number; note?: string }) {
+type More = { href: string; label: string };
+
+/** One count. The whole card opens the list behind it; `more` links open parts of it. */
+function Stat({
+  label,
+  value,
+  note,
+  href,
+  more = [],
+}: {
+  label: string;
+  value: number;
+  note?: string;
+  href: string;
+  more?: More[];
+}) {
   return (
-    <Card className="p-5">
-      <p className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">{label}</p>
-      <p className="mt-2 text-3xl font-black tabular-nums">{value.toLocaleString('en-IN')}</p>
-      {note && <p className="mt-1 text-xs text-zinc-500">{note}</p>}
+    <Card className="flex flex-col p-5 transition hover:ring-zinc-400">
+      <Link href={href} className="group block rounded focus-visible:outline-2">
+        <p className="text-xs font-semibold tracking-wide text-zinc-500 uppercase">{label}</p>
+        <p className="mt-2 text-3xl font-black tabular-nums">{value.toLocaleString('en-IN')}</p>
+        {note && <p className="mt-1 text-xs text-zinc-500">{note}</p>}
+        <p className="mt-2 text-xs font-semibold text-blue-700 group-hover:underline">
+          See all <span aria-hidden>→</span>
+        </p>
+      </Link>
+      {more.length > 0 && (
+        <ul className="mt-2 space-y-0.5 border-t border-zinc-100 pt-2">
+          {more.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:underline"
+              >
+                {item.label} <span aria-hidden>→</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
 
-/** Two bars per day: sign-ups and job checks. Read out as a table for screen readers. */
+/** The last two weeks; the Activity page shows any dates. */
 function Daily({ days }: { days: Stats['daily'] }) {
-  const top = Math.max(1, ...days.map((day) => Math.max(day.signups, day.job_checks)));
   return (
     <Card className="p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold">Last 14 days</h2>
-        <p className="flex gap-4 text-xs text-zinc-500">
-          <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm bg-zinc-900" /> Sign-ups
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm bg-blue-500" /> Job checks
-          </span>
-        </p>
+        <Link
+          href="/activity"
+          className="text-sm font-semibold text-blue-700 hover:underline focus-visible:outline-2"
+        >
+          Pick dates and see each day <span aria-hidden>→</span>
+        </Link>
       </div>
-      <div className="mt-5 flex h-40 items-end gap-1.5" aria-hidden>
-        {days.map((day) => (
-          <div key={day.day} className="flex h-full flex-1 flex-col justify-end gap-1">
-            <div className="flex flex-1 items-end gap-0.5">
-              <div
-                className="flex-1 rounded-t bg-zinc-900"
-                style={{ height: `${(day.signups / top) * 100}%` }}
-                title={`${day.signups} sign-ups`}
-              />
-              <div
-                className="flex-1 rounded-t bg-blue-500"
-                style={{ height: `${(day.job_checks / top) * 100}%` }}
-                title={`${day.job_checks} job checks`}
-              />
-            </div>
-            <p className="truncate text-center text-[10px] text-zinc-500">{formatDay(day.day)}</p>
-          </div>
-        ))}
-      </div>
-      <table className="sr-only">
-        <caption>Sign-ups and job checks per day</caption>
-        <tbody>
-          {days.map((day) => (
-            <tr key={day.day}>
-              <th scope="row">{formatDay(day.day)}</th>
-              <td>{day.signups} sign-ups</td>
-              <td>{day.job_checks} job checks</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ActivityChart days={days} />
     </Card>
   );
 }
@@ -74,6 +75,12 @@ export default function DashboardPage() {
     queryKey: ['admin', 'stats'],
     queryFn: () => api<Stats>('/admin/stats'),
   });
+  // Its own request, sent at the same time, so a problem with it only affects this card.
+  const aiCalls = useQuery({
+    queryKey: ['admin', 'ai-calls', 'summary', 24],
+    queryFn: () => api<AiCallSummary>('/admin/ai-calls/summary', { params: { hours: '24' } }),
+  });
+  const aiBySource = aiCalls.data?.by_source ?? {};
 
   return (
     <>
@@ -92,38 +99,73 @@ export default function DashboardPage() {
             <Stat
               label="Users"
               value={stats.data.users}
-              note={`${stats.data.users_with_profile} with a profile`}
+              href="/users"
+              more={[
+                {
+                  href: '/users?has=profile',
+                  label: `${stats.data.users_with_profile} with a profile`,
+                },
+              ]}
             />
-            <Stat label="Job checks" value={stats.data.job_checks} />
-            <Stat label="Applications tracked" value={stats.data.applications} />
+            <Stat label="Job checks" value={stats.data.job_checks} href="/job-checks" />
+            <Stat
+              label="Applications tracked"
+              value={stats.data.applications}
+              href="/applications"
+            />
             <Stat
               label="Extension connected"
               value={stats.data.extension_connected}
-              note={`${stats.data.extension_active_week} used it in the last 7 days`}
+              href="/users?has=extension"
+              more={[
+                {
+                  href: '/users?has=extension_week',
+                  label: `${stats.data.extension_active_week} used it in the last 7 days`,
+                },
+                { href: '/users?has=no_extension', label: 'People without it' },
+              ]}
             />
-            <Stat label="Extension waiting list" value={stats.data.waitlist} />
-            <Stat label="Gmail connected" value={stats.data.gmail_connected} />
+            <Stat label="Extension waiting list" value={stats.data.waitlist} href="/waitlist" />
+            <Stat
+              label="Gmail connected"
+              value={stats.data.gmail_connected}
+              href="/users?has=gmail"
+            />
             <Stat
               label="Landing previews"
               value={stats.data.previews_today}
               note="Job links read in the last 24 hours"
+              href="/previews"
+              more={[{ href: '/previews?show=failed', label: 'Ones that could not be read' }]}
             />
             <Stat
               label="Paid page reads"
               value={stats.data.paid_reads_today}
               note="Context.dev credits used in the last 24 hours"
+              href="/paid-reads"
             />
-            <Link href="/errors" className="block rounded-xl focus-visible:outline-2">
-              <Stat
-                label="Errors"
-                value={stats.data.errors_today}
-                note={
-                  stats.data.errors_today
-                    ? 'In the last 24 hours. Open to see them'
-                    : 'None in the last 24 hours'
-                }
-              />
-            </Link>
+            <Stat
+              label="AI calls"
+              value={aiCalls.data?.total ?? 0}
+              note={
+                aiCalls.isError
+                  ? 'Could not load. Open to see why'
+                  : aiCalls.data
+                    ? `Last 24 hours: ${aiBySource.extension ?? 0} from the extension, ${aiBySource.resume ?? 0} from the resume editor`
+                    : 'Loading…'
+              }
+              href="/ai-calls"
+              more={[
+                { href: '/ai-calls?source=extension', label: 'From the extension' },
+                { href: '/ai-calls?source=resume', label: 'From the resume editor' },
+              ]}
+            />
+            <Stat
+              label="Errors"
+              value={stats.data.errors_today}
+              note={stats.data.errors_today ? 'In the last 24 hours' : 'None in the last 24 hours'}
+              href="/errors"
+            />
           </div>
           <Daily days={stats.data.daily} />
           <Card>
@@ -147,7 +189,14 @@ export default function DashboardPage() {
                   <tbody className="divide-y divide-zinc-100">
                     {stats.data.sites.map((site) => (
                       <tr key={site.host}>
-                        <td className={`${td} font-semibold`}>{site.host}</td>
+                        <td className={`${td} font-semibold`}>
+                          <Link
+                            href={`/previews?host=${encodeURIComponent(site.host)}`}
+                            className="hover:underline"
+                          >
+                            {site.host}
+                          </Link>
+                        </td>
                         <td className={td}>{site.read}</td>
                         <td className={`${td} ${site.failed ? 'font-semibold text-red-700' : ''}`}>
                           {site.failed}

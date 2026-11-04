@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.v1.router import api_router
 from backend.core.config import get_settings
 from backend.core.exceptions import register_exception_handlers
+from backend.core.timing import add_timing, watch_queries
 from backend.db.session import get_engine
 from backend.modules.career_jobs import schedule as career_jobs_schedule
 from backend.modules.feedback import service as feedback
@@ -57,6 +58,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    add_timing(app)
+    watch_queries(get_engine())
     register_exception_handlers(app)
     app.include_router(api_router)
 

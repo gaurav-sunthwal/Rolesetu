@@ -12,6 +12,7 @@ from backend.db.base import Base
 # Importing each module's models here registers them on Base.metadata,
 # which is what makes `alembic revision --autogenerate` pick them up.
 from backend.modules.admin import models as admin_models  # noqa: F401
+from backend.modules.ai_calls import models as ai_calls_models  # noqa: F401
 from backend.modules.applications import models as applications_models  # noqa: F401
 from backend.modules.career_jobs import models as career_jobs_models  # noqa: F401
 from backend.modules.errors import models as errors_models  # noqa: F401

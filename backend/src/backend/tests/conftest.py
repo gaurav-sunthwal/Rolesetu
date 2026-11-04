@@ -13,6 +13,7 @@ from sqlalchemy import delete
 from backend.core.security import CurrentUser, get_current_user
 from backend.db.session import get_engine, get_sessionmaker
 from backend.main import app
+from backend.modules.ai_calls import service as ai_calls_service
 from backend.modules.errors import service as errors_service
 from backend.modules.users import service as users_service
 from backend.modules.users.models import User
@@ -38,6 +39,20 @@ def _errors_not_recorded(request: pytest.FixtureRequest, monkeypatch: pytest.Mon
         return None
 
     monkeypatch.setattr(errors_service, "record", nothing)
+
+
+@pytest.fixture(autouse=True)
+def _ai_calls_not_recorded(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fake model calls stay out of the AI calls table (which the admin panel
+    shows) unless a test is about recording them.
+    """
+    if "records_ai_calls" in request.keywords:
+        return
+
+    async def nothing(**_: object) -> None:
+        return None
+
+    monkeypatch.setattr(ai_calls_service, "record", nothing)
 
 
 @pytest.fixture(autouse=True)
@@ -87,7 +102,11 @@ async def make_client() -> AsyncGenerator[ClientFactory]:
         uid = request.headers["x-test-uid"]
         # A test that needs a verified sign-in (the admin routes) says so in a header.
         verified = request.headers.get("x-test-verified") == "1"
-        return CurrentUser(uid=uid, email=f"{uid}@example.com", email_verified=verified)
+        # A test that stands in for the browser extension says so in a header.
+        extension = request.headers.get("x-test-extension") == "1"
+        return CurrentUser(
+            uid=uid, email=f"{uid}@example.com", email_verified=verified, via_extension=extension
+        )
 
     app.dependency_overrides[get_current_user] = current_user_from_header
     try:

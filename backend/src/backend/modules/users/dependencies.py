@@ -13,6 +13,12 @@ async def resolve_user(
     """The caller's row, created on their first sign-in. A first sign-in also
     queues the new sign-up alert, which is sent after the response.
     """
+    if current_user.user_id is not None:
+        # Already loaded into this session while checking the extension key:
+        # `get` returns it from memory, without another query.
+        known = await db.get(User, current_user.user_id)
+        if known is not None:
+            return known
     user, created = await get_or_create_user(
         db, firebase_uid=current_user.uid, email=current_user.email
     )

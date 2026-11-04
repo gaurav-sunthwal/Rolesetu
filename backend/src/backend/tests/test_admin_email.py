@@ -10,15 +10,12 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import get_settings
-from backend.db.session import get_sessionmaker
 from backend.modules.admin import emails
 from backend.modules.admin import repository as admin_repository
 from backend.modules.admin import service as admin_service
-from backend.modules.admin.models import AdminAction
 from backend.tests.conftest import ClientFactory
 
 ADMIN = "/api/v1/admin"
@@ -55,9 +52,6 @@ async def admin(
     email = f"{client.headers['x-test-uid']}@example.com"
     monkeypatch.setattr(get_settings(), "admin_emails", [email])
     yield client
-    async with get_sessionmaker()() as db:
-        await db.execute(delete(AdminAction).where(AdminAction.admin_email == email))
-        await db.commit()
 
 
 def email_of(client: AsyncClient) -> str:

@@ -7,6 +7,7 @@ import { SectionCard } from '@/components/app/section-card';
 import { Button } from '@/components/ui/button';
 import { AddApplicationDialog } from '@/features/applications/components/add-application-dialog';
 import { ExperienceNote } from '@/features/matches/components/experience-note';
+import { FitNote } from '@/features/matches/components/fit-note';
 import { ScoreRing } from '@/features/matches/components/score-ring';
 import { bandOf, projectedScore, VERDICT_META } from '@/features/matches/score';
 import { ShareDialog } from '@/features/share/components/share-dialog';
@@ -54,8 +55,8 @@ export function MatchResult({
             </p>
           ) : heldBack ? (
             <p className="text-muted-foreground mt-2 text-sm">
-              The skills you ticked will not raise this score: it is held at {match.score_cap} by
-              the experience this job asks for.
+              The skills you ticked will not raise this score: it is held at {match.score_cap} for
+              the reasons below.
             </p>
           ) : null}
           <h2 className="mt-1 text-xl font-bold tracking-tight text-balance sm:text-2xl">
@@ -85,9 +86,10 @@ export function MatchResult({
             </p>
           ) : null}
           <p className="text-muted-foreground mt-2 text-sm">
-            {required.length > 0
-              ? `You show evidence for ${requiredMet} of ${required.length} required skills.`
-              : 'This posting listed no hard requirements, only nice-to-haves.'}
+            {match.summary ??
+              (required.length > 0
+                ? `You show evidence for ${requiredMet} of ${required.length} required skills.`
+                : 'This posting listed no hard requirements, only nice-to-haves.')}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
             <Button onClick={() => setTracking(true)}>
@@ -106,6 +108,7 @@ export function MatchResult({
         </div>
       </section>
 
+      <FitNote match={match} />
       <ExperienceNote match={match} />
 
       <div className="grid items-start gap-5 lg:grid-cols-5">

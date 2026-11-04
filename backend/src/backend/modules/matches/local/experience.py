@@ -29,6 +29,17 @@ _ABOUT_EXPERIENCE = re.compile(
     r"(?:years?|yrs?) (?:of|in|with|as|building|developing|designing|writing|working)",
     re.IGNORECASE,
 )
+# Standalone range or pill indicating experience ("3-6 Years", "0 - 2 yrs", "2 to 5 years").
+_RANGE = re.compile(
+    rf"\b{_NUMBER}\s*(?:\+|plus)?\s*(?:-|–|—|to)\s*{_NUMBER}\s*(?:\+|plus)?\s*(?:years?|yrs?|yoe|months?|mos)\b",
+    re.IGNORECASE,
+)
+# Metadata tag / pill with a plus or standalone year amount ("5+ years", "3+ Yrs").
+_PILL = re.compile(
+    rf"(?:^|[|•·,\t/])\s*{_NUMBER}\s*(?:\+|plus)?\s*(?:years?|yrs?|yoe)\s*(?:$|[|•·,\t/])|"
+    rf"\b{_NUMBER}\s*(?:\+|plus)\s*(?:years?|yrs?|yoe)\b",
+    re.IGNORECASE,
+)
 # ...and not about one of these.
 _ABOUT_SOMETHING_ELSE = re.compile(
     r"founded|established|in business|years? ago|anniversary|\bbond\b|contract|agreement|"
@@ -72,6 +83,14 @@ def _value(text: str) -> float:
     return float(_WORDS.get(text.lower(), 0) or text)
 
 
+def _is_experience_sentence(sentence: str) -> bool:
+    if _ABOUT_SOMETHING_ELSE.search(sentence):
+        return False
+    if _ABOUT_EXPERIENCE.search(sentence) or _RANGE.search(sentence):
+        return True
+    return bool(len(sentence) <= 60 and _PILL.search(sentence))
+
+
 def _sentences(text: str) -> list[str]:
     """Sentences to read. Job sites often print a label on one line and its
     value on the next ("Experience" / "2 - 5 years"); those are joined.
@@ -83,7 +102,9 @@ def _sentences(text: str) -> list[str]:
             continue
         if len(previous) <= 40 and len(line) <= 40 and _ABOUT_EXPERIENCE.search(previous):
             line = f"{previous}: {line}"
-        parts += [part.strip() for part in re.split(r"(?<=[.!?;])\s+", line) if part.strip()]
+        parts += [
+            part.strip() for part in re.split(r"(?<=[.!?;])\s+|[|•·\t]", line) if part.strip()
+        ]
         previous = line
     return parts
 
@@ -92,7 +113,7 @@ def read_experience(jd_text: str, title: str | None = None) -> ExperienceAsk:
     required: list[ExperienceAsk] = []
     preferred: list[ExperienceAsk] = []
     for sentence in _sentences(jd_text):
-        if not _ABOUT_EXPERIENCE.search(sentence) or _ABOUT_SOMETHING_ELSE.search(sentence):
+        if not _is_experience_sentence(sentence):
             continue
         for match in _AMOUNT.finditer(sentence):
             low, high, unit = match.group(1), match.group(2), match.group(3).lower()

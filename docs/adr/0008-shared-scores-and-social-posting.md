@@ -46,3 +46,7 @@ someone doing it by hand every day.
 - Instagram and Facebook image posts only work once `PUBLIC_API_URL` is the
   API's public https address.
 - Setup steps: `docs/runbooks/social-posting.md`.
+
+## Update (2026-10-27)
+Scheduling a post is still the approval, but it is no longer written to an audit
+log: the admin audit log was removed (see the update in ADR 0005).

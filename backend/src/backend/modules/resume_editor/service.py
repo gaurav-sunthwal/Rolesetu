@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.ai import resume_assistant
 from backend.core import storage
 from backend.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
+from backend.modules.ai_calls import service as ai_calls
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.profiles import service as profiles_service
 from backend.modules.resume_editor import assistant
@@ -349,7 +350,8 @@ async def assist(db: AsyncSession, *, user_id: uuid.UUID, payload: AssistRequest
     # The user's own key goes first; Rolesetu's keys are the fallback.
     user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
     started = time.monotonic()
-    answer = await resume_assistant.propose_edits(context.prompt, user_api_key=user_api_key)
+    with ai_calls.called_by(user_id, "resume"):
+        answer = await resume_assistant.propose_edits(context.prompt, user_api_key=user_api_key)
     edits = assistant.check_answer(answer, context)
     logger.info(
         "Resume assistant answered",

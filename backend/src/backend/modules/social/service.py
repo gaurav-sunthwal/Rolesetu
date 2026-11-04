@@ -16,7 +16,6 @@ from backend.core.encryption import decrypt_text, encrypt_text
 from backend.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
 from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.modules.admin.dependencies import Admin
-from backend.modules.admin.models import AdminAction
 from backend.modules.social import images, repository
 from backend.modules.social.models import SocialAccount, SocialPost
 from backend.modules.social.platforms import linkedin, meta
@@ -45,18 +44,6 @@ PLATFORM_NAMES: dict[str, str] = {
 
 class InvalidConnectStateError(Exception):
     """The callback's `state` is missing, forged, too old or for someone no longer an admin."""
-
-
-def _record(db: AsyncSession, admin_email: str, action: str, target_id: str, summary: str) -> None:
-    db.add(
-        AdminAction(
-            admin_email=admin_email,
-            action=action,
-            target_type="social",
-            target_id=target_id,
-            summary=summary[:500],
-        )
-    )
 
 
 def _account_read(account: SocialAccount) -> SocialAccountRead:
@@ -118,8 +105,6 @@ async def finish_connecting(db: AsyncSession, *, provider: Provider, code: str, 
             expires_at=account.expires_at,
             connected_by=email,
         )
-    names = ", ".join(f"{account.name} ({account.platform})" for account in accounts)
-    _record(db, email, "social.connect", provider, f"Connected {names or 'no accounts'}")
     return len(accounts)
 
 
@@ -127,7 +112,6 @@ async def disconnect(db: AsyncSession, *, admin: Admin, account_id: uuid.UUID) -
     """Forgets the account and its token. Posts already up stay up."""
     if not await repository.delete_account(db, account_id):
         raise NotFoundError("That account is not connected.")
-    _record(db, admin.email, "social.disconnect", str(account_id), "Disconnected an account")
 
 
 async def upload_image(data: bytes) -> str:
@@ -259,8 +243,6 @@ async def schedule(
     post.scheduled_at = max(at, now) if at else now
     post.status = "scheduled"
     post.approved_by = admin.email
-    when = "now" if post.scheduled_at == now else post.scheduled_at.isoformat()
-    _record(db, admin.email, "social.schedule", str(post.id), f"Approved a post for {when}")
     return await _read(db, post)
 
 
@@ -284,7 +266,6 @@ async def retry(db: AsyncSession, *, admin: Admin, post_id: uuid.UUID) -> Social
     for target in failed:
         target.status, target.error, target.attempts = "pending", None, 0
     post.status, post.scheduled_at, post.approved_by = "scheduled", datetime.now(UTC), admin.email
-    _record(db, admin.email, "social.retry", str(post.id), f"Retried on {len(failed)} account(s)")
     return await _read(db, post)
 
 
@@ -294,4 +275,3 @@ async def delete_post(db: AsyncSession, *, admin: Admin, post_id: uuid.UUID) -> 
     if post.status == "publishing":
         raise ConflictError("This post is being published right now. Try again in a minute.")
     await db.delete(post)
-    _record(db, admin.email, "social.delete", str(post_id), f"Deleted a {post.status} post")

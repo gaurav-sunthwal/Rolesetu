@@ -48,7 +48,10 @@ export function GapsCard({
       ) : check.isError ? (
         <div className="flex flex-col items-start gap-3">
           <p className="text-sm">{errorMessage(check.error)}</p>
-          {check.error instanceof ApiError && check.error.status === 404 ? (
+          {/* "Not found" is also what a missing job check says: only this one means no resume. */}
+          {check.error instanceof ApiError &&
+          check.error.status === 404 &&
+          check.error.message.startsWith('Upload your resume') ? (
             <Button variant="outline" nativeButton={false} render={<Link href="/app/profile" />}>
               Upload my resume
             </Button>

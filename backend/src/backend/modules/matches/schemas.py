@@ -59,6 +59,25 @@ class ExperienceCheck(BaseModel):
     # The posting's own words behind the number.
     quote: str | None
     summary: str
+    # All years of work, when `candidate_years` counts only the job's field.
+    total_years: float | None = None
+
+
+class FieldFitCheck(BaseModel):
+    """The job's line of work against the ones the candidate has worked in."""
+
+    status: Literal["same", "related", "different", "unknown"]
+    job_field: str | None
+    candidate_fields: list[str]
+    summary: str
+
+
+class ScoreLimit(BaseModel):
+    """Something that held the score below what the skills alone earned."""
+
+    kind: Literal["experience", "field", "must_have", "thin"]
+    limit: int
+    reason: str
 
 
 class MatchRead(BaseModel):
@@ -69,9 +88,17 @@ class MatchRead(BaseModel):
     raw_score: int | None
     seniority_note: str | None
     experience: ExperienceCheck | None
-    # The most this job's score can be while the user is short on experience,
-    # or None when experience does not limit it.
+    # The most this job's score can be whatever skills are added (experience,
+    # field, a missing licence...), or None when nothing limits it.
     score_cap: int | None = None
+    # One sentence on why the score is what it is, for the top of every result.
+    summary: str | None = None
+    # The job is in a different line of work from the candidate's, so it was
+    # answered from its title and must-haves without a full (model) read.
+    screened: bool = False
+    field_fit: FieldFitCheck | None = None
+    # Why the score is below `raw_score`, one entry per limit that lowered it.
+    limits: list[ScoreLimit] = []
     role: str | None
     company: str | None
     url: str | None

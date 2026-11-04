@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 import {
   Badge,
@@ -12,6 +12,7 @@ import {
   Loading,
   LoadMore,
   PageHeader,
+  pill,
   td,
   th,
 } from '@/components/ui';
@@ -19,18 +20,34 @@ import { BulkEmail } from '@/components/BulkEmail';
 import { api, errorMessage } from '@/lib/api';
 import { formatDate, timeAgo } from '@/lib/format';
 import type { UserPage } from '@/lib/types';
+import { useUrlFilter } from '@/lib/url-filter';
 
-export default function UsersPage() {
+// The dashboard counts link here with one of these picked.
+const FILTERS = [
+  { value: null, label: 'Everyone' },
+  { value: 'profile', label: 'With a profile' },
+  { value: 'extension', label: 'Extension connected' },
+  { value: 'extension_week', label: 'Used the extension in the last 7 days' },
+  { value: 'no_extension', label: 'Without the extension' },
+  { value: 'gmail', label: 'Gmail connected' },
+] as const;
+
+function Users() {
   const [typed, setTyped] = useState('');
   const [search, setSearch] = useState('');
-  const [withoutExtension, setWithoutExtension] = useState(false);
+  const [filter, setFilter] = useUrlFilter('has');
+  // Set by the Activity page, to list who signed up on one day.
+  const [joinedOn, setJoinedOn] = useUrlFilter('joined_on');
+  const withoutExtension = filter === 'no_extension';
   const users = useInfiniteQuery({
-    queryKey: ['admin', 'users', search, withoutExtension],
+    queryKey: ['admin', 'users', search, filter, joinedOn],
     queryFn: ({ pageParam }) =>
       api<UserPage>('/admin/users', {
         params: {
           q: search || undefined,
           extension: withoutExtension ? 'missing' : undefined,
+          has: filter && !withoutExtension ? filter : undefined,
+          joined_on: joinedOn ?? undefined,
           cursor: pageParam,
         },
       }),
@@ -63,15 +80,28 @@ export default function UsersPage() {
         </form>
       </PageHeader>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
-          <input
-            type="checkbox"
-            checked={withoutExtension}
-            onChange={(event) => setWithoutExtension(event.target.checked)}
-            className="size-4 accent-zinc-900"
-          />
-          Only people without the extension
-        </label>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
+          {FILTERS.map((option) => (
+            <button
+              key={option.label}
+              onClick={() => setFilter(option.value)}
+              aria-pressed={filter === option.value}
+              className={pill(filter === option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+          {joinedOn && (
+            <button
+              onClick={() => setJoinedOn(null)}
+              className={pill(true)}
+              title="Show people who joined on any day"
+            >
+              Joined {formatDate(joinedOn)} <span aria-hidden>×</span>
+              <span className="sr-only">(remove)</span>
+            </button>
+          )}
+        </div>
         <BulkEmail />
       </div>
       <Card>
@@ -80,7 +110,9 @@ export default function UsersPage() {
         ) : users.isError ? (
           <ErrorNote message={errorMessage(users.error)} onRetry={() => users.refetch()} />
         ) : rows.length === 0 ? (
-          <Empty>{search ? 'No users match that search.' : 'Nobody has signed up yet.'}</Empty>
+          <Empty>
+            {search || filter || joinedOn ? 'No users match this.' : 'Nobody has signed up yet.'}
+          </Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -153,5 +185,13 @@ export default function UsersPage() {
         />
       </Card>
     </>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense>
+      <Users />
+    </Suspense>
   );
 }

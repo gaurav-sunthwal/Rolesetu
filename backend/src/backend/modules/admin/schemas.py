@@ -23,6 +23,13 @@ class DayCount(BaseModel):
     job_checks: int
 
 
+class DailyActivity(BaseModel):
+    day: date
+    signups: int
+    job_checks: int
+    applications: int
+
+
 class SiteReads(BaseModel):
     """Job links visitors pasted on the landing page in the last day, by site."""
 
@@ -77,6 +84,50 @@ class AdminJobCheck(BaseModel):
     created_at: datetime
 
 
+class AdminJobCheckRow(BaseModel):
+    """A job check in the list of everyone's checks."""
+
+    id: uuid.UUID
+    created_at: datetime
+    user_id: uuid.UUID
+    user_email: str
+    role: str | None
+    company: str | None
+    url: str | None
+    status: str
+    score: int | None
+    error: str | None
+    # True when the page had to be read through the paid reader.
+    paid_read: bool
+
+
+class AdminApplicationRow(BaseModel):
+    """A tracked application in the list of everyone's applications."""
+
+    id: uuid.UUID
+    created_at: datetime
+    user_id: uuid.UUID
+    user_email: str
+    role: str
+    company: str
+    status: str
+    match_score: int | None
+    applied_at: datetime | None
+
+
+class AdminPreviewRow(BaseModel):
+    """A job link a visitor pasted on the landing page. Belongs to no user."""
+
+    id: uuid.UUID
+    created_at: datetime
+    host: str | None
+    title: str | None
+    company: str | None
+    read: bool
+    # "direct", "rendered" (the paid reader) or None when it was never fetched.
+    reader: str | None
+
+
 class AdminApplication(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -90,7 +141,7 @@ class AdminApplication(BaseModel):
 
 
 class AdminResume(BaseModel):
-    """About the file. The PDF itself is opened separately, and each opening is recorded."""
+    """About the file. The PDF itself is opened separately."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -125,18 +176,6 @@ class WaitlistRow(BaseModel):
     created_at: datetime
 
 
-class AdminActionRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    admin_email: str
-    action: str
-    target_type: str
-    target_id: str
-    summary: str | None
-    created_at: datetime
-
-
 class ErrorGroup(BaseModel):
     """One problem: every event with the same cause, counted together."""
 
@@ -157,6 +196,33 @@ class ErrorSummary(BaseModel):
     groups: list[ErrorGroup]
     # How many events each source produced in the period, whatever the filter.
     by_source: dict[str, int]
+
+
+class AiCallSummary(BaseModel):
+    total: int
+    failed: int
+    # Calls paid for by the user's own Gemini key rather than Rolesetu's.
+    own_key: int
+    input_tokens: int
+    output_tokens: int
+    # How many calls each source made in the period, whatever the filter.
+    by_source: dict[str, int]
+
+
+class AiCallRead(BaseModel):
+    id: uuid.UUID
+    created_at: datetime
+    user_id: uuid.UUID | None
+    user_email: str | None
+    source: str
+    purpose: str
+    model: str | None
+    own_key: bool
+    ok: bool
+    error: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    duration_ms: int
 
 
 class ErrorEventRead(BaseModel):

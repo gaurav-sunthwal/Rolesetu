@@ -18,6 +18,7 @@ at adding their own key.
 import asyncio
 import logging
 import time
+from dataclasses import dataclass
 
 from google import genai
 from google.genai import errors
@@ -31,6 +32,7 @@ from tenacity import (
 
 from backend.core.config import get_settings
 from backend.core.exceptions import AppError
+from backend.modules.ai_calls import service as ai_calls
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,12 @@ logger = logging.getLogger(__name__)
 # per-process hint: losing it (restart, another instance) just means one retry.
 _MODEL_COOLDOWN_SECONDS = 300.0
 _cooling_until: dict[str, float] = {}
+# A key that a model refused for quota (429) is not offered to that model again
+# for this long: asking again would only be refused again, and each refusal
+# costs a round trip the person waiting on the answer can feel. Same caveat as
+# above: a per-process hint, and losing it only costs one refused call.
+_QUOTA_COOLDOWN_SECONDS = 60.0
+_out_of_quota_until: dict[tuple[str, str], float] = {}
 
 
 def _models_to_try() -> list[str]:
@@ -124,13 +132,23 @@ def _candidate_keys(user_api_key: str | None) -> list[str]:
     return list(dict.fromkeys(k for k in keys if k))
 
 
+@dataclass(frozen=True)
+class _Answer[T: BaseModel]:
+    parsed: T | list[T]
+    model: str
+    key: str
+    input_tokens: int | None
+    output_tokens: int | None
+
+
 async def _call_once[T: BaseModel](
     key: str,
     model: str,
     prompt: str,
     response_schema: type[T] | type[list[T]],
     system_instruction: str | None,
-) -> T | list[T]:
+    timeout_seconds: float | None = None,
+) -> _Answer[T]:
     settings = get_settings()
     config: genai.types.GenerateContentConfigDict = {
         "response_mime_type": "application/json",
@@ -143,11 +161,27 @@ async def _call_once[T: BaseModel](
     client = genai.Client(api_key=key)
     response = await asyncio.wait_for(
         client.aio.models.generate_content(model=model, contents=prompt, config=config),
-        timeout=settings.llm_timeout_seconds,
+        timeout=timeout_seconds or settings.llm_timeout_seconds,
     )
     if response.parsed is None:
         raise TimeoutError("Model returned no parseable output")
-    return response.parsed  # type: ignore[return-value]
+    usage = getattr(response, "usage_metadata", None)
+    # Thinking is billed as output, so it is counted with the answer.
+    output_parts = [
+        getattr(usage, "candidates_token_count", None),
+        getattr(usage, "thoughts_token_count", None),
+    ]
+    return _Answer(
+        parsed=response.parsed,  # type: ignore[arg-type]
+        model=model,
+        key=key,
+        input_tokens=getattr(usage, "prompt_token_count", None),
+        output_tokens=(
+            sum(part for part in output_parts if part)
+            if any(part is not None for part in output_parts)
+            else None
+        ),
+    )
 
 
 def _is_key_problem(exc: errors.ClientError) -> bool:
@@ -165,9 +199,55 @@ async def generate_structured[T: BaseModel](
     prompt: str,
     response_schema: type[T] | type[list[T]],
     *,
+    purpose: str = "other",
     user_api_key: str | None = None,
     system_instruction: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> T | list[T]:
+    """`purpose` says what the call is for, so the admin panel can count it.
+    `timeout_seconds` overrides the default for one call: a person waiting on
+    the answer is better served by moving to the next model sooner.
+    """
+    started = time.monotonic()
+
+    def elapsed_ms() -> int:
+        return round((time.monotonic() - started) * 1000)
+
+    try:
+        answer = await _answer(
+            prompt, response_schema, user_api_key, system_instruction, timeout_seconds
+        )
+    except LLMUnavailableError as exc:
+        cause = exc.__cause__
+        await ai_calls.record(
+            purpose=purpose,
+            model=None,
+            own_key=False,
+            ok=False,
+            duration_ms=elapsed_ms(),
+            error=type(cause).__name__ if cause else "NoKeyConfigured",
+        )
+        raise
+    await ai_calls.record(
+        purpose=purpose,
+        model=answer.model,
+        own_key=answer.key == user_api_key,
+        ok=True,
+        duration_ms=elapsed_ms(),
+        input_tokens=answer.input_tokens,
+        output_tokens=answer.output_tokens,
+    )
+    return answer.parsed
+
+
+async def _answer[T: BaseModel](
+    prompt: str,
+    response_schema: type[T] | type[list[T]],
+    user_api_key: str | None,
+    system_instruction: str | None,
+    timeout_seconds: float | None,
+) -> _Answer[T]:
+    """The first answer any model gives, trying every model and key in turn."""
     keys = _candidate_keys(user_api_key)
     if not keys:
         raise LLMUnavailableError("No Gemini API key is configured")
@@ -179,6 +259,8 @@ async def generate_structured[T: BaseModel](
         for number, key in enumerate(keys, start=1):
             if key in unusable_keys:
                 continue
+            if _out_of_quota_until.get((model, key), 0.0) > time.monotonic():
+                continue
             try:
                 # One quick retry for a blip; a model that stays down is left behind.
                 async for attempt in AsyncRetrying(
@@ -189,7 +271,7 @@ async def generate_structured[T: BaseModel](
                 ):
                     with attempt:
                         result = await _call_once(
-                            key, model, prompt, response_schema, system_instruction
+                            key, model, prompt, response_schema, system_instruction, timeout_seconds
                         )
                 if model != get_settings().llm_model:
                     logger.warning("Answered by fallback model %s", model)
@@ -203,6 +285,8 @@ async def generate_structured[T: BaseModel](
                 # Out of quota on this model (429) or no access to it (404):
                 # another key might still work here, and this key on another model.
                 logger.warning("%s refused key #%d (status %s)", model, number, exc.code)
+                if exc.code == 429:
+                    _out_of_quota_until[(model, key)] = time.monotonic() + _QUOTA_COOLDOWN_SECONDS
             except (errors.APIError, TimeoutError) as exc:
                 # Overloaded or hung: every key would hit the same wall, so change model.
                 logger.warning("%s unavailable (%s), moving on", model, type(exc).__name__)

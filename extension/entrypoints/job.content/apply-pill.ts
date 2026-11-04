@@ -13,6 +13,10 @@ const CANDIDATES = CONTROLS;
 
 export type PillState = { text: string; color: string } | null;
 
+// The text of each pill on the page. The pills' shadow roots are closed, so
+// this is the only way to change their words without rebuilding them.
+let pillTexts: HTMLElement[] = [];
+
 function isVisible(element: Element): boolean {
   if (!(element instanceof HTMLElement)) return false;
   const box = element.getBoundingClientRect();
@@ -69,6 +73,7 @@ function buildPill(state: NonNullable<PillState>, onClick: () => void): HTMLElem
   dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${state.color};flex:none`;
   const text = document.createElement('span');
   text.textContent = state.text;
+  pillTexts.push(text);
   button.append(dot, text);
   shadow.append(button);
 
@@ -83,6 +88,12 @@ function buildPill(state: NonNullable<PillState>, onClick: () => void): HTMLElem
 
 export function removeApplyPills(): void {
   document.querySelectorAll(`[${MARK}]`).forEach((pill) => pill.remove());
+  pillTexts = [];
+}
+
+/** Changes what the pills say in place, for text that updates often (a timer). */
+export function setPillText(text: string): void {
+  for (const element of pillTexts) element.textContent = text;
 }
 
 /**

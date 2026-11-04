@@ -2,6 +2,7 @@
 and sends its ID token; the browser extension sends a key issued from Settings.
 """
 
+import uuid
 from dataclasses import dataclass
 
 from fastapi import Depends
@@ -26,6 +27,9 @@ class CurrentUser:
     # Whether the sign-in provider vouches for the email address. Only that
     # makes an address safe to check against the admin list.
     email_verified: bool = False
+    # The account row, when working out who is calling already loaded it (an
+    # extension key is looked up together with its user), so it is not read twice.
+    user_id: uuid.UUID | None = None
 
 
 async def get_current_user(
@@ -45,7 +49,9 @@ async def get_current_user(
             raise UnauthorizedError(
                 "This browser extension is no longer connected. Connect it again from Settings."
             )
-        return CurrentUser(uid=user.firebase_uid, email=user.email, via_extension=True)
+        return CurrentUser(
+            uid=user.firebase_uid, email=user.email, via_extension=True, user_id=user.id
+        )
 
     try:
         decoded = await verify_id_token(token)

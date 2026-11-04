@@ -13,6 +13,9 @@ import { useAdmin, useApiTarget, useGoogleAccount } from '@/lib/session';
  * Every panel page sits behind this: a signed-in Google account that the API
  * confirms is an admin. It is a convenience for the person, not the lock: the
  * API refuses every admin request from anyone else regardless.
+ *
+ * Because the API is the lock, a page does not wait for the admin check: its
+ * own requests go out at the same time, so a page costs one round trip, not two.
  */
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -26,7 +29,7 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
     if (turnedAway) router.replace('/login');
   }, [turnedAway, router]);
 
-  if (!admin.data) {
+  if (!account || turnedAway) {
     return (
       <div
         className="flex min-h-dvh items-center justify-center"
@@ -50,8 +53,8 @@ export default function PanelLayout({ children }: { children: ReactNode }) {
         <p className="px-2 text-lg font-black">Admin</p>
         <NavLinks />
         <div className="mt-6 border-t border-zinc-200 px-2 pt-4 md:mt-auto">
-          <p className="truncate text-xs text-zinc-500" title={admin.data.email}>
-            {admin.data.email}
+          <p className="truncate text-xs text-zinc-500" title={admin.data?.email}>
+            {admin.data?.email ?? account.email}
           </p>
           {apiTarget.data && (
             <p

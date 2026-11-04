@@ -45,7 +45,8 @@ function fitName(value: string | null): string | null {
 }
 
 export type JobRequest = {
-  jd_text: string;
+  // Null when the page showed too little: the server then reads the job from its link.
+  jd_text: string | null;
   url: string | null;
   role: string | null;
   company: string | null;
@@ -64,6 +65,12 @@ export function fitJob(job: {
 }): JobRequest | { problem: string } {
   const description = job.description.trim().slice(0, MAX_DESCRIPTION).trim();
   if (description.length < MIN_DESCRIPTION) {
+    // The page shows only part of the job (a collapsed "see more", a sign-in
+    // wall). The server can read the full listing from its link instead.
+    const url = /^https?:\/\//.test(job.url) ? fitUrl(job.url) : null;
+    if (url) {
+      return { jd_text: null, url, role: fitName(job.title), company: fitName(job.company) };
+    }
     return {
       problem:
         'This page shows too little of the job to score it. Open the full job description and try again.',

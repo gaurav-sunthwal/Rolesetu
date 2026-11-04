@@ -55,13 +55,24 @@ describe('fitJob', () => {
     if ('problem' in fitted) throw new Error(fitted.problem);
     expect(fitted.role?.length).toBeLessThanOrEqual(160);
     expect(fitted.company?.length).toBeLessThanOrEqual(160);
-    expect(fitted.jd_text.length).toBe(20000);
+    expect(fitted.jd_text?.length).toBe(20000);
   });
 
-  it('explains instead of sending a description too short to score', () => {
-    const fitted = fitJob({ ...job, description: 'Apply now!' });
-    expect(fitted).toHaveProperty('problem');
-    expect(fitJob({ ...job, description: 'x'.repeat(MIN_DESCRIPTION) })).not.toHaveProperty(
+  it('sends the link alone when the page shows too little, so the server reads it', () => {
+    expect(fitJob({ ...job, description: 'Apply now!' })).toEqual({
+      jd_text: null,
+      url: 'https://x.test/j/1',
+      role: 'React Developer',
+      company: 'Acme',
+    });
+    expect(fitJob({ ...job, description: 'x'.repeat(MIN_DESCRIPTION) })).toHaveProperty(
+      'jd_text',
+      'x'.repeat(MIN_DESCRIPTION),
+    );
+  });
+
+  it('explains instead when there is no link to read either', () => {
+    expect(fitJob({ ...job, description: 'Apply now!', url: 'about:blank' })).toHaveProperty(
       'problem',
     );
   });

@@ -198,8 +198,14 @@ export interface paths {
     put?: never;
     /**
      * Create Match
-     * @description Scoring takes several seconds, so this returns straight away with a
-     *     pending match; the client polls GET /matches/{id} until it completes.
+     * @description Most jobs are scored in the request. A job the model has to read takes
+     *     several seconds, and how that is handled depends on the client:
+     *
+     *     - one that sends `Prefer: respond-async` (RFC 7240) gets the pending match
+     *       at once and polls GET /matches/{id} until it completes;
+     *     - any other (an older extension that cannot poll) is kept waiting up to
+     *       WAIT_FOR_RESULT_SECONDS for the finished result, and gets it pending only
+     *       if it takes longer.
      */
     post: operations['create_match_api_v1_matches_post'];
     delete?: never;
@@ -912,8 +918,93 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Users */
+    /**
+     * List Users
+     * @description `has` keeps the users a dashboard count is about: with a profile, with
+     *     the extension connected (or used in the last week), or with Gmail connected.
+     */
     get: operations['list_users_api_v1_admin_users_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/job-checks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Job Checks
+     * @description Everyone's job checks, newest first. `day` (a UTC date) keeps one day's;
+     *     `paid` keeps those read through the paid reader.
+     */
+    get: operations['list_job_checks_api_v1_admin_job_checks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/applications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Applications
+     * @description Everyone's tracked applications, newest first. `day` (a UTC date) keeps one day's.
+     */
+    get: operations['list_applications_api_v1_admin_applications_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/daily': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Daily Activity
+     * @description Sign-ups, job checks and applications per UTC day, from `start` to `end`.
+     */
+    get: operations['read_daily_activity_api_v1_admin_daily_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/previews': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Previews
+     * @description Job links pasted on the landing page, newest first. Kept for a day.
+     */
+    get: operations['list_previews_api_v1_admin_previews_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -954,7 +1045,7 @@ export interface paths {
     /**
      * Read Resume File
      * @description The resume PDF, served through the API (not a storage link) so the panel
-     *     can draw it in the page. Recorded in the audit log each time.
+     *     can draw it in the page.
      */
     get: operations['read_resume_file_api_v1_admin_users__user_id__resumes__resume_id__file_get'];
     put?: never;
@@ -982,15 +1073,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/audit': {
+  '/api/v1/admin/ai-calls/summary': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** List Audit */
-    get: operations['list_audit_api_v1_admin_audit_get'];
+    /**
+     * Read Ai Call Summary
+     * @description How many model calls were made in the period, and from where.
+     */
+    get: operations['read_ai_call_summary_api_v1_admin_ai_calls_summary_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/ai-calls': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Ai Calls
+     * @description Every model call in the period, newest first.
+     */
+    get: operations['list_ai_calls_api_v1_admin_ai_calls_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1310,29 +1424,6 @@ export interface components {
       /** Readable */
       readable: boolean;
     };
-    /** AdminActionRead */
-    AdminActionRead: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string;
-      /** Admin Email */
-      admin_email: string;
-      /** Action */
-      action: string;
-      /** Target Type */
-      target_type: string;
-      /** Target Id */
-      target_id: string;
-      /** Summary */
-      summary: string | null;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-    };
     /** AdminApplication */
     AdminApplication: {
       /**
@@ -1355,6 +1446,39 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /**
+     * AdminApplicationRow
+     * @description A tracked application in the list of everyone's applications.
+     */
+    AdminApplicationRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** User Email */
+      user_email: string;
+      /** Role */
+      role: string;
+      /** Company */
+      company: string;
+      /** Status */
+      status: string;
+      /** Match Score */
+      match_score: number | null;
+      /** Applied At */
+      applied_at: string | null;
     };
     /** AdminJobCheck */
     AdminJobCheck: {
@@ -1379,6 +1503,69 @@ export interface components {
        */
       created_at: string;
     };
+    /**
+     * AdminJobCheckRow
+     * @description A job check in the list of everyone's checks.
+     */
+    AdminJobCheckRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** User Email */
+      user_email: string;
+      /** Role */
+      role: string | null;
+      /** Company */
+      company: string | null;
+      /** Url */
+      url: string | null;
+      /** Status */
+      status: string;
+      /** Score */
+      score: number | null;
+      /** Error */
+      error: string | null;
+      /** Paid Read */
+      paid_read: boolean;
+    };
+    /**
+     * AdminPreviewRow
+     * @description A job link a visitor pasted on the landing page. Belongs to no user.
+     */
+    AdminPreviewRow: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Host */
+      host: string | null;
+      /** Title */
+      title: string | null;
+      /** Company */
+      company: string | null;
+      /** Read */
+      read: boolean;
+      /** Reader */
+      reader: string | null;
+    };
     /** AdminRead */
     AdminRead: {
       /** Email */
@@ -1386,7 +1573,7 @@ export interface components {
     };
     /**
      * AdminResume
-     * @description About the file. The PDF itself is opened separately, and each opening is recorded.
+     * @description About the file. The PDF itself is opened separately.
      */
     AdminResume: {
       /**
@@ -1487,6 +1674,58 @@ export interface components {
       last_emailed_at: string | null;
       /** Last Check At */
       last_check_at: string | null;
+    };
+    /** AiCallRead */
+    AiCallRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** User Id */
+      user_id: string | null;
+      /** User Email */
+      user_email: string | null;
+      /** Source */
+      source: string;
+      /** Purpose */
+      purpose: string;
+      /** Model */
+      model: string | null;
+      /** Own Key */
+      own_key: boolean;
+      /** Ok */
+      ok: boolean;
+      /** Error */
+      error: string | null;
+      /** Input Tokens */
+      input_tokens: number | null;
+      /** Output Tokens */
+      output_tokens: number | null;
+      /** Duration Ms */
+      duration_ms: number;
+    };
+    /** AiCallSummary */
+    AiCallSummary: {
+      /** Total */
+      total: number;
+      /** Failed */
+      failed: number;
+      /** Own Key */
+      own_key: number;
+      /** Input Tokens */
+      input_tokens: number;
+      /** Output Tokens */
+      output_tokens: number;
+      /** By Source */
+      by_source: {
+        [key: string]: number;
+      };
     };
     /** ApplicationCreate */
     ApplicationCreate: {
@@ -1801,6 +2040,8 @@ export interface components {
       total: number;
       /** Places */
       places: components['schemas']['PlaceCount'][];
+      /** Work Modes */
+      work_modes: components['schemas']['WorkModeCount'][];
       /** Collected At */
       collected_at: string | null;
       /** Candidate Years */
@@ -1822,6 +2063,11 @@ export interface components {
       location: string;
       /** Places */
       places: string[];
+      /**
+       * Work Mode
+       * @enum {string}
+       */
+      work_mode: 'remote' | 'hybrid' | 'onsite' | 'not_stated';
       /** Posted On */
       posted_on: string | null;
       /**
@@ -1831,6 +2077,8 @@ export interface components {
       first_seen: string;
       /** Score */
       score: number | null;
+      /** Score Cap */
+      score_cap: number | null;
       /**
        * Fit
        * @enum {string}
@@ -1840,6 +2088,8 @@ export interface components {
       fit_note: string;
       /** Skill Results */
       skill_results: components['schemas']['SkillResult'][];
+      /** Score Boosts */
+      score_boosts: components['schemas']['ScoreBoost'][];
     };
     /**
      * ChangeRead
@@ -1876,6 +2126,20 @@ export interface components {
     ConnectUrl: {
       /** Url */
       url: string;
+    };
+    /** DailyActivity */
+    DailyActivity: {
+      /**
+       * Day
+       * Format: date
+       */
+      day: string;
+      /** Signups */
+      signups: number;
+      /** Job Checks */
+      job_checks: number;
+      /** Applications */
+      applications: number;
     };
     /** DayCount */
     DayCount: {
@@ -2234,6 +2498,8 @@ export interface components {
       quote: string | null;
       /** Summary */
       summary: string;
+      /** Total Years */
+      total_years?: number | null;
     };
     /** ExperienceItem */
     ExperienceItem: {
@@ -2273,6 +2539,23 @@ export interface components {
       connected_at: string | null;
       /** Last Used At */
       last_used_at: string | null;
+    };
+    /**
+     * FieldFitCheck
+     * @description The job's line of work against the ones the candidate has worked in.
+     */
+    FieldFitCheck: {
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'same' | 'related' | 'different' | 'unknown';
+      /** Job Field */
+      job_field: string | null;
+      /** Candidate Fields */
+      candidate_fields: string[];
+      /** Summary */
+      summary: string;
     };
     /** FindingRead */
     FindingRead: {
@@ -2521,6 +2804,19 @@ export interface components {
       experience: components['schemas']['ExperienceCheck'] | null;
       /** Score Cap */
       score_cap?: number | null;
+      /** Summary */
+      summary?: string | null;
+      /**
+       * Screened
+       * @default false
+       */
+      screened: boolean;
+      field_fit?: components['schemas']['FieldFitCheck'] | null;
+      /**
+       * Limits
+       * @default []
+       */
+      limits: components['schemas']['ScoreLimit'][];
       /** Role */
       role: string | null;
       /** Company */
@@ -2568,10 +2864,24 @@ export interface components {
        */
       created_at: string;
     };
-    /** Page[AdminActionRead] */
-    Page_AdminActionRead_: {
+    /** Page[AdminApplicationRow] */
+    Page_AdminApplicationRow_: {
       /** Items */
-      items: components['schemas']['AdminActionRead'][];
+      items: components['schemas']['AdminApplicationRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** Page[AdminJobCheckRow] */
+    Page_AdminJobCheckRow_: {
+      /** Items */
+      items: components['schemas']['AdminJobCheckRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** Page[AdminPreviewRow] */
+    Page_AdminPreviewRow_: {
+      /** Items */
+      items: components['schemas']['AdminPreviewRow'][];
       /** Next Cursor */
       next_cursor: string | null;
     };
@@ -2579,6 +2889,13 @@ export interface components {
     Page_AdminUserRow_: {
       /** Items */
       items: components['schemas']['AdminUserRow'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
+    /** Page[AiCallRead] */
+    Page_AiCallRead_: {
+      /** Items */
+      items: components['schemas']['AiCallRead'][];
       /** Next Cursor */
       next_cursor: string | null;
     };
@@ -2816,6 +3133,38 @@ export interface components {
     ScheduleRequest: {
       /** At */
       at?: string | null;
+    };
+    /**
+     * ScoreBoost
+     * @description One skill that would raise this job's score if the user showed strong evidence for it.
+     */
+    ScoreBoost: {
+      /** Name */
+      name: string;
+      /** Required */
+      required: boolean;
+      /**
+       * Verdict
+       * @enum {string}
+       */
+      verdict: 'strong' | 'partial' | 'missing';
+      /** Points */
+      points: number;
+    };
+    /**
+     * ScoreLimit
+     * @description Something that held the score below what the skills alone earned.
+     */
+    ScoreLimit: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'experience' | 'field' | 'must_have' | 'thin';
+      /** Limit */
+      limit: number;
+      /** Reason */
+      reason: string;
     };
     /** ShareCreate */
     ShareCreate: {
@@ -3150,6 +3499,16 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /** WorkModeCount */
+    WorkModeCount: {
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'remote' | 'hybrid' | 'onsite' | 'not_stated';
+      /** Count */
+      count: number;
     };
   };
   responses: never;
@@ -3630,6 +3989,7 @@ export interface operations {
       query?: {
         companies?: string[] | null;
         places?: string[] | null;
+        work_modes?: ('remote' | 'hybrid' | 'onsite' | 'not_stated')[] | null;
         include_stretch?: boolean;
         cursor?: string | null;
         limit?: number;
@@ -3695,7 +4055,9 @@ export interface operations {
   create_match_api_v1_matches_post: {
     parameters: {
       query?: never;
-      header?: never;
+      header?: {
+        prefer?: string | null;
+      };
       path?: never;
       cookie?: never;
     };
@@ -4781,6 +5143,8 @@ export interface operations {
       query?: {
         q?: string | null;
         extension?: 'missing' | null;
+        has?: ('profile' | 'extension' | 'extension_week' | 'gmail') | null;
+        joined_on?: string | null;
         cursor?: string | null;
         limit?: number;
       };
@@ -4797,6 +5161,142 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['Page_AdminUserRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_job_checks_api_v1_admin_job_checks_get: {
+    parameters: {
+      query?: {
+        hours?: number | null;
+        day?: string | null;
+        paid?: boolean;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminJobCheckRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_applications_api_v1_admin_applications_get: {
+    parameters: {
+      query?: {
+        day?: string | null;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminApplicationRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_daily_activity_api_v1_admin_daily_get: {
+    parameters: {
+      query: {
+        start: string;
+        end: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DailyActivity'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_previews_api_v1_admin_previews_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+        host?: string | null;
+        paid?: boolean;
+        failed?: boolean;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_AdminPreviewRow_'];
         };
       };
       /** @description Validation Error */
@@ -4938,9 +5438,43 @@ export interface operations {
       };
     };
   };
-  list_audit_api_v1_admin_audit_get: {
+  read_ai_call_summary_api_v1_admin_ai_calls_summary_get: {
     parameters: {
       query?: {
+        hours?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiCallSummary'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_ai_calls_api_v1_admin_ai_calls_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+        source?: ('extension' | 'dashboard' | 'resume' | 'other') | null;
+        user_id?: string | null;
         cursor?: string | null;
         limit?: number;
       };
@@ -4956,7 +5490,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['Page_AdminActionRead_'];
+          'application/json': components['schemas']['Page_AiCallRead_'];
         };
       };
       /** @description Validation Error */
