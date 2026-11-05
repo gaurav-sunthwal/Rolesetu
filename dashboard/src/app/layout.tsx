@@ -52,6 +52,12 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
   },
+  alternates: {
+    canonical: '/',
+    types: {
+      'text/plain': [{ url: '/llms.txt', title: 'Product summary for AI assistants' }],
+    },
+  },
   // Proves ownership to Google Search Console, once a code has been issued.
   verification: VERIFICATION ? { google: VERIFICATION } : undefined,
 };

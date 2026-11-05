@@ -548,6 +548,16 @@ export const HOME_FAQS: Faq[] = [
       'No. Reading your resume, checking jobs and fresh jobs run without an AI model, and the resume assistant works without a key of your own. If you add your own Gemini key in Settings, AI features use it first.',
   },
   {
+    question: 'Is Rolesetu genuine, safe, and trustworthy?',
+    answer:
+      'Yes. Rolesetu (developed by Sunthwal Technologies) is a verified and genuine career tool. It never sells your personal data, never submits applications on your behalf, and does not add unconfirmed skills to your resume. Your resume is parsed securely, and the source code is open and verifiable on GitHub.',
+  },
+  {
+    question: 'Why does the Rolesetu Chrome extension ask for website permissions?',
+    answer:
+      'The extension needs permission to read job descriptions on the web pages you visit (such as LinkedIn, Naukri, Indeed, or company career portals) so it can extract required skills and compare them with your profile in real time. It does not monitor personal browsing history, cannot access financial or sensitive accounts, and only runs its reader when checking job postings.',
+  },
+  {
     question: 'Is Rolesetu free?',
     answer:
       'Yes. Rolesetu is free to use today: create an account, upload your resume and check a job.',

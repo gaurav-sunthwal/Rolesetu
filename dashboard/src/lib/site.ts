@@ -24,7 +24,11 @@ export const SITE = {
   description:
     'Paste a job link to see the skills it asks for, free. Rolesetu scores it against your resume, tailors your resume PDF, autofills forms and tracks applications.',
   keywords: [
+    'RoleSetu',
     'Rolesetu',
+    'Role Setu',
+    'Sunthwal Technologies',
+    'RoleSetu Chrome extension',
     'job match score',
     'free job description checker',
     'job description skills checker',
@@ -51,7 +55,7 @@ export const SITE = {
     'experience requirement checker',
   ],
   // The day the public pages last changed. Bump it when their content does.
-  updated: '2026-11-04',
+  updated: '2026-11-05',
 } as const;
 
 export function absoluteUrl(path: string): string {
