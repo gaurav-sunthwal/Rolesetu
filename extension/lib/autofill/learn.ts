@@ -29,7 +29,11 @@ const LEARNED_KINDS: ReadonlySet<Kind> = new Set<Kind>([
 
 // Never kept, whatever is typed: identity numbers, money, and secrets.
 const PRIVATE =
-  /\bssn\b|social security|aadh?aa?r|\bpan\b|passport|national (?:id|insurance)|\btax\b|\btin\b|bank|account (?:no|number)|iban|ifsc|swift|routing|card|cvv|expiry|security (?:question|answer)|pass ?code|\bpin\b(?! ?code)|signature/;
+  /\bssn\b|social security|aadh?aa?r|\bpan\b|passport|national (?:id|insurance)|\btax\b|\btin\b|bank|account (?:no|number)|iban|ifsc|swift|routing|card|cvv|expiry|security (?:question|answer)|pass ?(?:code|word)|\bpin\b(?! ?code)|signature/;
+// Equal-opportunity and background questions stay on the form. They are not remembered.
+const SENSITIVE =
+  /\brace\b|ethnic|disabilit|veteran|religio|\bcaste\b|sexual orientation|criminal|convict|medical|health condition|pregnan|marital/;
+const NOT_ANSWERS: ReadonlySet<string> = new Set(['password', 'hidden', 'file']);
 
 const MAX_ANSWER = 500;
 const SAVE_AFTER_MS = 800;
@@ -56,13 +60,15 @@ export function answerName(field: Field): string {
 function isPrivate(field: Field): boolean {
   const { element } = field;
   const words = `${field.question ?? ''} ${field.label} ${element.getAttribute('name') ?? ''} ${element.id}`;
-  return PRIVATE.test(words.toLowerCase());
+  const said = words.toLowerCase();
+  return PRIVATE.test(said) || SENSITIVE.test(said);
 }
 
 /** The answer worth keeping from this field, or null. */
 export function learnedAnswer(field: Field): string | null {
   const { element } = field;
   if (!LEARNED_KINDS.has(field.kind) || isPrivate(field)) return null;
+  if (element instanceof HTMLInputElement && NOT_ANSWERS.has(element.type)) return null;
   // Long answers are written for one job ("Why us?"), not reused.
   if (element instanceof HTMLTextAreaElement) return null;
 

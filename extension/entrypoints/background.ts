@@ -203,6 +203,17 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return forgotten;
     }
 
+    case 'learn-answers':
+      return api<LearnedAnswerRead[]>('/extension/learned-answers', {
+        method: 'POST',
+        body: JSON.stringify({ answers: request.answers }),
+      });
+
+    case 'forget-answer':
+      return api<null>(`/extension/learned-answers/${encodeURIComponent(request.key)}`, {
+        method: 'DELETE',
+      });
+
     case 'keyword-check':
       // Reading the resume PDF is the slowest part of opening a job: once per job result.
       // (The server waits for a job check that is still being saved, so no retry here.)

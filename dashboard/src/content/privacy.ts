@@ -43,7 +43,8 @@ export const PRIVACY_SECTIONS: PolicySection[] = [
     ],
     items: [
       'On a job listing, it sends the job’s title, company, description and page address to Rolesetu so the job can be scored against your profile.',
-      'On an application form, it fetches your profile and saved answers from Rolesetu and fills the empty fields. What you type into a form is not sent to us, and the extension never presses Submit.',
+      'On an application form, it fetches your profile and saved answers from Rolesetu and fills the empty fields. The extension never presses Submit.',
+      'When you answer a common application question we had no answer for, such as your notice period, expected salary, date of birth, postal code or how you heard about the job, the extension saves that answer to your saved answers so the next form can be filled with it. It tells you each time and offers Undo, and you can change or delete these answers in your profile. It never saves passwords, identity or bank numbers, card details, long written answers, or answers about race, ethnicity, religion, disability, health, veteran status, marital status or criminal record. Nothing else you type into a form is sent to us.',
       'When you apply to a job it scored, it records that job’s role, company and address in your tracker.',
       'It keeps one access key in the browser’s own storage so it can act for your account. Disconnecting the extension in Settings cancels that key.',
       'It does not collect your browsing history, does not read pages that are not job listings or application forms, and contains no analytics or advertising code.',
