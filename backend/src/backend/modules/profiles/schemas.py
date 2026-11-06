@@ -3,6 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from backend.modules.matches.schemas import SkillResult
+
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
 ItemId = Annotated[str, StringConstraints(min_length=1, max_length=64)]
@@ -52,6 +54,16 @@ class EducationItem(BaseModel):
     end_year: int | None = Field(default=None, ge=1950, le=2100)
 
 
+FieldKey = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        max_length=32,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    ),
+]
+
+
 class ProfileWrite(BaseModel):
     full_name: ShortText | None = None
     headline: ShortText | None = None
@@ -62,6 +74,21 @@ class ProfileWrite(BaseModel):
     experience: list[ExperienceItem] = Field(default_factory=list, max_length=30)
     projects: list[ProjectItem] = Field(default_factory=list, max_length=30)
     education: list[EducationItem] = Field(default_factory=list, max_length=10)
+    field_key: FieldKey | None = None
+    scope_summary: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)] | None
+    ) = None
+    inferred_field_key: FieldKey | None = None
+
+
+class FieldSnapshotRead(BaseModel):
+    field_key: str | None
+    field_label: str | None
+    scope_summary: str | None
+    inferred_field_key: str | None
+    inferred_field_label: str | None
+    catalog_status: Literal["ready", "unavailable"]
+    skills: list[SkillResult]
 
 
 class ProfileRead(BaseModel):
@@ -76,6 +103,9 @@ class ProfileRead(BaseModel):
     experience: list[ExperienceItem]
     projects: list[ProjectItem]
     education: list[EducationItem]
+    field_key: str | None = None
+    scope_summary: str | None = None
+    inferred_field_key: str | None = None
     version: int
     completeness: int = Field(ge=0, le=100)
     updated_at: datetime | None

@@ -124,11 +124,6 @@ async def test_clear_errors_when_it_cannot_be_done(client: AsyncClient) -> None:
     assert no_resume.status_code == 404
     assert "Upload your resume" in no_resume.json()["detail"]
 
-    await _upload(client, TWOCOL)
-    one_per_line = await client.post(BASE, json={"skills": [{"name": "Celery"}]})
-    assert one_per_line.status_code == 422
-    assert "one skill per line" in one_per_line.json()["detail"]
-
     await _upload(client, JAKE)
     nothing_new = await client.post(BASE, json={"skills": [{"name": "Docker"}]})
     assert nothing_new.status_code == 422

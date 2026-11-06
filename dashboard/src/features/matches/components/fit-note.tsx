@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 type Limit = Match['limits'][number];
 
 const LIMIT_TITLE: Record<Exclude<Limit['kind'], 'experience'>, string> = {
-  field: 'Different line of work',
+  field: 'Not your role',
   must_have: 'Missing a requirement the job insists on',
   thin: 'Too little in this posting to be sure',
 };

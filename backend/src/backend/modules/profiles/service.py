@@ -7,7 +7,15 @@ from backend.modules.profiles.models import Profile
 from backend.modules.profiles.schemas import ProfileRead, ProfileWrite
 
 _DOCUMENT_FIELDS = ("links", "skills", "experience", "projects", "education")
-_SCALAR_FIELDS = ("full_name", "headline", "location", "phone")
+_SCALAR_FIELDS = (
+    "full_name",
+    "headline",
+    "location",
+    "phone",
+    "field_key",
+    "scope_summary",
+    "inferred_field_key",
+)
 
 
 def completeness_of(profile: ProfileWrite) -> int:

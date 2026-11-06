@@ -1,6 +1,7 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -152,6 +153,14 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
+
+    @model_validator(mode="after")
+    def production_stays_quiet(self) -> Self:
+        # A production process must not echo SQL or leave the debug flag on,
+        # even when DEBUG was left unset.
+        if self.environment == "production":
+            self.debug = False
+        return self
 
 
 @lru_cache

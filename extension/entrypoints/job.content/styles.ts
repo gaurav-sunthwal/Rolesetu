@@ -151,5 +151,8 @@ ul { list-style: none; margin: 0; padding: 0; }
 /* Opposite corner from the score, so the two never overlap. */
 .notice.autofill { right: auto; left: 20px; bottom: 20px; }
 .center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 36px 12px; }
+.linkbox { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px; text-align: left; }
+.linkbox input { width: 100%; height: 36px; padding: 0 10px; font: inherit; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
 .center .spin { width: 28px; height: 28px; border-width: 3px; margin: 0; }
 `;

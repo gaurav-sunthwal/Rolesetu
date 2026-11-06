@@ -24,6 +24,7 @@ from backend.modules.admin.schemas import (
     AiCallSummary,
     BulkQueued,
     DailyActivity,
+    DomainCatalogAdminRead,
     EmailCompose,
     EmailDefaults,
     EmailTemplate,
@@ -115,6 +116,31 @@ async def read_daily_activity(
 ) -> list[DailyActivity]:
     """Sign-ups, job checks and applications per UTC day, from `start` to `end`."""
     return await service.daily_activity(db, start=start, end=end)
+
+
+@router.get("/domain-catalogs", response_model=list[DomainCatalogAdminRead])
+async def list_domain_catalogs(
+    _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> list[DomainCatalogAdminRead]:
+    """Skill dictionaries built for fields outside software and data.
+
+    Each field is generated once and then reused. Uploading a resume again
+    does not rebuild it.
+    """
+    from backend.modules.domain_catalogs import repository as catalogs
+
+    rows = await catalogs.list_all(db)
+    return [
+        DomainCatalogAdminRead(
+            field_key=row.field_key,
+            version=row.version,
+            source=row.source,
+            catalog_text=row.catalog_text,
+            core_skill_names=list(row.core_skill_names),
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/previews", response_model=Page[AdminPreviewRow])

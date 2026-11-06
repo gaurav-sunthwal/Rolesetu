@@ -12,7 +12,7 @@ from backend.modules.profiles.schemas import ProfileRead
 
 # Bump when the dictionary or the rules change, so stored results record
 # which version produced them.
-ENGINE_VERSION = "local.v5"
+ENGINE_VERSION = "local.v8"
 
 
 @dataclass(frozen=True)
@@ -26,7 +26,8 @@ def score_locally(
     jd_text: str,
     matcher: Matcher | None = None,
     url: str | None = None,
+    catalog_append: str = "",
 ) -> LocalMatch:
-    index = ProfileIndex(profile, matcher)
-    job = parse_job(jd_text, index.extra, url)
+    index = ProfileIndex(profile, matcher, catalog_append=catalog_append)
+    job = parse_job(jd_text, index.extra, url, catalog_append=catalog_append)
     return LocalMatch(job=job, judgements=[index.judge(item) for item in job.requirements])

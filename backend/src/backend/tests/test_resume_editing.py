@@ -10,6 +10,7 @@ import pytest
 from backend.modules.resumes.extraction.pdf_lines import extract_lines
 from backend.modules.tailoring import placement
 from backend.modules.tailoring.pdf import editor
+from backend.modules.tailoring.pdf.fonts import _stand_in
 from backend.modules.tailoring.pdf.section import find_skills_section
 from backend.modules.tailoring.pdf.shift import Cut, shift_down
 
@@ -118,9 +119,48 @@ def test_the_user_can_choose_the_row() -> None:
 
 
 def test_a_column_beside_the_skills_is_never_pushed_down() -> None:
-    with pytest.raises(editor.ResumeEditError) as error:
-        editor.add_skills(pdf("twocol"), ["Celery"])
-    assert error.value.reason == "unsupported_layout"
+    original = pdf("twocol")
+    result = editor.add_skills(original, ["Celery"])
+
+    def top_of(data: bytes, words: str) -> float:
+        with pymupdf.open(stream=data) as doc:
+            return float(doc[0].search_for(words)[0].y0)
+
+    assert top_of(result.pdf, "WORK EXPERIENCE") == pytest.approx(
+        top_of(original, "WORK EXPERIENCE"), abs=0.01
+    )
+    assert top_of(result.pdf, "LANGUAGES") == pytest.approx(top_of(original, "LANGUAGES"), abs=0.01)
+
+
+def _linkedin_style() -> bytes:
+    """A two-column page: skills one per line on the left, the story on the right."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((224, 66), "Ada Example", fontsize=22, fontname="helv")
+    page.insert_text((224, 90), "Mechanical Engineering Student", fontsize=12, fontname="helv")
+    page.insert_text((22, 135), "Top Skills", fontsize=13, fontname="helv")
+    page.insert_text((22, 155), "SOLIDWORKS", fontsize=10.5, fontname="helv")
+    page.insert_text((22, 173), "AutoCAD", fontsize=10.5, fontname="helv")
+    page.insert_text((224, 154), "Summary", fontsize=16, fontname="helv")
+    page.insert_text(
+        (224, 180), "A student building vehicle chassis parts.", fontsize=12, fontname="helv"
+    )
+    data: bytes = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_a_sidebar_of_one_skill_per_line_gains_skills_without_moving_the_story() -> None:
+    original = _linkedin_style()
+    result = editor.add_skills(original, ["CATIA", "MATLAB"])
+    assert [item.skill for item in result.added] == ["CATIA", "MATLAB"]
+
+    def top_of(data: bytes, words: str) -> float:
+        with pymupdf.open(stream=data) as doc:
+            return float(doc[0].search_for(words)[0].y0)
+
+    assert top_of(result.pdf, "Summary") == pytest.approx(top_of(original, "Summary"), abs=0.01)
+    assert editor.contains_skill(text_of(result.pdf), "CATIA")
 
 
 def test_a_file_that_is_not_a_pdf_is_refused() -> None:
@@ -133,6 +173,51 @@ def test_ranking_prefers_the_matching_row() -> None:
     rows = [("Languages", "Python, Go"), ("Databases", "PostgreSQL, Redis"), ("Tools", "Git")]
     assert placement.rank_rows("MongoDB", rows)[0][0] == 1
     assert placement.rank_rows("Kotlin", rows)[0][0] == 0
+
+
+def test_ranking_diverse_skill_rows() -> None:
+    rows = [
+        ("HR & Administrative Skills", "Documentation, Payroll, Filing"),
+        ("Organisational Skills", "Event planning, Scheduling"),
+        ("Interpersonal Skills", "Communication, Teamwork"),
+        ("Analytical Skills", "Problem solving, Research"),
+        ("Professional Skills", "Business ethics, Leadership"),
+        ("Technical & Software Skills", "MS Excel, Google Suite"),
+    ]
+    # Employee onboarding must go to HR & Administrative Skills
+    assert (
+        rows[placement.rank_rows("Employee onboarding", rows)[0][0]][0]
+        == "HR & Administrative Skills"
+    )
+    # Kubernetes must go to Technical & Software Skills
+    assert rows[placement.rank_rows("Kubernetes", rows)[0][0]][0] == "Technical & Software Skills"
+    # Organisational skill
+    assert rows[placement.rank_rows("Time management", rows)[0][0]][0] == "Organisational Skills"
+    # Interpersonal skill
+    assert rows[placement.rank_rows("Conflict resolution", rows)[0][0]][0] == "Interpersonal Skills"
+    # Analytical skill
+    assert rows[placement.rank_rows("Data analysis", rows)[0][0]][0] == "Analytical Skills"
+    # Professional skill
+    assert (
+        rows[placement.rank_rows("Stakeholder management", rows)[0][0]][0] == "Professional Skills"
+    )
+
+
+def test_font_fallback_for_diverse_typefaces() -> None:
+    for name in [
+        "Roboto",
+        "OpenSans",
+        "Poppins",
+        "Montserrat",
+        "Lato",
+        "Aptos",
+        "CustomSerifFont",
+        "ArbitraryFont",
+    ]:
+        font = _stand_in(name)
+        assert font is not None, f"Expected stand-in for {name}"
+        assert font.has_glyph(ord("E"))
+        assert font.has_glyph(ord("T"))
 
 
 def test_shift_moves_only_what_is_below_the_cut() -> None:

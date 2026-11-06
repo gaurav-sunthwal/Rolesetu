@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 import uuid
 from collections.abc import Callable
@@ -6,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.ai.profile_understanding import understand_profile
 from backend.core import storage
 from backend.core.exceptions import (
     ConflictError,
@@ -13,17 +15,25 @@ from backend.core.exceptions import (
     RateLimitedError,
     ValidationFailedError,
 )
+from backend.modules.llm_keys.service import get_decrypted_user_llm_key
+from backend.modules.matches.local.semantic import usable_lines, warm_up_chunks
 from backend.modules.profiles import service as profiles_service
-from backend.modules.profiles.schemas import ProfileRead, ProfileWrite
+from backend.modules.profiles.field_detection import resolve_field
+from backend.modules.profiles.schemas import ProfileRead, ProfileWrite, SkillItem
 from backend.modules.resumes import normalize, repository
 from backend.modules.resumes.extraction import parser
-from backend.modules.resumes.extraction.pdf_lines import UnreadablePdfError
+from backend.modules.resumes.extraction.pdf_lines import UnreadablePdfError, extract_lines
 from backend.modules.resumes.merge import ApplyMode, apply_resume
 from backend.modules.resumes.models import ResumeFile
+from backend.modules.resumes.normalize import MAX_SKILLS as MAX_PROFILE_SKILLS
 from backend.modules.resumes.schemas import DownloadLink, ResumeIdentity, ResumeRead
+
+logger = logging.getLogger(__name__)
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_UPLOADS_PER_HOUR = 10
+# Re-reading a resume calls the model for the person's field. Twice a day is enough.
+MAX_RESUME_READS_PER_DAY = 2
 DOWNLOAD_LINK_SECONDS = 300
 _PDF_MAGIC = b"%PDF-"
 
@@ -84,10 +94,59 @@ async def _run_parser[T](read: Callable[[bytes], T], data: bytes) -> T:
         ) from exc
 
 
-async def read_pdf(data: bytes) -> ProfileWrite:
-    """Reads a resume locally (no model call) into a cleaned profile."""
+async def read_pdf(data: bytes, user_api_key: str | None = None) -> ProfileWrite:
+    """Reads a resume into a cleaned profile with AI-assisted understanding."""
     raw = await _run_parser(parser.parse_pdf, data)
     profile = normalize.to_profile(raw)
+
+    # AI-assisted profile understanding: extract domain, scope, and categorized skills
+    try:
+        raw_lines = await _run_parser(extract_lines, data)
+        full_text = "\n".join(line.text for line in raw_lines)
+        ai_profile = await understand_profile(full_text, user_api_key=user_api_key)
+        if ai_profile is not None:
+            existing = {s.name.lower() for s in profile.skills}
+            # Gather all categorized and flat skills
+            all_ai_skills = list(ai_profile.skills)
+            for cat_list in [
+                ai_profile.categorized_skills.hr_administrative,
+                ai_profile.categorized_skills.organisational,
+                ai_profile.categorized_skills.interpersonal,
+                ai_profile.categorized_skills.analytical,
+                ai_profile.categorized_skills.professional,
+                ai_profile.categorized_skills.technical_software,
+            ]:
+                all_ai_skills.extend(cat_list)
+
+            for skill_name in all_ai_skills:
+                clean = skill_name.strip()
+                if (
+                    clean
+                    and clean.lower() not in existing
+                    and len(profile.skills) < MAX_PROFILE_SKILLS
+                ):
+                    profile.skills.append(SkillItem(id=uuid.uuid4().hex, name=clean[:60]))
+                    existing.add(clean.lower())
+
+            if not profile.headline and ai_profile.headline:
+                profile.headline = ai_profile.headline
+
+            field_key, scope_summary, inferred = resolve_field(profile, ai_profile)
+            if field_key and not profile.field_key:
+                profile.field_key = field_key
+            if scope_summary and not profile.scope_summary:
+                profile.scope_summary = scope_summary
+            if inferred and not profile.inferred_field_key:
+                profile.inferred_field_key = inferred
+
+            # Warm up embeddings for semantic matcher
+            chunks = list(ai_profile.scope_chunks)
+            for exp in profile.experience:
+                chunks.extend(usable_lines(exp.description))
+            warm_up_chunks(chunks)
+    except Exception:
+        logger.exception("AI profile enrichment failed; continuing with locally parsed profile")
+
     if not normalize.has_content(profile):
         raise ValidationFailedError(
             "We could not find skills, roles, projects or education in that PDF. "
@@ -120,7 +179,13 @@ async def create_upload(
             f"You have uploaded {MAX_UPLOADS_PER_HOUR} resumes in the last hour. "
             "Please wait a little before uploading another."
         )
-    profile = await read_pdf(data)
+    if (
+        await repository.count_since(db, user_id, now - timedelta(days=1))
+        >= MAX_RESUME_READS_PER_DAY
+    ):
+        raise RateLimitedError("You can update your resume twice a day. Try again tomorrow.")
+    user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
+    profile = await read_pdf(data, user_api_key=user_api_key)
 
     resume_id = uuid.uuid4()
     storage_key = f"resumes/{user_id}/{resume_id}.pdf"
@@ -177,6 +242,9 @@ async def apply_to_profile(
     profile = await profiles_service.save_profile(
         db, user_id=user_id, payload=apply_resume(current_write, parsed, mode)
     )
+    chunks = [line for exp in profile.experience for line in usable_lines(exp.description)]
+    if chunks:
+        warm_up_chunks(chunks)
     resume.applied_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(resume)

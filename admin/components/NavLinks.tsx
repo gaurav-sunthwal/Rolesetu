@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/previews', label: 'Landing previews' },
   ...(SOCIAL_ENABLED ? [{ href: '/social', label: 'Social' }] : []),
   { href: '/waitlist', label: 'Waiting list' },
+  { href: '/skill-catalogs', label: 'Skill catalogs' },
   { href: '/ai-calls', label: 'AI calls' },
   { href: '/errors', label: 'Errors' },
 ];

@@ -238,7 +238,5 @@ def compare(job_field: Field | None, candidate_fields: list[str]) -> FieldFit:
         "different",
         job_field.key,
         fields,
-        f"This is {_a(job_field.label)} role, but your work has been in {theirs}. "
-        "Employers screen on relevant background first, so treat this as a long shot "
-        "unless you are changing careers on purpose.",
+        f"This is {_a(job_field.label)} role. It is not your role. Your work is in {theirs}.",
     )

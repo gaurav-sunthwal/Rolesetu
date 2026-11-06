@@ -132,11 +132,16 @@ class ProfileIndex:
     """Which skills each part of the profile shows, computed once per check."""
 
     def __init__(
-        self, profile: ProfileRead, matcher: Matcher | None = None, today: date | None = None
+        self,
+        profile: ProfileRead,
+        matcher: Matcher | None = None,
+        today: date | None = None,
+        catalog_append: str = "",
     ) -> None:
         self.extra = extra_names(profile)
         self.matcher = matcher
         self.today = today or date.today()
+        self.catalog_append = catalog_append
         # Every line of real work, for the by-meaning pass.
         self.work_lines: list[tuple[Evidence, str]] = []
         # Every line of the profile with its words, for judging phrases.
@@ -153,7 +158,7 @@ class ProfileIndex:
                 for line in item.text.splitlines()
                 if line.strip()
             )
-            for mention in find_skills(item.text, self.extra):
+            for mention in find_skills(item.text, self.extra, self.catalog_append):
                 snippet = _snippet(item.text, mention.start, mention.end)
                 self._keep(target, mention.skill, item, snippet)
                 # Using a tool demonstrates what it is built on (Tailwind CSS -> CSS).

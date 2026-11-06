@@ -58,6 +58,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/profile/me/field-snapshot': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Field Snapshot */
+    get: operations['read_field_snapshot_api_v1_profile_me_field_snapshot_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/saved-answers': {
     parameters: {
       query?: never;
@@ -198,8 +215,9 @@ export interface paths {
     put?: never;
     /**
      * Create Match
-     * @description Most jobs are scored in the request. A job the model has to read takes
-     *     several seconds, and how that is handled depends on the client:
+     * @description Jobs are scored in the request by the local engine. Only with the model
+     *     engine (`match_engine = "llm"`) does a check take several seconds, and then
+     *     how that is handled depends on the client:
      *
      *     - one that sends `Prefer: respond-async` (RFC 7240) gets the pending match
      *       at once and polls GET /matches/{id} until it completes;
@@ -985,6 +1003,29 @@ export interface paths {
      * @description Sign-ups, job checks and applications per UTC day, from `start` to `end`.
      */
     get: operations['read_daily_activity_api_v1_admin_daily_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/domain-catalogs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Domain Catalogs
+     * @description Skill dictionaries built for fields outside software and data.
+     *
+     *     Each field is generated once and then reused. Uploading a resume again
+     *     does not rebuild it.
+     */
+    get: operations['list_domain_catalogs_api_v1_admin_domain_catalogs_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2153,6 +2194,24 @@ export interface components {
       /** Job Checks */
       job_checks: number;
     };
+    /**
+     * DomainCatalogAdminRead
+     * @description A skill dictionary generated once for a field and reused for every user in it.
+     */
+    DomainCatalogAdminRead: {
+      /** Field Key */
+      field_key: string;
+      /** Version */
+      version: number;
+      /** Source */
+      source: string;
+      /** Catalog Text */
+      catalog_text: string;
+      /** Core Skill Names */
+      core_skill_names: string[];
+      /** Created At */
+      created_at: string | null;
+    };
     /** DownloadLink */
     DownloadLink: {
       /** Url */
@@ -2556,6 +2615,26 @@ export interface components {
       candidate_fields: string[];
       /** Summary */
       summary: string;
+    };
+    /** FieldSnapshotRead */
+    FieldSnapshotRead: {
+      /** Field Key */
+      field_key: string | null;
+      /** Field Label */
+      field_label: string | null;
+      /** Scope Summary */
+      scope_summary: string | null;
+      /** Inferred Field Key */
+      inferred_field_key: string | null;
+      /** Inferred Field Label */
+      inferred_field_label: string | null;
+      /**
+       * Catalog Status
+       * @enum {string}
+       */
+      catalog_status: 'ready' | 'unavailable';
+      /** Skills */
+      skills: components['schemas']['SkillResult'][];
     };
     /** FindingRead */
     FindingRead: {
@@ -2963,6 +3042,12 @@ export interface components {
       projects: components['schemas']['ProjectItem'][];
       /** Education */
       education: components['schemas']['EducationItem'][];
+      /** Field Key */
+      field_key?: string | null;
+      /** Scope Summary */
+      scope_summary?: string | null;
+      /** Inferred Field Key */
+      inferred_field_key?: string | null;
       /** Version */
       version: number;
       /** Completeness */
@@ -2989,6 +3074,12 @@ export interface components {
       projects?: components['schemas']['ProjectItem'][];
       /** Education */
       education?: components['schemas']['EducationItem'][];
+      /** Field Key */
+      field_key?: string | null;
+      /** Scope Summary */
+      scope_summary?: string | null;
+      /** Inferred Field Key */
+      inferred_field_key?: string | null;
     };
     /** ProjectItem */
     ProjectItem: {
@@ -3659,6 +3750,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_field_snapshot_api_v1_profile_me_field_snapshot_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FieldSnapshotRead'];
         };
       };
     };
@@ -5270,6 +5381,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_domain_catalogs_api_v1_admin_domain_catalogs_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DomainCatalogAdminRead'][];
         };
       };
     };

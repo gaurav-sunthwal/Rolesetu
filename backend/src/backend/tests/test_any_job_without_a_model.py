@@ -122,10 +122,11 @@ def test_a_phrase_is_proven_by_work_that_names_it() -> None:
     assert found["Building automation systems"] == "strong"
 
 
-def test_a_job_in_another_field_is_read_in_full_and_held_low() -> None:
+def test_a_job_in_another_field_is_turned_away_without_a_skill_read() -> None:
     match = score(FULL_STACK_INTERN, "ICU Staff Nurse", "Requirements\n- BLS and ACLS.\n- Epic.")
-    assert {item["verdict"] for item in match.skill_results} == {"missing"}
-    assert match.score is not None and match.score < 40
+    assert match.skill_results == []
+    assert match.score == 35
+    assert "not your role" in (match.experience or {})["assessment"]["field_fit"]["summary"]
 
 
 def test_a_short_title_from_a_careers_site_is_read_in_full() -> None:

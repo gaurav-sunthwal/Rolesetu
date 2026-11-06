@@ -4,6 +4,7 @@ type Schemas = components['schemas'];
 
 export type Profile = Schemas['ProfileRead'];
 export type ProfileWrite = Schemas['ProfileWrite'];
+export type FieldSnapshot = Schemas['FieldSnapshotRead'];
 export type SkillItem = Schemas['SkillItem'];
 export type ExperienceItem = Schemas['ExperienceItem'];
 export type ProjectItem = Schemas['ProjectItem'];

@@ -1,0 +1,19 @@
+# --- HR extended (fixture for tests and offline dev)
+Workday | Workday HCM | hr-system
+SuccessFactors | SAP SuccessFactors | hr-system
+BambooHR | | hr-system
+Talent acquisition | TA, hiring | hr-recruit
+Sourcing | candidate sourcing | hr-recruit
+Offer management | offer letter, joining formalities | hr-onboarding
+Exit interviews | separation, offboarding | hr-ops
+Payroll processing | payroll, salary processing | hr-payroll
+Statutory compliance | PF, ESI, labour compliance | hr-compliance
+HR analytics | people analytics, HR metrics | hr-analytics
+Employee engagement | engagement surveys | hr-ops
+Learning and development | L&D, training | hr-ld
+Compensation and benefits | C&B, benefits administration | hr-comp
+HR business partner | HRBP | hr-ops
+Policy drafting | HR policy, policy writing | hr-admin
+Interview coordination | scheduling interviews | hr-recruit
+Applicant tracking | ATS | hr-recruit
+# core: Recruitment, Employee onboarding, HR Operations, HRIS, Documentation, Payroll processing, Talent acquisition, Performance management, Labour law, Employee relations, HR analytics, Statutory compliance

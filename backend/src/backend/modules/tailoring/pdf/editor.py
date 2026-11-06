@@ -92,6 +92,8 @@ class _Row:
     skills: list[tuple[str, bool]] = field(default_factory=list)
 
     def fits(self, skill: str, section: SkillsSection, font: LineFont) -> bool:
+        if section.kind == "stacked":
+            return False
         line, start = (
             (self.new_lines[-1], self.entry.wrap_x)
             if self.new_lines
@@ -102,6 +104,9 @@ class _Row:
 
     def add(self, skill: str, section: SkillsSection, font: LineFont, *, on_new_line: bool) -> None:
         self.skills.append((skill, font.exact))
+        if section.kind == "stacked":
+            self.new_lines.append([(skill, font)])
+            return
         current = self.new_lines[-1] if self.new_lines else self.tail
         if on_new_line:
             # The line being left ends with the separator, as a wrapped list does.
@@ -115,6 +120,26 @@ def _write(page: pymupdf.Page, x: float, baseline: float, pieces: list[_Piece]) 
     for text, font in pieces:
         font.write(page, x, baseline, text)
         x += font.width(text)
+
+
+def column_lines_free(page: pymupdf.Page, section: SkillsSection) -> int:
+    """How many new lines fit under the skills before the next text in that column.
+
+    Used when another column sits beside the skills, so nothing below may be
+    pushed down. The empty part of the skills column is still usable.
+    """
+    last = section.entries[-1].last
+    left = min(line.x0 for entry in section.entries for line in entry.lines)
+    floor = page.rect.height - MIN_BOTTOM_MARGIN
+    for line in read_lines(page):
+        if line.y0 <= last.y1 + 1:
+            continue
+        if line.x1 < left - 8 or line.x0 > section.right_limit + 8:
+            continue
+        floor = min(floor, line.y0 - 2)
+    if section.leading <= 0:
+        return 0
+    return max(0, int((floor - last.baseline) // section.leading))
 
 
 def content_bottom(page: pymupdf.Page) -> float:
@@ -165,8 +190,11 @@ def _plan(
 ) -> tuple[list[_Row], list[Skipped]]:
     rows = [_Row(entry=entry) for entry in section.entries]
     section_text = " ".join(entry.text for entry in section.entries)
-    spare = page.rect.height - MIN_BOTTOM_MARGIN - content_bottom(page)
-    lines_left = int(spare // section.leading) if section.can_grow else 0
+    if section.can_grow:
+        spare = page.rect.height - MIN_BOTTOM_MARGIN - content_bottom(page)
+        lines_left = int(spare // section.leading)
+    else:
+        lines_left = column_lines_free(page, section)
     skipped: list[Skipped] = []
 
     for skill in skills:
@@ -195,6 +223,13 @@ def _plan(
             best = usable[0][0]
         else:
             best = min(fonts, key=lambda index: rows[index].entry.last.x1)
+
+        if (
+            section.kind == "stacked"
+            and rows[best].entry.wrap_x + fonts[best].width(skill) > section.right_limit
+        ):
+            skipped.append(Skipped(skill, "no_room"))
+            continue
 
         if rows[best].fits(skill, section, fonts[best]):
             target, new_line = best, False
@@ -240,12 +275,21 @@ def add_skills(
         rows, skipped = _plan(doc, page, section, skills, chosen_rows)
         changed = [row for row in rows if row.skills]
 
-        cuts = [
-            # Just under the row's last line: the next line down is the first to move.
-            (row.entry.last.baseline + section.leading * 0.3, len(row.new_lines) * section.leading)
-            for row in changed
-            if row.new_lines
-        ]
+        # A sidebar grows into its own empty space. Shifting by y would also
+        # drag the column beside it.
+        cuts = (
+            []
+            if not section.can_grow
+            else [
+                # Just under the row's last line: the next line down is the first to move.
+                (
+                    row.entry.last.baseline + section.leading * 0.3,
+                    len(row.new_lines) * section.leading,
+                )
+                for row in changed
+                if row.new_lines
+            ]
+        )
         if cuts:
             try:
                 move_down(doc, page, cuts)

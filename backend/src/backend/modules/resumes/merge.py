@@ -104,4 +104,7 @@ def apply_resume(current: ProfileWrite, parsed: ProfileWrite, mode: ApplyMode) -
         experience=_merge_experience(current.experience, parsed.experience),
         projects=_merge_projects(current.projects, parsed.projects),
         education=_merge_education(current.education, parsed.education),
+        field_key=current.field_key or parsed.field_key,
+        scope_summary=current.scope_summary or parsed.scope_summary,
+        inferred_field_key=current.inferred_field_key or parsed.inferred_field_key,
     )

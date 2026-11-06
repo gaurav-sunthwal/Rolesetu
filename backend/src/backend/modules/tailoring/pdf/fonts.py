@@ -53,6 +53,18 @@ _FAMILIES: list[tuple[re.Pattern[str], tuple[str, ...]]] = [
     (re.compile(r"georgia|gelasio", re.I), ("Georgia{}.ttf", "Gelasio-{}.ttf")),
     (re.compile(r"verdana|dejavu ?sans", re.I), ("Verdana{}.ttf", "DejaVuSans{}.ttf")),
     (re.compile(r"courier|liberation ?mono", re.I), ("Courier New{}.ttf", "LiberationMono-{}.ttf")),
+    (re.compile(r"roboto", re.I), ("Roboto{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"open ?sans", re.I), ("OpenSans{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"lato", re.I), ("Lato{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"inter", re.I), ("Inter{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"montserrat", re.I), ("Montserrat{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"poppins", re.I), ("Poppins{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"aptos", re.I), ("Aptos{}.ttf", "Carlito-{}.ttf", "LiberationSans-{}.ttf")),
+    (re.compile(r"segoe", re.I), ("Segoe UI{}.ttf", "LiberationSans-{}.ttf")),
+    (
+        re.compile(r"garamond|minion|baskerville", re.I),
+        ("Garamond{}.ttf", "LiberationSerif-{}.ttf"),
+    ),
 ]
 # Shipped with the backend, so a server with no fonts installed still has these.
 _BUNDLED_FONT_DIR = Path(__file__).resolve().parents[3] / "assets" / "fonts"
@@ -129,6 +141,41 @@ def _stand_in(name: str) -> pymupdf.Font | None:
                 path = files.get(pattern.format(style).lower())
                 if path is not None:
                     return pymupdf.Font(fontfile=str(path))
+
+    # Fallback to bundled open fonts based on serif / mono / sans-serif classification
+    is_serif = bool(
+        re.search(
+            r"serif|times|roman|georgia|cambria|garamond|minion|baskerville|palatino|century|book",
+            name,
+            re.I,
+        )
+    )
+    is_mono = bool(re.search(r"mono|code|courier|console", name, re.I))
+    style_suffix = f"-{dashed}" if dashed != "Regular" else "-Regular"
+    if is_serif:
+        candidates = [
+            f"LiberationSerif{style_suffix}.ttf",
+            f"Caladea{style_suffix}.ttf",
+            "LiberationSerif-Regular.ttf",
+            "Caladea-Regular.ttf",
+        ]
+    elif is_mono:
+        candidates = [
+            f"LiberationMono{style_suffix}.ttf",
+            "LiberationMono-Regular.ttf",
+        ]
+    else:
+        # Default sans-serif fallback
+        candidates = [
+            f"LiberationSans{style_suffix}.ttf",
+            f"Carlito{style_suffix}.ttf",
+            "LiberationSans-Regular.ttf",
+            "Carlito-Regular.ttf",
+        ]
+    for candidate in candidates:
+        path = files.get(candidate.lower())
+        if path is not None:
+            return pymupdf.Font(fontfile=str(path))
     return None
 
 
@@ -160,7 +207,25 @@ def font_for(doc: pymupdf.Document, page: pymupdf.Page, span: Span, text: str) -
             return own
 
     other = _stand_in(span.font)
-    if other is None:
-        return None
-    stand_in = LineFont(size=span.size, color=color, font=other, exact=False)
+    if other is not None:
+        stand_in = LineFont(size=span.size, color=color, font=other, exact=False)
+        if stand_in.can_write(text):
+            return stand_in
+
+    # Standard PDF font safety net (helv, hebo, heit, hebi, tiro, cour)
+    bold = bool(re.search(r"bold|black|heavy|semibold", span.font, re.I))
+    italic = bool(re.search(r"italic|oblique", span.font, re.I))
+    if re.search(r"serif|times|roman", span.font, re.I):
+        standard = (
+            "tibi" if (bold and italic) else ("tibo" if bold else ("tiit" if italic else "tiro"))
+        )
+    elif re.search(r"mono|code|courier", span.font, re.I):
+        standard = (
+            "cobi" if (bold and italic) else ("cobo" if bold else ("coit" if italic else "cour"))
+        )
+    else:
+        standard = (
+            "hebi" if (bold and italic) else ("hebo" if bold else ("heit" if italic else "helv"))
+        )
+    stand_in = LineFont(size=span.size, color=color, standard=standard, exact=False)
     return stand_in if stand_in.can_write(text) else None

@@ -9,6 +9,12 @@ describe('messageFor', () => {
     );
   });
 
+  it('shows the resume limit instead of a generic wait message', () => {
+    expect(messageFor(429, { detail: 'You can update your resume twice a day. Try again tomorrow.' })).toBe(
+      'You can update your resume twice a day. Try again tomorrow.',
+    );
+  });
+
   it('shows the first reason from a field-by-field list', () => {
     const body = { detail: [{ msg: 'Value error, Choose at least one change to make.' }] };
     expect(messageFor(422, body)).toBe('Choose at least one change to make.');

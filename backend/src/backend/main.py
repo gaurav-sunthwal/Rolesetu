@@ -48,6 +48,10 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Rolesetu API",
         lifespan=lifespan,
+        # The schema is for local development. Production does not publish it.
+        docs_url="/docs" if settings.debug else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if settings.debug else None,
     )
 
     app.add_middleware(

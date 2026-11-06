@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -194,6 +195,57 @@ async def test_a_visitor_gets_the_email_on_their_resume_and_nothing_is_stored(
     assert status == 200
     assert body == {"email": email, "first_name": first_name}
     assert bucket == {}
+
+
+@pytest.mark.records_errors
+async def test_a_refused_resume_update_is_recorded_for_admins(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import select
+
+    from backend.db.session import get_sessionmaker
+    from backend.modules.errors.models import ErrorEvent
+    from backend.modules.resumes import repository
+
+    async def count_since(_db, _user_id, since: datetime) -> int:
+        if since > datetime.now(UTC) - timedelta(hours=2):
+            return 0
+        return 2
+
+    monkeypatch.setattr(repository, "count_since", count_since)
+    response = await client.post(
+        BASE, files={"file": ("resume.pdf", b"%PDF-1.4\n", "application/pdf")}
+    )
+    assert response.status_code == 429
+    async with get_sessionmaker()() as db:
+        rows = list(
+            (
+                await db.scalars(
+                    select(ErrorEvent).where(ErrorEvent.message.contains("twice a day"))
+                )
+            ).all()
+        )
+    assert rows
+    assert rows[-1].source == "resume"
+    assert rows[-1].status == 429
+
+
+async def test_a_third_resume_update_in_a_day_is_refused(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend.modules.resumes import repository
+
+    async def count_since(_db, _user_id, since: datetime) -> int:
+        if since > datetime.now(UTC) - timedelta(hours=2):
+            return 0
+        return 2
+
+    monkeypatch.setattr(repository, "count_since", count_since)
+    response = await client.post(
+        BASE, files={"file": ("resume.pdf", b"%PDF-1.4\n", "application/pdf")}
+    )
+    assert response.status_code == 429
+    assert "twice a day" in response.json()["detail"]
 
 
 async def test_reading_the_email_rejects_files_that_are_not_pdfs() -> None:

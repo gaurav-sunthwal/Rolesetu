@@ -15,6 +15,7 @@ from backend.modules.admin import models as admin_models  # noqa: F401
 from backend.modules.ai_calls import models as ai_calls_models  # noqa: F401
 from backend.modules.applications import models as applications_models  # noqa: F401
 from backend.modules.career_jobs import models as career_jobs_models  # noqa: F401
+from backend.modules.domain_catalogs import models as domain_catalogs_models  # noqa: F401
 from backend.modules.errors import models as errors_models  # noqa: F401
 from backend.modules.extension import models as extension_models  # noqa: F401
 from backend.modules.inbox import models as inbox_models  # noqa: F401

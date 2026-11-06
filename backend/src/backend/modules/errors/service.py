@@ -49,11 +49,13 @@ async def record(
     route: str | None = None,
     method: str | None = None,
     status: int | None = None,
+    group_by_message: bool = False,
 ) -> None:
     """Writes one event. Never raises."""
     code = type(exc).__name__ if exc is not None else None
-    # Without an exception the message itself tells problems apart.
-    place = _where_raised(exc) if exc is not None else message[:120]
+    # A limit the person was shown is grouped by that sentence, so "twice a day"
+    # and "too many job checks" stay separate. A crash is grouped by where it broke.
+    place = message[:120] if group_by_message or exc is None else _where_raised(exc)
     fingerprint = _fingerprint(source, code, route, place)
     stack = (
         "".join(traceback.format_exception(exc))[-_STACK_LIMIT:]

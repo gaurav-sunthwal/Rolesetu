@@ -263,7 +263,7 @@ Performance optimization | performance tuning, performance optimisation, web per
 Code review | code reviews |
 API design | API development |
 Security | application security, OWASP, cybersecurity |
-Technical writing | documentation |
+Technical writing | technical documentation, docs writing |
 Software development | software engineering, software engineering principles, software development principles, software development life cycle, SDLC, application development, software solutions, coding |
 Debugging | troubleshooting code |
 Project management | project planning, project coordination, PMP |
@@ -390,11 +390,14 @@ Quota attainment | quota, sales targets, revenue targets |
 
 # --- HR
 Recruitment | recruiting, talent acquisition, end-to-end recruitment, sourcing candidates |
-Employee onboarding | onboarding new hires |
+Employee onboarding | onboarding new hires, onboarding, employee induction, induction, joiner process | hr-onboarding
 HRIS | Workday, SuccessFactors, BambooHR |
 Employee relations | |
 Performance management | performance appraisals, appraisals |
-Labour law | labor law, employment law, statutory compliance |
+Labour law | labor law, employment law, statutory compliance, labor compliance |
+HR Operations | HR administration, human resources operations, HR admin, people operations |
+HR Policies | company policies, HR compliance |
+Documentation | records management, employee records, document management |
 
 # --- operations
 Supply chain management | supply chain, SCM |
@@ -415,7 +418,7 @@ FIELD_SHOWS = {
     "healthcare": ("Patient care",),
     "marketing": ("Digital marketing",),
     "sales": ("B2B sales",),
-    "hr": ("Recruitment",),
+    "hr": ("Recruitment", "Employee onboarding", "HR Operations"),
     "operations": ("Supply chain management",),
 }
 

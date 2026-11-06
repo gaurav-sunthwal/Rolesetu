@@ -115,6 +115,18 @@ def warm_up() -> None:
         logger.exception("Semantic matcher could not be loaded")
 
 
+def warm_up_chunks(chunks: list[str]) -> None:
+    """Pre-embeds and caches vectors for candidate scope chunks and experience lines."""
+    if not _matcher.ready or not chunks:
+        return
+    try:
+        valid = [c.strip() for c in chunks if len(c.strip()) >= _MIN_LINE_LENGTH]
+        if valid:
+            _matcher._embed(valid)
+    except Exception:
+        logger.exception("Failed to pre-embed profile chunks")
+
+
 def usable_lines(text: str) -> list[str]:
     """The lines of a description worth comparing: real sentences, not fragments."""
     return [line.strip() for line in text.splitlines() if len(line.strip()) >= _MIN_LINE_LENGTH]

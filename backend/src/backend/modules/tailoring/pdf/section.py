@@ -10,7 +10,7 @@ from typing import Any, Literal
 import pymupdf
 
 _HEADING = re.compile(
-    r"^(?:(?:technical|core|key|professional|relevant)\s+)?"
+    r"^(?:(?:technical|core|key|professional|relevant|top)\s+)?"
     r"(?:skills?(?:\s*(?:&|and)\s*\w+)?|technologies|tech(?:nical)?\s+stack|"
     r"technical\s+proficienc(?:y|ies)|areas?\s+of\s+expertise|competenc(?:e|ies))\s*:?$",
     re.IGNORECASE,
@@ -100,7 +100,7 @@ class SkillsSection:
     right_limit: float
     # False when another column sits beside this one, so nothing may be pushed down.
     can_grow: bool
-    kind: Literal["labelled", "list"]
+    kind: Literal["labelled", "list", "stacked"]
 
 
 class NoSkillsSectionError(Exception):
@@ -198,12 +198,14 @@ def _section_on(page_index: int, lines: list[Line]) -> SkillsSection | None:
             entries.append(Entry(label=match.group(1).strip(), lines=[line]))
         elif entries:
             entries[-1].lines.append(line)
-    kind: Literal["labelled", "list"] = "labelled"
+    kind: Literal["labelled", "list", "stacked"] = "labelled"
     text = " ".join(line.text for line in body)
     if not entries:
-        if not any(separator in text for separator in _SEPARATORS):
-            raise UnsupportedLayoutError
-        entries, kind = [Entry(label=None, lines=body)], "list"
+        if any(separator in text for separator in _SEPARATORS):
+            entries, kind = [Entry(label=None, lines=body)], "list"
+        else:
+            # One skill on each line, as LinkedIn and many sidebars do.
+            entries, kind = [Entry(label=None, lines=body)], "stacked"
 
     def gaps_between(lines: list[Line]) -> list[float]:
         return [
@@ -226,6 +228,11 @@ def _section_on(page_index: int, lines: list[Line]) -> SkillsSection | None:
     ]
     right_limit = max(line.x1 for line in same_column)
     beside = any(line.x0 > right_limit + 5 or line.x1 < left - 5 for line in lines)
+    if beside:
+        # The column is wider than its longest line. New text may use that
+        # width, stopping short of whatever sits beside it.
+        other_left = min(line.x0 for line in lines if line.x0 > right_limit + 5)
+        right_limit = other_left - 12
 
     return SkillsSection(
         page_index=page_index,

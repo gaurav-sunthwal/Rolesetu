@@ -53,8 +53,15 @@ function ProfileSection({ profile }: { profile: UserDetail['profile'] }) {
       <dl className="grid gap-5 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Fact label="Name">{profile.full_name ?? '—'}</Fact>
         <Fact label="Headline">{profile.headline ?? '—'}</Fact>
+        <Fact label="Field">{profile.field_key ?? '—'}</Fact>
+        <Fact label="Titles suggest">{profile.inferred_field_key ?? '—'}</Fact>
         <Fact label="Location">{profile.location ?? '—'}</Fact>
         <Fact label="Completeness">{profile.completeness}%</Fact>
+        {profile.scope_summary ? (
+          <div className="sm:col-span-2 lg:col-span-4">
+            <Fact label="Scope">{profile.scope_summary}</Fact>
+          </div>
+        ) : null}
       </dl>
       <div className="space-y-4 border-t border-zinc-200 p-4 text-sm">
         <div>

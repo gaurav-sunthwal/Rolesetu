@@ -109,7 +109,7 @@ const EXPERIENCE_TITLE = {
 
 const LIMIT_TITLE: Record<Match['limits'][number]['kind'], string> = {
   experience: 'Not enough experience',
-  field: 'Different line of work',
+  field: 'Not your role',
   must_have: 'Missing a must-have',
   thin: 'Too little to be sure',
 };
@@ -421,6 +421,27 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     [ctx, manual],
   );
 
+  // The page text failed. A pasted link is read by the server through Context.dev,
+  // which loads the listing in a browser and sends back the job description.
+  const readFromUrl = useCallback(
+    async (url: string) => {
+      const id = (run.current += 1);
+      const stale = () => id !== run.current || ctx.isInvalid;
+      const job: DetectedJob = { title: null, company: null, description: '', url };
+      shown.current = job;
+      const connection = await ask({ type: 'connection' });
+      if (stale()) return;
+      if (!connection.ok || !connection.data.connected) return setPhase({ name: 'disconnected' });
+      setPhase({ name: 'scoring', job, startedAt: Date.now() });
+      const result = await ask({ type: 'check-job', job });
+      if (stale()) return;
+      if (result.ok) setPhase({ name: 'ready', job, match: result.data });
+      else if (result.status === 401) setPhase({ name: 'disconnected' });
+      else setPhase({ name: 'error', message: result.message });
+    },
+    [ctx],
+  );
+
   // The profile changed (skills were added), so the same job is scored again
   // in the background. The panel stays as it is until the new score arrives.
   const rescore = useCallback(async (job: DetectedJob) => {
@@ -577,6 +598,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
           setTailoring={setTailoringFor}
           onClose={() => setOpen(false)}
           onRetry={check}
+          onReadUrl={(url) => void readFromUrl(url)}
           onRescore={rescore}
         />
       ) : pills > 0 ? null : (
@@ -645,6 +667,7 @@ function Panel({
   setTailoring,
   onClose,
   onRetry,
+  onReadUrl,
   onRescore,
 }: {
   phase: Phase;
@@ -652,6 +675,7 @@ function Panel({
   setTailoring: (job: DetectedJob, next: Tailoring) => void;
   onClose: () => void;
   onRetry: () => void;
+  onReadUrl: (url: string) => void;
   onRescore: (job: DetectedJob) => void;
 }) {
   return (
@@ -706,30 +730,31 @@ function Panel({
               <>
                 <strong>No job found on this page</strong>
                 <span className="muted">
-                  Open a single job listing (not a list of results) and try again.
+                  Paste the job link. Rolesetu opens it with Context.dev and reads the description.
                 </span>
-                {/^https?:\/\//i.test(window.location.href) ? (
-                  <button
-                    type="button"
-                    className="btn primary"
-                    style={{ marginTop: 12, padding: '0 20px' }}
-                    onClick={() => void check(true)}
-                  >
-                    Check page using URL reader
-                  </button>
-                ) : null}
+                <ReadFromLink
+                  suggested={window.location.href}
+                  onRead={onReadUrl}
+                />
               </>
             ) : (
               <>
-                <strong>This job could not be scored</strong>
+                <strong>This page could not be read</strong>
                 <span className="muted">{phase.message}</span>
+                <span className="muted">
+                  Paste the job link. Rolesetu opens it with Context.dev and scores that description.
+                </span>
+                <ReadFromLink
+                  suggested={window.location.href}
+                  onRead={onReadUrl}
+                />
                 <button
                   type="button"
                   className="btn"
                   style={{ flex: 'none', padding: '0 20px' }}
                   onClick={onRetry}
                 >
-                  Try again
+                  Try this page again
                 </button>
               </>
             )}
@@ -737,6 +762,51 @@ function Panel({
         </div>
       )}
     </section>
+  );
+}
+
+function ReadFromLink({
+  suggested,
+  onRead,
+}: {
+  suggested: string;
+  onRead: (url: string) => void;
+}) {
+  const initial = /^https?:\/\//i.test(suggested) ? suggested : '';
+  const [url, setUrl] = useState(initial);
+  const [problem, setProblem] = useState<string | null>(null);
+  const usable = /^https?:\/\/\S+$/i.test(url.trim());
+
+  return (
+    <form
+      className="linkbox"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const next = url.trim();
+        if (!/^https?:\/\/\S+$/i.test(next)) {
+          setProblem('Paste a full job link, starting with https://');
+          return;
+        }
+        setProblem(null);
+        onRead(next);
+      }}
+    >
+      <label className="muted small" htmlFor="rolesetu-job-url">
+        Job link
+      </label>
+      <input
+        id="rolesetu-job-url"
+        type="url"
+        inputMode="url"
+        placeholder="https://…"
+        value={url}
+        onChange={(event) => setUrl(event.target.value)}
+      />
+      {problem ? <p className="problem">{problem}</p> : null}
+      <button type="submit" className="btn primary" disabled={!usable}>
+        Read with Context.dev
+      </button>
+    </form>
   );
 }
 
@@ -873,13 +943,15 @@ function Result({
           <p className="note">{match.seniority_note}</p>
         ) : null}
 
-        <ResumeMatcher
-          matchId={match.id}
-          tailoring={tailoring}
-          setTailoring={setTailoring}
-          onTicked={setTicked}
-          onChanged={onRescore}
-        />
+        {match.field_fit?.status === 'different' ? null : (
+          <ResumeMatcher
+            matchId={match.id}
+            tailoring={tailoring}
+            setTailoring={setTailoring}
+            onTicked={setTicked}
+            onChanged={onRescore}
+          />
+        )}
 
         <Skills title="Required" skills={required} />
         <Skills title="Nice to have" skills={niceToHave} />

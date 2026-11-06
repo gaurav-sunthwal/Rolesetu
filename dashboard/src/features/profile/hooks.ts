@@ -29,6 +29,9 @@ export function toWrite(profile: Profile): ProfileWrite {
     experience: profile.experience,
     projects: profile.projects,
     education: profile.education,
+    field_key: profile.field_key,
+    scope_summary: profile.scope_summary,
+    inferred_field_key: profile.inferred_field_key,
   };
 }
 

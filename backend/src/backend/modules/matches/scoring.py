@@ -21,6 +21,9 @@ _WELL_SHORT_CAP = 60
 # The highest score shown when something other than skills rules the job out.
 # Each comes with a sentence saying why (see `Cap`).
 FIELD_CAP = 35  # the job is in a different line of work from the person's
+# An entry-level job in the field the person is aiming at is not a zero just
+# because they have not done that work yet. The floor stays under a real match.
+ENTRY_AIM_FLOOR = 40
 MUST_HAVE_CAP = 45  # a licence, certification or degree the job requires is missing
 THIN_CAP = 60  # too few requirements could be checked to trust a high score
 MIN_CHECKED = 3
@@ -77,6 +80,17 @@ class Cap:
     kind: CapKind
     limit: int
     reason: str
+
+
+def entry_aim_floor(*, same_field: bool, entry_level: bool) -> int | None:
+    """A floor for an entry-level job in the field the person is heading into.
+
+    Skill verdicts stay honest (missing stays missing). The floor only stops a
+    career-start role from reading as 0 when the background points at that field.
+    """
+    if same_field and entry_level:
+        return ENTRY_AIM_FLOOR
+    return None
 
 
 def apply_caps(score: int, caps: Sequence[Cap]) -> tuple[int, list[Cap]]:

@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BasicsCard } from '@/features/profile/components/basics-card';
 import { SkillsCard } from '@/features/profile/components/skills-card';
+import { FieldCard } from '@/features/welcome/components/field-card';
+import { FieldSnapshotCard } from '@/features/welcome/components/field-snapshot-card';
 import { useProfile } from '@/features/profile/hooks';
 import { ResumeCard } from '@/features/resume/components/resume-card';
 import { getExtensionStatus } from '@/features/settings/api';
@@ -103,7 +105,9 @@ function Steps({ profile, initial }: { profile: Profile; initial: Step }) {
             body="We filled these in from your resume. The extension uses them to score jobs and fill in application forms, so check your name, phone and links, or skip and fix them later on your profile page."
           />
           <BasicsCard key={importCount} profile={profile} />
+          <FieldCard profile={profile} />
           <SkillsCard profile={profile} />
+          <FieldSnapshotCard />
           <FoundSummary profile={profile} />
           <Footer
             back={() => setStep(0)}

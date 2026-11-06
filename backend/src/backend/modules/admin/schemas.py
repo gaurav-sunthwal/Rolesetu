@@ -17,6 +17,17 @@ class AdminRead(BaseModel):
     email: str
 
 
+class DomainCatalogAdminRead(BaseModel):
+    """A skill dictionary generated once for a field and reused for every user in it."""
+
+    field_key: str
+    version: int
+    source: str
+    catalog_text: str
+    core_skill_names: list[str]
+    created_at: datetime | None
+
+
 class DayCount(BaseModel):
     day: date
     signups: int

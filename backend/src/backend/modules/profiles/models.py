@@ -28,4 +28,7 @@ class Profile(IdMixin, TimestampMixin, Base):
     experience: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     projects: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     education: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    field_key: Mapped[str | None] = mapped_column(default=None)
+    scope_summary: Mapped[str | None] = mapped_column(default=None)
+    inferred_field_key: Mapped[str | None] = mapped_column(default=None)
     version: Mapped[int] = mapped_column(default=1)

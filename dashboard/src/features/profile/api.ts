@@ -1,8 +1,13 @@
 import { api } from '@/lib/api/client';
-import type { Profile, ProfileWrite, SavedAnswer } from '@/lib/api/types';
+import type { FieldSnapshot, Profile, ProfileWrite, SavedAnswer } from '@/lib/api/types';
 
 export async function getProfile(): Promise<Profile> {
   const { data } = await api.get<Profile>('/profile/me');
+  return data;
+}
+
+export async function getFieldSnapshot(): Promise<FieldSnapshot> {
+  const { data } = await api.get<FieldSnapshot>('/profile/me/field-snapshot');
   return data;
 }
 

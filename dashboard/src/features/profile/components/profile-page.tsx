@@ -13,6 +13,8 @@ import { SavedAnswersCard } from '@/features/profile/components/saved-answers-ca
 import { SkillsCard } from '@/features/profile/components/skills-card';
 import { useProfile, useUpdateProfile } from '@/features/profile/hooks';
 import { ResumeCard } from '@/features/resume/components/resume-card';
+import { FieldCard } from '@/features/welcome/components/field-card';
+import { FieldSnapshotCard } from '@/features/welcome/components/field-snapshot-card';
 import { errorMessage } from '@/lib/api/client';
 import type {
   EducationItem,
@@ -109,6 +111,8 @@ export function ProfilePage() {
     <div className="mx-auto grid w-full max-w-5xl items-start gap-5 lg:grid-cols-3">
       <div className="flex flex-col gap-5 lg:col-span-2">
         <ResumeCard profile={data} onApplied={handleImported} />
+        <FieldCard profile={data} />
+        <FieldSnapshotCard />
         <BasicsCard key={importCount} profile={data} />
         <SkillsCard profile={data} />
 

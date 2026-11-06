@@ -62,6 +62,7 @@ def test_a_job_in_another_line_of_work_is_called_out() -> None:
     fit = fields.compare(fields.field_of("Electrical Design Manager"), ["data"])
     assert fit.status == "different"
     assert "electrical engineering" in fit.summary and "data and analytics" in fit.summary
+    assert "not your role" in fit.summary
 
 
 def test_close_fields_are_related_and_unknown_titles_decide_nothing() -> None:
@@ -181,13 +182,11 @@ def test_a_job_in_a_line_of_work_the_person_never_had_is_held_low() -> None:
     match.id, match.created_at = uuid.uuid4(), datetime.now(UTC)
     shown = service.to_read(match, datetime.now(UTC))
 
-    assert shown.score is not None and shown.score <= scoring.FIELD_CAP
-    assert shown.summary is not None and "electrical engineering role" in shown.summary
-    names = {item.name: item.verdict for item in shown.skill_results}
-    assert names["Professional Engineer (PE) license"] == "missing"
-    assert names["Degree in Electrical Engineering"] == "missing"
-    assert names["Power distribution"] == "missing"
-    assert names["Data analysis"] == "strong"
+    assert shown.score == scoring.FIELD_CAP
+    assert shown.summary is not None and "not your role" in shown.summary
+    assert shown.skill_results == []
+    assert shown.screened is True
+    assert shown.field_fit is not None and shown.field_fit.status == "different"
 
 
 def test_a_related_field_gets_a_full_read() -> None:
@@ -327,9 +326,9 @@ async def test_each_skill_is_judged_by_the_cheapest_thing_that_can(
         return [SkillJudgement(skill_id="K1", verdict="missing", reason="Not shown")]
 
     monkeypatch.setattr(matching, "generate_structured", fake_model)
-    job, match = new_match("electrical_design_manager")
+    job, match = new_match("data_engineer")
     known = ExtractedJob(
-        role="Electrical Design Manager",
+        role="Data Engineer",
         required_skills=["Python", "Busway sizing", "Grounding grid design"],
     )
     remembered = {

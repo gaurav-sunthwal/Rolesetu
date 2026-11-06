@@ -22,6 +22,7 @@ export type PreviewPage = Schemas['Page_AdminPreviewRow_'];
 export type AiCall = Schemas['AiCallRead'];
 export type AiCallPage = Schemas['Page_AiCallRead_'];
 export type AiCallSummary = Schemas['AiCallSummary'];
+export type DomainCatalog = Schemas['DomainCatalogAdminRead'];
 export type EmailDefaults = Schemas['EmailDefaults'];
 export type EmailCompose = Schemas['EmailCompose'];
 export type EmailTemplate = Schemas['EmailTemplate'];

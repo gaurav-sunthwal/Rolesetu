@@ -23,6 +23,8 @@ from backend.core.exceptions import (
 from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.db.session import get_sessionmaker
 from backend.modules.ai_calls import service as ai_calls
+from backend.modules.domain_catalogs import repository as domain_catalogs_repository
+from backend.modules.domain_catalogs import service as domain_catalogs_service
 from backend.modules.errors import service as errors_service
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches import repository, scoring
@@ -31,6 +33,7 @@ from backend.modules.matches.fetching.reader import load_job_page
 from backend.modules.matches.job_key import job_key
 from backend.modules.matches.local import fields
 from backend.modules.matches.local.catalog import in_dictionary, lookup
+from backend.modules.matches.local.domain_catalogs import field_keys_for_profile
 from backend.modules.matches.local.engine import ENGINE_VERSION, LocalMatch, score_locally
 from backend.modules.matches.local.experience import ExperienceAsk, read_experience
 from backend.modules.matches.local.jd import Requirement
@@ -83,6 +86,11 @@ def _current_versions() -> tuple[str, ...]:
 
 
 # Words nearly every job posting uses, and other text does not.
+_ENTRY_LEVEL = re.compile(
+    r"\bintern(?:ship)?\b|\bfreshers?\b|prior experience is not|experience is not mandatory|"
+    r"no prior experience|experience is not required",
+    re.IGNORECASE,
+)
 _JOB_WORDS = re.compile(
     r"responsibilit|requirement|qualification|experience|skills?\b|candidate|"
     r"\brole\b|apply|hiring|position|duties|job description",
@@ -164,7 +172,11 @@ def to_read(match: Match, now: datetime) -> MatchRead:
         limits=[
             ScoreLimit(kind=cap.kind, limit=cap.limit, reason=cap.reason)
             for cap in caps
-            if match.raw_score is not None and cap.limit < match.raw_score and cap.reason
+            if cap.reason
+            and (
+                (match.raw_score is not None and cap.limit < match.raw_score)
+                or (cap.kind == "field" and assessment.get("screened"))
+            )
         ],
         role=match.job.role,
         company=match.job.company,
@@ -194,6 +206,9 @@ def _summary(match: Match, caps: list[scoring.Cap]) -> str | None:
     field = next((cap for cap in caps if cap.kind == "field"), None)
     if field is not None and field.reason:
         return field.reason
+    background = ((match.experience or {}).get("assessment") or {}).get("background")
+    if background and match.raw_score is not None and (match.score or 0) > match.raw_score:
+        return background
     biting = [cap for cap in caps if cap.reason and cap.limit < (match.raw_score or 0)]
     if biting:
         return min(biting, key=lambda cap: cap.limit).reason
@@ -303,9 +318,29 @@ async def start_match(
         status="pending",
         created_at=now,
     )
+    fit = _field_fit(profile, role or payload.role, jd_text)
+    if fit.status == "different":
+        # Title and profile already disagree. Say so. Do not build a catalog
+        # and do not ask a model what the job wants.
+        _record_different_field(job, match, fit)
+        answer = to_read(match, now)
+        return Started(answer, save=functools.partial(_save_in_background, job, match))
+
     if engine == "local":
-        # Off the event loop: the embedding pass is CPU work.
-        await asyncio.to_thread(score_without_model, job, match, profile, get_matcher())
+        # A catalog is built only for the field this person is in.
+        catalog_keys = field_keys_for_profile(profile)
+        for field_key in catalog_keys:
+            await domain_catalogs_service.ensure_catalog(db, field_key)
+        job_title = role or payload.role
+        job_field = fields.field_of(job_title) if job_title else None
+        if job_field is not None and job_field.key not in catalog_keys:
+            stored = await domain_catalogs_repository.get(db, job_field.key)
+            if stored is not None:
+                catalog_keys.add(job_field.key)
+        catalog_append = await domain_catalogs_service.catalog_append_for_fields(db, catalog_keys)
+        await asyncio.to_thread(
+            score_without_model, job, match, profile, get_matcher(), catalog_append
+        )
         answer = to_read(match, now)
         # A partial of the async function itself, not a lambda: the task runner
         # awaits only what it can see is async, and would otherwise call a
@@ -434,12 +469,66 @@ def _listing_of(job: Job) -> dict[str, str | None] | None:
     return listing if isinstance(listing, dict) else None
 
 
+def _role_line(jd_text: str) -> str | None:
+    """The first short line that names a field, when the page sent no job title."""
+    for line in jd_text.splitlines():
+        line = line.strip()
+        if 3 <= len(line) <= 80 and fields.field_of(line) is not None:
+            return line
+    return None
+
+
+def _field_fit(profile: ProfileRead, role: str | None, jd_text: str) -> fields.FieldFit:
+    title = role or _role_line(jd_text)
+    return fields.compare(fields.field_of(title), _person_fields(profile))
+
+
+def _record_different_field(job: Job, match: Match, fit: fields.FieldFit) -> None:
+    """The title already says this is another field. No catalog and no model."""
+    if not job.role:
+        job.role = _role_line(job.jd_text)
+    cap = scoring.Cap("field", scoring.FIELD_CAP, fit.summary)
+    match.skill_results = []
+    match.gaps = []
+    match.raw_score = 0
+    match.score = scoring.FIELD_CAP
+    match.seniority_note = None
+    match.experience = {
+        "status": "not_stated",
+        "required_min": None,
+        "required_max": None,
+        "candidate_years": 0.0,
+        "source": None,
+        "quote": None,
+        "summary": "Experience was not checked, because this is not your field.",
+        "total_years": None,
+        "assessment": {
+            "field_fit": {
+                "status": fit.status,
+                "job_field": fields.label(fit.job_field) if fit.job_field else None,
+                "candidate_fields": [fields.label(key) for key in fit.candidate_fields],
+                "summary": fit.summary,
+            },
+            "caps": [dataclasses.asdict(cap)],
+            "screened": True,
+            "background": None,
+        },
+    }
+    match.prompt_versions = ENGINE_VERSION
+    match.status = "completed"
+
+
 def _person_fields(profile: ProfileRead) -> list[str]:
-    return fields.fields_of_person(
+    found = fields.fields_of_person(
         [(item.title, item.start, item.end) for item in profile.experience],
         profile.headline,
         [f"{item.field or ''} {item.degree}" for item in profile.education],
     )
+    # The field they confirmed is where they are going, even when past titles
+    # are in another line of work.
+    if profile.field_key and profile.field_key not in found:
+        found.append(profile.field_key)
+    return found
 
 
 def _same_qualification(name: str, must: MustHave) -> bool:
@@ -585,6 +674,16 @@ def _finish(
             )
         )
     score, _ = scoring.apply_caps(raw_score, caps)
+    entry_level = bool(_ENTRY_LEVEL.search(f"{job.role or ''}\n{job.jd_text[:2000]}"))
+    floor = scoring.entry_aim_floor(same_field=fit.status == "same", entry_level=entry_level)
+    background = None
+    if floor is not None and score < floor and not any(cap.kind == "must_have" for cap in caps):
+        score = floor
+        label = job_field.label if job_field else "this"
+        background = (
+            f"This is an entry-level {label} role, and your profile is aimed at that work. "
+            "You have not shown the specific skills yet, so treat it as a stretch, not a blank."
+        )
 
     match.skill_results = [r.model_dump() for r in results]
     match.gaps = [r.name for r in results if r.verdict == "missing"]
@@ -606,6 +705,7 @@ def _finish(
             },
             "caps": [dataclasses.asdict(cap) for cap in caps],
             "screened": screened,
+            "background": background,
         },
     }
     match.prompt_versions = engine_version
@@ -613,7 +713,11 @@ def _finish(
 
 
 def score_without_model(
-    job: Job, match: Match, profile: ProfileRead, matcher: Matcher | None
+    job: Job,
+    match: Match,
+    profile: ProfileRead,
+    matcher: Matcher | None,
+    catalog_append: str = "",
 ) -> None:
     """Scores the job on this machine alone: no model call, no network, no cost.
 
@@ -624,7 +728,12 @@ def score_without_model(
     is not a job posting at all is turned away. Pure apart from the objects it
     fills in.
     """
-    found = score_locally(profile, job.jd_text, matcher, job.url)
+    fit = _field_fit(profile, job.role, job.jd_text)
+    if fit.status == "different":
+        _record_different_field(job, match, fit)
+        return
+
+    found = score_locally(profile, job.jd_text, matcher, job.url, catalog_append)
     if (
         not found.job.requirements
         and fields.field_of(job.role or found.job.role) is None
@@ -737,6 +846,11 @@ async def score_with_model(
     already given for this profile on another job (`remembered`), and only then
     the model. A job whose skills are all known costs no judging call at all.
     """
+    fit = _field_fit(profile, job.role, job.jd_text)
+    if fit.status == "different":
+        _record_different_field(job, match, fit)
+        return
+
     evidence = build_evidence(profile)
 
     extracted = known or await matching.extract_job(job.jd_text, user_api_key=user_api_key)

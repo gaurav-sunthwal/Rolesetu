@@ -84,18 +84,14 @@ class ParsedJob:
     company: str | None = None
     min_years: int | None = None
     requirements: list[Requirement] = field(default_factory=list)
+    catalog_append: str = ""
 
     @property
     def understood(self) -> int:
-        """Requirements read from the posting itself: ones the dictionary knows
-        (see `in_dictionary`) or the posting's own wording named (see `phrases`).
-        A skill found only because the candidate lists it does not count: the
-        candidate's own names can only ever find what they already have.
-        """
         return sum(
             1
             for item in self.requirements
-            if any(in_dictionary(o) or o.phrase for o in item.options)
+            if any(in_dictionary(o, self.catalog_append) or o.phrase for o in item.options)
         )
 
 
@@ -156,7 +152,12 @@ def _unknown_tools(sentence: str, mentions: list[Mention]) -> list[Skill]:
     return found
 
 
-def parse_job(jd_text: str, extra_names: tuple[str, ...] = (), url: str | None = None) -> ParsedJob:
+def parse_job(
+    jd_text: str,
+    extra_names: tuple[str, ...] = (),
+    url: str | None = None,
+    catalog_append: str = "",
+) -> ParsedJob:
     lines = [line.strip() for line in jd_text.splitlines() if line.strip()]
     job = ParsedJob()
 
@@ -186,7 +187,7 @@ def parse_job(jd_text: str, extra_names: tuple[str, ...] = (), url: str | None =
             continue
 
         for sentence in _sentences(line):
-            mentions = find_skills(sentence, extra_names)
+            mentions = find_skills(sentence, extra_names, catalog_append)
             required = mode == "required" and not _NICE.search(sentence)
             groups = _groups(sentence, mentions)
             for tool in _unknown_tools(sentence, mentions):
@@ -218,4 +219,5 @@ def parse_job(jd_text: str, extra_names: tuple[str, ...] = (), url: str | None =
     job.role, job.company = find_title(
         jd_text, lines, url, [skill for item in job.requirements for skill in item.options]
     )
+    job.catalog_append = catalog_append
     return job

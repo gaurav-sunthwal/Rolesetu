@@ -58,6 +58,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/profile/me/field-snapshot': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Field Snapshot */
+    get: operations['read_field_snapshot_api_v1_profile_me_field_snapshot_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/saved-answers': {
     parameters: {
       query?: never;
@@ -198,8 +215,9 @@ export interface paths {
     put?: never;
     /**
      * Create Match
-     * @description Most jobs are scored in the request. A job the model has to read takes
-     *     several seconds, and how that is handled depends on the client:
+     * @description Jobs are scored in the request by the local engine. Only with the model
+     *     engine (`match_engine = "llm"`) does a check take several seconds, and then
+     *     how that is handled depends on the client:
      *
      *     - one that sends `Prefer: respond-async` (RFC 7240) gets the pending match
      *       at once and polls GET /matches/{id} until it completes;
@@ -941,7 +959,8 @@ export interface paths {
     };
     /**
      * List Job Checks
-     * @description Everyone's job checks, newest first. `paid` keeps those read through the paid reader.
+     * @description Everyone's job checks, newest first. `day` (a UTC date) keeps one day's;
+     *     `paid` keeps those read through the paid reader.
      */
     get: operations['list_job_checks_api_v1_admin_job_checks_get'];
     put?: never;
@@ -961,9 +980,29 @@ export interface paths {
     };
     /**
      * List Applications
-     * @description Everyone's tracked applications, newest first.
+     * @description Everyone's tracked applications, newest first. `day` (a UTC date) keeps one day's.
      */
     get: operations['list_applications_api_v1_admin_applications_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/daily': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Daily Activity
+     * @description Sign-ups, job checks and applications per UTC day, from `start` to `end`.
+     */
+    get: operations['read_daily_activity_api_v1_admin_daily_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2106,6 +2145,20 @@ export interface components {
       /** Url */
       url: string;
     };
+    /** DailyActivity */
+    DailyActivity: {
+      /**
+       * Day
+       * Format: date
+       */
+      day: string;
+      /** Signups */
+      signups: number;
+      /** Job Checks */
+      job_checks: number;
+      /** Applications */
+      applications: number;
+    };
     /** DayCount */
     DayCount: {
       /**
@@ -2522,6 +2575,26 @@ export interface components {
       /** Summary */
       summary: string;
     };
+    /** FieldSnapshotRead */
+    FieldSnapshotRead: {
+      /** Field Key */
+      field_key: string | null;
+      /** Field Label */
+      field_label: string | null;
+      /** Scope Summary */
+      scope_summary: string | null;
+      /** Inferred Field Key */
+      inferred_field_key: string | null;
+      /** Inferred Field Label */
+      inferred_field_label: string | null;
+      /**
+       * Catalog Status
+       * @enum {string}
+       */
+      catalog_status: 'ready' | 'unavailable';
+      /** Skills */
+      skills: components['schemas']['SkillResult'][];
+    };
     /** FindingRead */
     FindingRead: {
       /** Title */
@@ -2928,6 +3001,12 @@ export interface components {
       projects: components['schemas']['ProjectItem'][];
       /** Education */
       education: components['schemas']['EducationItem'][];
+      /** Field Key */
+      field_key: string | null;
+      /** Scope Summary */
+      scope_summary: string | null;
+      /** Inferred Field Key */
+      inferred_field_key: string | null;
       /** Version */
       version: number;
       /** Completeness */
@@ -2954,6 +3033,12 @@ export interface components {
       projects?: components['schemas']['ProjectItem'][];
       /** Education */
       education?: components['schemas']['EducationItem'][];
+      /** Field Key */
+      field_key?: string | null;
+      /** Scope Summary */
+      scope_summary?: string | null;
+      /** Inferred Field Key */
+      inferred_field_key?: string | null;
     };
     /** ProjectItem */
     ProjectItem: {
@@ -3624,6 +3709,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_field_snapshot_api_v1_profile_me_field_snapshot_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FieldSnapshotRead'];
         };
       };
     };
@@ -5109,6 +5214,7 @@ export interface operations {
         q?: string | null;
         extension?: 'missing' | null;
         has?: ('profile' | 'extension' | 'extension_week' | 'gmail') | null;
+        joined_on?: string | null;
         cursor?: string | null;
         limit?: number;
       };
@@ -5142,6 +5248,7 @@ export interface operations {
     parameters: {
       query?: {
         hours?: number | null;
+        day?: string | null;
         paid?: boolean;
         cursor?: string | null;
         limit?: number;
@@ -5175,6 +5282,7 @@ export interface operations {
   list_applications_api_v1_admin_applications_get: {
     parameters: {
       query?: {
+        day?: string | null;
         cursor?: string | null;
         limit?: number;
       };
@@ -5191,6 +5299,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['Page_AdminApplicationRow_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_daily_activity_api_v1_admin_daily_get: {
+    parameters: {
+      query: {
+        start: string;
+        end: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DailyActivity'][];
         };
       };
       /** @description Validation Error */

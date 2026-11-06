@@ -92,6 +92,19 @@ def describe_validation(errors: list[dict[str, Any]]) -> str:
     return f"{subject} is not valid. Please check it and try again."
 
 
+def _client_source(request: Request) -> str:
+    """Where the person was when they hit this: the extension, a resume update, or the site."""
+    from backend.modules.extension.service import TOKEN_PREFIX
+
+    header = request.headers.get("authorization") or ""
+    token = header.split(" ", 1)[1].strip() if header.lower().startswith("bearer ") else ""
+    if token.startswith(TOKEN_PREFIX):
+        return "extension"
+    if "/resume" in request.url.path:
+        return "resume"
+    return "dashboard"
+
+
 async def _record(request: Request, exc: Exception, *, level: str, status: int) -> None:
     # Imported here: the errors module needs the database, which needs settings,
     # and this file is imported before either is ready.
@@ -102,23 +115,30 @@ async def _record(request: Request, exc: Exception, *, level: str, status: int) 
     for name, value in request.path_params.items():
         route = route.replace(f"/{value}", f"/{{{name}}}", 1)
     await errors_service.record(
-        source="api",
+        source=_client_source(request) if status < 500 else "api",
         level=level,
         exc=exc,
         message=str(exc) or type(exc).__name__,
         route=route,
         method=request.method,
         status=status,
+        group_by_message=status < 500,
     )
 
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-        # A failure we chose to report as our own fault (a service we depend on
-        # is down, say) is worth seeing in the admin panel. A refused request is not.
-        if exc.status_code >= 500:
-            await _record(request, exc, level="warning", status=exc.status_code)
+        # Crashes and the limits a person actually hits (a resume they cannot
+        # update yet, too many job checks) are worth seeing. Ordinary validation
+        # mistakes are not.
+        if exc.status_code >= 500 or exc.status_code == 429:
+            await _record(
+                request,
+                exc,
+                level="error" if exc.status_code >= 500 else "warning",
+                status=exc.status_code,
+            )
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     @app.exception_handler(RequestValidationError)

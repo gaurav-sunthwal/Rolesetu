@@ -26,7 +26,7 @@ _MAX_LENGTH = 50
 def _split_label(text: str) -> str:
     """Drops a category label: "Languages: Python, Go" -> "Python, Go"."""
     label, separator, rest = text.partition(":")
-    if separator and rest.strip() and len(label.split()) <= 5:
+    if separator and rest.strip() and len(label.split()) <= 6:
         return rest
     return text
 
