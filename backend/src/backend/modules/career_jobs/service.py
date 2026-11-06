@@ -5,14 +5,21 @@ engine (no model call). Scores are kept per (user, profile version, collection
 version) so paging and changing filters do not score again. That cache is only
 a per-server shortcut: its key includes the collection's version in the
 database, so a change made through another server is never missed.
+
+A new collection is scored in the background. Until it finishes, the page is
+the last finished list for this same profile version, with a percent of how
+far the new scoring has got. The user can open those jobs while the new ones
+are still being matched.
 """
 
 import asyncio
 import base64
 import binascii
+import logging
 import re
 import uuid
 from collections import Counter, OrderedDict
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,11 +48,53 @@ from backend.modules.matches.schemas import SkillResult
 from backend.modules.profiles.schemas import ProfileRead
 from backend.modules.profiles.service import get_profile
 
+logger = logging.getLogger(__name__)
+
 # A user's scored list, kept for the last few users who opened the page.
 _CACHE_SIZE = 32
 _cache: OrderedDict[tuple[uuid.UUID, int, int], list[CareerJobRead]] = OrderedDict()
+# The last finished list for a user and profile version, kept so a new
+# collection can be scored without hiding the jobs they already had.
+_previous: dict[tuple[uuid.UUID, int], list[CareerJobRead]] = {}
 # Skills a posting must name, that we recognise, for its score to rank on its own.
 WELL_EVIDENCED = 3
+
+
+@dataclass
+class _Run:
+    """One in-progress scoring of a collection for one profile."""
+
+    done: int
+    total: int
+    # Jobs scored so far, replaced as a whole so the page can read it safely.
+    shown: list[CareerJobRead] | None = None
+    task: asyncio.Task[None] | None = None
+
+
+# Scoring that has started and not finished, keyed like `_cache`.
+_runs: dict[tuple[uuid.UUID, int, int], _Run] = {}
+
+
+def invalidate_user_cache(user_id: uuid.UUID) -> None:
+    """Drop all cached scores for a user so the next page scores fresh.
+
+    Called when the user's profile changes, so that fresh jobs are re-scored
+    against the new profile instead of serving stale results from the old one.
+    """
+    stale = [key for key in _cache if key[0] == user_id]
+    for key in stale:
+        del _cache[key]
+    stale_prev = [key for key in _previous if key[0] == user_id]
+    for key in stale_prev:
+        del _previous[key]
+    # Cancel any in-progress scoring too.
+    stale_runs = [key for key in _runs if key[0] == user_id]
+    for key in stale_runs:
+        run = _runs.pop(key, None)
+        if run and run.task:
+            run.task.cancel()
+
+
 # Reading a newly added company: one board API call, or a small Workday site.
 ADD_TIMEOUT_SECONDS = 90
 # Each added site is read every day for everyone, so adding is limited.
@@ -222,43 +271,96 @@ def _score(profile: ProfileRead, job: StoredJob, candidate_years: float) -> Care
     )
 
 
-async def _scored(
-    db: AsyncSession, profile: ProfileRead, user_id: uuid.UUID, collection: store.Collection
-) -> list[CareerJobRead]:
-    key = (user_id, profile.version, collection.version)
-    if key in _cache:
-        _cache.move_to_end(key)
-        return _cache[key]
-    # Every company the collection knows, so one since dropped from the catalog keeps its name.
-    names = {c.slug: c.name for c in collection.companies} | {
-        c.slug: c.name for c in (await _companies(db)).values()
-    }
-    years = candidate_years_of(profile)
-
-    def work() -> list[CareerJobRead]:
-        picked = (_score(profile, job, years) for job in collection.jobs)
-        return [
-            job.model_copy(update={"company": names.get(job.company_slug, job.company_slug)})
-            for job in picked
-            if job is not None
-        ]
-
-    # Scoring thousands of jobs is CPU work; keep the event loop free meanwhile.
-    jobs = await asyncio.to_thread(work)
-    # A score from one or two recognised skills says little, so those jobs
-    # come after the ones with real evidence behind their score.
-    jobs.sort(
+def _ranked(jobs: list[CareerJobRead]) -> list[CareerJobRead]:
+    """A score from one or two recognised skills says little, so those jobs
+    come after the ones with real evidence behind their score.
+    """
+    return sorted(
+        jobs,
         key=lambda j: (
             j.score is None,
             len(j.skill_results) < WELL_EVIDENCED,
             -(j.score or 0),
             -(j.posted_on or j.first_seen).toordinal(),
-        )
+        ),
     )
+
+
+def _remember(key: tuple[uuid.UUID, int, int], jobs: list[CareerJobRead]) -> None:
     _cache[key] = jobs
+    _previous[(key[0], key[1])] = jobs
     while len(_cache) > _CACHE_SIZE:
         _cache.popitem(last=False)
-    return jobs
+
+
+async def _begin(
+    db: AsyncSession, profile: ProfileRead, user_id: uuid.UUID, collection: store.Collection
+) -> None:
+    """Starts scoring this collection if it is not already scored or underway."""
+    key = (user_id, profile.version, collection.version)
+    if key in _cache or key in _runs:
+        if key in _cache:
+            _cache.move_to_end(key)
+        return
+    # Claim the slot before the first await, so two opens of the page start one scoring.
+    run = _Run(done=0, total=0)
+    _runs[key] = run
+    try:
+        # Every company the collection knows, so one since dropped from the catalog keeps its name.
+        names = {c.slug: c.name for c in collection.companies} | {
+            c.slug: c.name for c in (await _companies(db)).values()
+        }
+    except Exception:
+        _runs.pop(key, None)
+        raise
+    years = candidate_years_of(profile)
+    jobs = list(collection.jobs)
+    if not jobs:
+        _remember(key, [])
+        _runs.pop(key, None)
+        return
+    run.total = len(jobs)
+
+    def work() -> list[CareerJobRead]:
+        picked: list[CareerJobRead] = []
+        for index, job in enumerate(jobs, start=1):
+            scored = _score(profile, job, years)
+            if scored is not None:
+                picked.append(
+                    scored.model_copy(
+                        update={"company": names.get(job.company_slug, job.company_slug)}
+                    )
+                )
+            # The page reads this between jobs, so the percent and the list can move.
+            run.done = index
+            if index == 1 or index % 20 == 0 or index == len(jobs):
+                run.shown = _ranked(picked)
+        return _ranked(picked)
+
+    async def finish() -> None:
+        try:
+            # Scoring thousands of jobs is CPU work; keep the event loop free meanwhile.
+            _remember(key, await asyncio.to_thread(work))
+        except Exception:
+            logger.exception("Scoring fresh jobs failed")
+        finally:
+            _runs.pop(key, None)
+
+    run.task = asyncio.create_task(finish())
+
+
+def _progress(key: tuple[uuid.UUID, int, int]) -> tuple[list[CareerJobRead], int, bool]:
+    """The list to show, how much of the current scoring is done, and whether it is still going."""
+    ready = _cache.get(key)
+    if ready is not None:
+        return ready, 100, False
+    previous = _previous.get((key[0], key[1]), [])
+    run = _runs.get(key)
+    # Stay under 100 until the finished list replaces this one.
+    percent = 0 if run is None or run.total == 0 else min(99, run.done * 100 // run.total)
+    # A finished list for this profile stays up. Otherwise show whatever is already scored.
+    shown = previous or (run.shown if run is not None and run.shown else [])
+    return shown, percent, True
 
 
 def _encode(offset: int) -> str:
@@ -285,7 +387,8 @@ async def list_jobs(
 ) -> CareerJobPage:
     profile = await get_profile(db, user_id=user_id)
     collection = await store.current(db)
-    scored = await _scored(db, profile, user_id, collection)
+    await _begin(db, profile, user_id, collection)
+    scored, percent, refreshing = _progress((user_id, profile.version, collection.version))
     since = date.today() - timedelta(days=collection.days or DAYS)
 
     chosen = set(companies)
@@ -318,4 +421,6 @@ async def list_jobs(
         work_modes=[WorkModeCount(mode=m, count=c) for m, c in mode_counts.most_common()],
         collected_at=collection.collected_at,
         candidate_years=candidate_years_of(profile),
+        scored_percent=percent,
+        refreshing=refreshing,
     )

@@ -82,3 +82,8 @@ class CareerJobPage(BaseModel):
     collected_at: datetime | None
     # The user's experience the list was filtered by.
     candidate_years: float
+    # How much of the current collection has been scored, 0 to 100.
+    # 100 only when `items` is that finished list.
+    scored_percent: int = Field(ge=0, le=100)
+    # True while `items` is an older list for this profile and a newer one is still scoring.
+    refreshing: bool

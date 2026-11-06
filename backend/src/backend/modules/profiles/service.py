@@ -74,6 +74,11 @@ async def save_profile(
             for field, value in incoming.items():
                 setattr(profile, field, value)
             profile.version += 1
+            # Deferred import to avoid circular dependency:
+            # profiles.service ↔ career_jobs.service
+            from backend.modules.career_jobs.service import invalidate_user_cache
+
+            invalidate_user_cache(user_id)
 
     await db.flush()
     await db.refresh(profile)

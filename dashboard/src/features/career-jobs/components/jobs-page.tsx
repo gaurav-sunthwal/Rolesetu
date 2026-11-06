@@ -6,7 +6,6 @@ import { useMemo, useState } from 'react';
 
 import { EmptyState, ErrorState } from '@/components/app/states';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import type { CareerJobFilters } from '@/features/career-jobs/api';
 import { CompanyPicker } from '@/features/career-jobs/components/company-picker';
 import { JobCard } from '@/features/career-jobs/components/job-card';
@@ -72,6 +71,10 @@ export function JobsPage() {
   // Only worth a filter when some jobs say how they are worked.
   const modeCounts = first?.work_modes ?? [];
   const showModes = modeCounts.some((m) => m.mode !== 'not_stated') || workModes.length > 0;
+
+  const percent = first?.scored_percent ?? 0;
+  const scoring =
+    profile.isPending || Boolean(first?.refreshing) || (hasEvidence && list.isPending && !first);
 
   const followingLabel = picks.all
     ? `All companies${companyCount ? ` · ${companyCount}` : ''}`
@@ -167,27 +170,11 @@ export function JobsPage() {
         </div>
       ) : null}
 
-      {profile.isPending || (hasEvidence && list.isPending) ? (
-        <ul className={GRID} aria-busy="true" aria-label="Loading jobs">
-          {Array.from({ length: 6 }, (_, index) => (
-            <li key={index} className="bg-card flex flex-col gap-3 rounded-3xl border p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-                <Skeleton className="size-12 rounded-2xl" />
-              </div>
-              <Skeleton className="h-5 w-4/5" />
-              <Skeleton className="h-3 w-1/2" />
-              <Skeleton className="h-5 w-32 rounded-full" />
-              <Skeleton className="mt-2 h-8 w-full rounded-full" />
-            </li>
-          ))}
-        </ul>
-      ) : profile.isError ? (
+      {scoring ? <ScoreProgress percent={percent} showingPrevious={jobs.length > 0} /> : null}
+
+      {profile.isError ? (
         <ErrorState className={PANEL} error={profile.error} onRetry={() => profile.refetch()} />
-      ) : !hasEvidence ? (
+      ) : !profile.isPending && !hasEvidence ? (
         <EmptyState
           className={PANEL}
           icon={UserRound}
@@ -199,9 +186,9 @@ export function JobsPage() {
             </Button>
           }
         />
-      ) : list.isError ? (
+      ) : list.isError && jobs.length === 0 ? (
         <ErrorState className={PANEL} error={list.error} onRetry={() => list.refetch()} />
-      ) : !collectedAt ? (
+      ) : scoring && jobs.length === 0 ? null : !collectedAt ? (
         <EmptyState
           className={PANEL}
           icon={Inbox}
@@ -268,6 +255,43 @@ export function JobsPage() {
         picks={picks}
         onSave={updatePicks}
       />
+    </div>
+  );
+}
+
+function ScoreProgress({
+  percent,
+  showingPrevious,
+}: {
+  percent: number;
+  showingPrevious: boolean;
+}) {
+  const shown = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div className="bg-card rounded-3xl border px-4 py-3" aria-live="polite">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-semibold">Matching jobs to your profile</p>
+        <p className="text-sm font-semibold tabular-nums">{shown}%</p>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="Matching jobs to your profile"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={shown}
+        className="bg-secondary mt-2 h-2 overflow-hidden rounded-full"
+      >
+        <div
+          className="bg-primary h-full rounded-full transition-[width] duration-300 ease-linear motion-reduce:transition-none"
+          style={{ width: `${shown}%` }}
+        />
+      </div>
+      {showingPrevious ? (
+        <p className="text-muted-foreground mt-2 text-xs">
+          Open any job below. This list is what is already matched for your profile, and it keeps
+          filling in.
+        </p>
+      ) : null}
     </div>
   );
 }

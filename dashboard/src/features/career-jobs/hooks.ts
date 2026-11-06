@@ -24,6 +24,7 @@ export function useCareerJobs(filters: CareerJobFilters, enabled: boolean) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor,
     placeholderData: (previous) => previous,
+    refetchInterval: (query) => (query.state.data?.pages[0]?.refreshing ? 1000 : false),
     enabled,
   });
 }

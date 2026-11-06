@@ -4,6 +4,8 @@ The profile and the collection are passed in directly, so nothing here
 touches the database; test_career_store.py covers saving them.
 """
 
+import asyncio
+import time
 import uuid
 from datetime import UTC, date, datetime
 
@@ -128,6 +130,8 @@ def collection(monkeypatch: pytest.MonkeyPatch) -> FakeStore:
     for name in ("current", "companies", "job_counts"):
         monkeypatch.setattr(store, name, getattr(fake, name))
     service._cache.clear()
+    service._previous.clear()
+    service._runs.clear()
     companies = [
         StoredCompany(slug="acme", name="Acme", kind="lever", config={"token": "acme"}),
         StoredCompany(slug="globex", name="Globex", kind="lever", config={"token": "globex"}),
@@ -154,9 +158,12 @@ async def _list(
     cursor: str | None = None,
     limit: int = 20,
     tracked: set[str] | None = None,
+    user_id: uuid.UUID | None = None,
+    wait: bool = True,
 ) -> CareerJobPage:
     tracked = tracked or set()
     profile = _profile(years)
+    user_id = user_id or uuid.uuid4()
 
     async def fake_profile(_db: object, *, user_id: uuid.UUID) -> ProfileRead:
         return profile
@@ -166,16 +173,85 @@ async def _list(
 
     monkeypatch.setattr(service, "get_profile", fake_profile)
     monkeypatch.setattr(service, "tracked_urls", fake_tracked)
-    return await service.list_jobs(
-        None,  # type: ignore[arg-type]  # the profile lookup above never uses it
-        user_id=uuid.uuid4(),
-        companies=companies or [],
-        places=places or [],
-        work_modes=work_modes or [],
-        include_stretch=include_stretch,
-        cursor=cursor,
-        limit=limit,
+
+    async def once() -> CareerJobPage:
+        return await service.list_jobs(
+            None,  # type: ignore[arg-type]  # the profile lookup above never uses it
+            user_id=user_id,
+            companies=companies or [],
+            places=places or [],
+            work_modes=work_modes or [],
+            include_stretch=include_stretch,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    page = await once()
+    if not wait:
+        return page
+    for _ in range(200):
+        if page.scored_percent == 100 and not page.refreshing:
+            return page
+        await asyncio.sleep(0.01)
+        page = await once()
+    raise AssertionError("scoring did not finish")
+
+
+@pytest.mark.usefixtures("collection")
+async def test_scored_jobs_show_before_the_run_finishes(monkeypatch: pytest.MonkeyPatch) -> None:
+    user_id = uuid.uuid4()
+    real = service._score
+
+    def slow(
+        profile: ProfileRead, job: StoredJob, candidate_years: float
+    ) -> service.CareerJobRead | None:
+        time.sleep(0.05)
+        return real(profile, job, candidate_years)
+
+    monkeypatch.setattr(service, "_score", slow)
+    started = await _list(monkeypatch, user_id=user_id, wait=False)
+    assert started.refreshing
+    assert started.items == []
+    midway: CareerJobPage | None = None
+    for _ in range(40):
+        await asyncio.sleep(0.02)
+        page = await _list(monkeypatch, user_id=user_id, wait=False)
+        if page.items and page.refreshing and page.scored_percent < 100:
+            midway = page
+            break
+    assert midway is not None
+    done = await _list(monkeypatch, user_id=user_id)
+    assert done.scored_percent == 100
+    assert len(done.items) >= len(midway.items)
+
+
+@pytest.mark.usefixtures("collection")
+async def test_an_older_list_stays_up_while_new_jobs_are_scored(
+    monkeypatch: pytest.MonkeyPatch, collection: FakeStore
+) -> None:
+    user_id = uuid.uuid4()
+    first = await _list(monkeypatch, user_id=user_id)
+    assert first.scored_percent == 100
+    real = service._score
+
+    def slow(
+        profile: ProfileRead, job: StoredJob, candidate_years: float
+    ) -> service.CareerJobRead | None:
+        time.sleep(0.05)
+        return real(profile, job, candidate_years)
+
+    monkeypatch.setattr(service, "_score", slow)
+    collection.set(
+        collection.collection.companies,
+        [*collection.collection.jobs, _job("acme", 9, min_years=1, place="Pune")],
     )
+    early = await _list(monkeypatch, user_id=user_id, wait=False)
+    assert early.refreshing
+    assert early.scored_percent < 100
+    assert {job.id for job in early.items} == {job.id for job in first.items}
+    done = await _list(monkeypatch, user_id=user_id)
+    assert done.scored_percent == 100
+    assert "acme:9" in {job.id for job in done.items}
 
 
 @pytest.mark.usefixtures("collection")
