@@ -3,7 +3,7 @@
 Postings say this in many ways: "3+ years", "2-5 Yrs", "minimum two years",
 "freshers welcome", "6 months", or only through the title ("Senior ..."). A
 number of years that is about something else (the company's age, a bond, a
-contract) is not taken for an experience requirement.
+contract, or the education duration) is not taken for an experience requirement.
 """
 
 import re
@@ -49,6 +49,23 @@ _ABOUT_SOMETHING_ELSE = re.compile(
     r"for (?:over |more than )?\d+ years,? we",
     re.IGNORECASE,
 )
+# Education/schooling duration — "15 years full time education", "10+2+3 = 15 years of study",
+# "educational qualification: 12 years", "schooling: 10 years", "full-time education".
+# These describe years spent in the school system, not years of professional work.
+_ABOUT_EDUCATION = re.compile(
+    r"educational? (?:qualification|background|requirement|standard|level|degree)|"
+    r"(?:full[- ]time|full[- ]time\s+)?education\b|"
+    r"\bschooling\b|"
+    r"\bstudy(?:ing)?\b|"
+    r"\bcourse(?:work)?\b|"
+    r"\bclass(?:room)?\b|"
+    r"years? of (?:education|study|schooling|learning|training)|"
+    r"(?:secondary|primary|higher|formal|academic) (?:education|schooling|qualification)|"
+    r"(?:class|grade|standard)\s+\d+|"  # "Class 12", "Grade 10", "Standard 10"
+    r"\b(?:10th|12th|ssc|hsc|cbse|icse|igcse|gcse|a[- ]levels?|o[- ]levels?)\b|"
+    r"\b(?:bachelor|b\.?tech|b\.?e|b\.?sc|b\.?com|b\.?a|m\.?tech|m\.?sc|mba|phd|doctorate)\b",
+    re.IGNORECASE,
+)
 _PREFERRED = re.compile(
     r"prefer|nice to have|good to have|bonus|\ba plus\b|ideal|desirable", re.IGNORECASE
 )
@@ -85,6 +102,12 @@ def _value(text: str) -> float:
 
 def _is_experience_sentence(sentence: str) -> bool:
     if _ABOUT_SOMETHING_ELSE.search(sentence):
+        return False
+    # A sentence about the candidate's schooling duration is not a work-experience
+    # requirement, even when it contains a number followed by "years".
+    # e.g. "Educational Qualification: 15 years full time education"
+    #      "B.Tech or equivalent (10+2+3 = 15 years of education)"
+    if _ABOUT_EDUCATION.search(sentence):
         return False
     if _ABOUT_EXPERIENCE.search(sentence) or _RANGE.search(sentence):
         return True

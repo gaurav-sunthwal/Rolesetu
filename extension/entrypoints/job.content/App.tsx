@@ -4,6 +4,8 @@ import type { ContentScriptContext } from '#imports';
 import { hasApplicationForm } from '@/lib/autofill/fields';
 import { fill, planAutofill } from '@/lib/autofill/fill';
 import { type Learned, watchAnswers } from '@/lib/autofill/learn';
+import { getSiteProfile, mergeSiteAnswers, saveSiteProfile } from '@/lib/autofill/site-profiles';
+import { track } from '@/lib/analytics';
 import { detectJob } from '@/lib/job-detect';
 import { projectedScore } from '@/lib/projected-score';
 import { sameJob } from '@/lib/same-job';
@@ -198,6 +200,7 @@ function useApplyTracking(current: TrackedJob | null) {
       const started = job.current ? { ...job.current, startedAt: Date.now() } : pending.current;
       if (!started) return; // a button on a page where no job was scored
       if (action === 'apply' && job.current) {
+        track('apply_clicked');
         pending.current = started;
         void ask({ type: 'pending-apply', action: 'set', value: started });
         // In the tracker straight away, so it is not lost if they never finish.
@@ -268,9 +271,21 @@ function useAutofill(ctx: ContentScriptContext) {
         return setState(result.status === 401 ? { name: 'connect' } : { name: 'none' });
       }
       data.current = result.data;
+      // Merge site-specific answers (local storage, per-hostname) into the
+      // autofill data.  These are answers the user previously picked on this
+      // exact site — e.g. dropdown selections on Capgemini's career page.
+      // Server answers always win; site answers fill the gaps.
+      const siteAnswers = await getSiteProfile(document.location.hostname);
+      if (Object.keys(siteAnswers).length > 0) {
+        data.current = {
+          ...data.current,
+          saved_answers: mergeSiteAnswers(data.current.saved_answers, siteAnswers),
+        };
+      }
     }
     const count = planAutofill(document, data.current).length;
     setState(count > 0 ? { name: 'offer', count } : { name: 'none' });
+    if (count > 0) track('autofill_offered', { count });
   }, [ctx]);
 
   useEffect(() => {
@@ -288,11 +303,13 @@ function useAutofill(ctx: ContentScriptContext) {
     if (data.current === null) return;
     const count = fill(planAutofill(document, data.current));
     holding.current = true;
-    setState(
-      count > 0
-        ? { name: 'filled', count }
-        : { name: 'failed', message: 'This form did not accept the values. Please fill it by hand.' },
-    );
+    if (count > 0) {
+      track('autofill_filled', { count });
+      setState({ name: 'filled', count });
+    } else {
+      track('autofill_failed');
+      setState({ name: 'failed', message: 'This form did not accept the values. Please fill it by hand.' });
+    }
   }, []);
 
   const remember = useCallback(
@@ -306,6 +323,7 @@ function useAutofill(ctx: ContentScriptContext) {
 
       const changed = new Set(result.data.map((change) => change.question_key));
       const names = learned.filter((item) => changed.has(item.answer.question_key)).map((item) => item.name);
+      track('autofill_learned', { count: names.length });
       holding.current = true;
       setState((shown) => {
         if (shown.name !== 'learned') return { name: 'learned', names, changes: result.data };
@@ -327,6 +345,7 @@ function useAutofill(ctx: ContentScriptContext) {
         document,
         () => data.current?.saved_answers ?? null,
         (learned) => void remember(learned),
+        (answers) => void saveSiteProfile(document.location.hostname, answers),
       ),
     [remember],
   );
@@ -414,8 +433,10 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       setPhase({ name: 'scoring', job, startedAt: Date.now() });
       const result = await ask({ type: 'check-job', job });
       if (stale()) return;
-      if (result.ok) setPhase({ name: 'ready', job, match: result.data });
-      else if (result.status === 401) setPhase({ name: 'disconnected' });
+      if (result.ok) {
+        track('job_scored', { count: result.data.score ?? 0 });
+        setPhase({ name: 'ready', job, match: result.data });
+      } else if (result.status === 401) setPhase({ name: 'disconnected' });
       else setPhase({ name: 'error', message: result.message });
     },
     [ctx, manual],
@@ -492,6 +513,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
     document.addEventListener('visibilitychange', onVisible);
 
     const reopen = () => {
+      track('panel_opened');
       setOpen(true);
       if (shown.current === null || shown.current.description === '') {
         void check(true);

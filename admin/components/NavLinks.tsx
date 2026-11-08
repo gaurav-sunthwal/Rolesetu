@@ -8,6 +8,7 @@ import { SOCIAL_ENABLED } from '@/lib/features';
 const LINKS = [
   { href: '/', label: 'Dashboard' },
   { href: '/activity', label: 'Activity' },
+  { href: '/extension-usage', label: 'Extension usage' },
   { href: '/users', label: 'Users' },
   { href: '/job-checks', label: 'Job checks' },
   { href: '/applications', label: 'Applications' },

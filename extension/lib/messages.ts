@@ -40,7 +40,8 @@ export type Request =
   | { type: 'pending-apply'; action: 'get' }
   | { type: 'pending-apply'; action: 'set'; value: PendingApply }
   | { type: 'pending-apply'; action: 'clear' }
-  | { type: 'open-dashboard'; path: string };
+  | { type: 'open-dashboard'; path: string }
+  | { type: 'track-events'; events: { name: string; host?: string; count?: number }[] };
 
 export type Failure = { ok: false; status: number | null; message: string };
 export type Result<T> = { ok: true; data: T } | Failure;
@@ -58,6 +59,7 @@ export type Responses = {
   'record-application': Result<{ id: string; status: string }>;
   'pending-apply': Result<PendingApply | null>;
   'open-dashboard': Result<null>;
+  'track-events': Result<null>;
 };
 
 export async function ask<T extends Request>(request: T): Promise<Responses[T['type']]> {

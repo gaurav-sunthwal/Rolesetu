@@ -33,6 +33,8 @@ from backend.modules.admin.schemas import (
     OutreachRead,
     WaitlistRow,
 )
+from backend.modules.ext_events import repository as events_repo
+from backend.modules.ext_events.schemas import ExtEventStats
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -333,3 +335,21 @@ async def email_everyone_without_extension(
             service.send_extension_nudges, admin.email, payload.subject, payload.message
         )
     return BulkQueued(queued=queued)
+
+
+@router.get("/ext-events", response_model=ExtEventStats)
+async def read_ext_event_stats(
+    hours: Hours = 168,  # default: last 7 days
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> ExtEventStats:
+    """Extension usage analytics: what users do inside the extension,
+    aggregated by event type, day, and site. No personal data is returned.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    t = await events_repo.totals(db, since=since)
+    d = await events_repo.daily(db, since=since)
+    s = await events_repo.top_sites(db, since=since)
+    return ExtEventStats(hours=hours, totals=t, daily=d, top_sites=s)

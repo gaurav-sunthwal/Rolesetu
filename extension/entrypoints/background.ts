@@ -266,6 +266,13 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
     case 'open-dashboard':
       await browser.tabs.create({ url: `${DASHBOARD_URL}${request.path}` });
       return { ok: true, data: null };
+
+    case 'track-events':
+      // Fire-and-forget: a 204 is a success, failures are silently dropped.
+      return api<null>('/extension/events', {
+        method: 'POST',
+        body: JSON.stringify({ events: request.events }),
+      });
   }
 }
 

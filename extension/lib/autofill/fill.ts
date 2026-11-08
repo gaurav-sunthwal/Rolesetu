@@ -7,17 +7,36 @@
 import type { AutofillData } from '../messages';
 import { birthDateText } from './dates';
 import { type Field, type Fillable, findFields } from './fields';
+import { type WidgetField, comboboxIsEmpty, fillWidget, findWidgetFields } from './widgets';
 
 type Profile = AutofillData['profile'];
 type Job = Profile['experience'][number];
 
 /** A field we have something for. `values` are tried in order (a dropdown may only offer one form). */
-export type PlannedFill = { field: Field; values: string[] };
+export type PlannedFill = { field: Field; values: string[] } | { widget: WidgetField; values: string[] };
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+/**
+ * Synonyms for common answers that appear under many surface forms in dropdowns.
+ * Used as a last-resort fallback in `optionFor` when exact and leading-word
+ * matching both fail.  The key is what we have in `saved_answers`; the values
+ * are alternative texts the dropdown option might use.
+ */
+const ANSWER_SYNONYMS: Record<string, string[]> = {
+  yes: ['i agree', 'agree', 'i accept', 'accept', 'i consent', 'consent', 'i do', 'affirmative'],
+  no: ['i do not agree', 'disagree', 'decline', 'i decline', 'i do not consent', 'i do not', 'negative'],
+  'no selection': [],
+  // Work authorization variants
+  'yes, i am authorized': ['yes – i am authorized', 'authorized', 'i am authorized to work'],
+  'no, i am not authorized': ['not authorized', 'i am not authorized'],
+  // Relocation
+  'yes, willing to relocate': ['willing to relocate', 'open to relocation', 'yes – willing'],
+  'not willing to relocate': ['not open to relocation', 'no – not willing'],
+};
 
 /** Most recent job first: the one still held, then by when each ended. */
 function newestFirst(jobs: Job[]): Job[] {
@@ -121,16 +140,63 @@ function isEmpty(element: Fillable): boolean {
   return element.value.trim() === '';
 }
 
-function optionFor(select: HTMLSelectElement, values: string[]): HTMLOptionElement | null {
+/**
+ * Finds the best matching option for a set of candidate values.
+ *
+ * Matching priority (first win):
+ *  1. Exact text or value match (case-insensitive, trimmed).
+ *  2. Leading "Yes"/"No" word — e.g. saved "Yes" matches "Yes, within India".
+ *  3. The saved value is contained inside the option text, or vice-versa.
+ *     e.g. saved "Authorized" matches option "Yes, I am authorized to work".
+ *  4. Synonym table — common consent/authorization phrasing variants.
+ */
+export function optionFor(select: HTMLSelectElement, values: string[]): HTMLOptionElement | null {
   const options = [...select.options].filter((option) => !option.disabled && option.value !== '');
-  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const norm = (s: string) => s.trim().toLowerCase();
+
   for (const value of values) {
-    const exact = options.find((option) => same(option.text, value) || same(option.value, value));
+    const nv = norm(value);
+
+    // 1. Exact match on option text or option value attribute.
+    const exact = options.find((o) => norm(o.text) === nv || norm(o.value) === nv);
     if (exact) return exact;
   }
-  // "Yes, within India" should still pick a plain "Yes".
-  const lead = /^(yes|no)\b/i.exec(values[0] ?? '')?.[1];
-  return (lead && options.find((option) => same(option.text, lead))) || null;
+
+  // 2. Leading yes/no keyword.
+  const lead = /^(yes|no)\b/i.exec(values[0] ?? '')?.[1]?.toLowerCase();
+  if (lead) {
+    const match = options.find((o) => norm(o.text).startsWith(lead));
+    if (match) return match;
+  }
+
+  // 3. Substring / contains matching (saved answer appears inside option, or option inside answer).
+  for (const value of values) {
+    const nv = norm(value);
+    if (nv.length < 3) continue; // too short — too many false positives
+    const sub = options.find(
+      (o) => norm(o.text).includes(nv) || nv.includes(norm(o.text)),
+    );
+    if (sub) return sub;
+  }
+
+  // 4. Synonym table.
+  for (const value of values) {
+    const nv = norm(value);
+    const synonyms = ANSWER_SYNONYMS[nv] ?? [];
+    const syn = options.find((o) => synonyms.some((s) => norm(o.text).includes(s)));
+    if (syn) return syn;
+    // Also check if the option's text maps to a synonym of our value.
+    for (const [canonical, syns] of Object.entries(ANSWER_SYNONYMS)) {
+      if (canonical === nv) continue;
+      if (syns.some((s) => norm(value).includes(s))) {
+        // Our value is a synonym of `canonical`; see if the option matches canonical.
+        const match = options.find((o) => norm(o.text) === canonical || norm(o.text).startsWith(canonical.split(' ')[0] ?? ''));
+        if (match) return match;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -167,13 +233,25 @@ function write(element: Fillable, values: string[]): boolean {
 /** The empty fields on this page that the profile has a value for. */
 export function planAutofill(doc: Document, data: AutofillData): PlannedFill[] {
   const plan: PlannedFill[] = [];
+
+  // Native <input>, <textarea>, <select> fields.
   for (const field of findFields(doc)) {
-    if (!isEmpty(field.element)) continue; // what the user typed is never replaced
+    if (!isEmpty(field.element)) continue;
     const values = valuesFor(field, data);
     if (values.length === 0) continue;
     if (field.element instanceof HTMLSelectElement && !optionFor(field.element, values)) continue;
     plan.push({ field, values });
   }
+
+  // Custom-widget dropdowns (SAP SuccessFactors / Capgemini, Workday, etc.)
+  for (const widget of findWidgetFields(doc)) {
+    if (!comboboxIsEmpty(widget.combobox)) continue;
+    // Use saved_answers for the widget key (same key format as Field).
+    const saved = data.saved_answers[widget.key];
+    if (!saved) continue;
+    plan.push({ widget, values: [saved] });
+  }
+
   return plan;
 }
 
@@ -188,11 +266,21 @@ function flash(element: HTMLElement): void {
 /** Fills the planned fields and returns how many took the value. */
 export function fill(plan: PlannedFill[]): number {
   let filled = 0;
-  for (const { field, values } of plan) {
-    if (!field.element.isConnected || !isEmpty(field.element)) continue;
-    if (!write(field.element, values)) continue;
-    flash(field.element);
-    filled += 1;
+  for (const item of plan) {
+    if ('widget' in item) {
+      // Custom widget field (SAP SuccessFactors / combobox pattern).
+      if (!comboboxIsEmpty(item.widget.combobox)) continue; // already filled
+      if (fillWidget(item.widget, item.values)) {
+        flash(item.widget.combobox);
+        filled += 1;
+      }
+    } else {
+      const { field, values } = item;
+      if (!field.element.isConnected || !isEmpty(field.element)) continue;
+      if (!write(field.element, values)) continue;
+      flash(field.element);
+      filled += 1;
+    }
   }
   return filled;
 }

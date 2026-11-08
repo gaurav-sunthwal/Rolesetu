@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.session import get_db
+from backend.modules.ext_events import repository as events_repo
+from backend.modules.ext_events.schemas import ExtEventsWrite
 from backend.modules.extension import service
 from backend.modules.extension.schemas import AutofillData, ExtensionConnected, ExtensionStatus
 from backend.modules.matches import scoring
@@ -93,3 +95,23 @@ async def forget_answer(
 ) -> None:
     """The Undo for an answer that was new when it was learned."""
     await saved_answers_service.delete_answer(db, user_id=user.id, question_key=question_key)
+
+
+@router.post("/events", status_code=204)
+async def record_events(
+    payload: ExtEventsWrite,
+    user: User = Depends(get_db_user_or_extension),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Fire-and-forget usage events from the extension.
+
+    The extension batches events locally and sends them in one request.
+    Storing the same batch twice changes nothing meaningful (each row gets
+    a new UUID, but the aggregate counts are unaffected), so the extension
+    may retry on network failure without an idempotency key.
+    """
+    await events_repo.insert_events(
+        db,
+        user_id=user.id,
+        events=[ev.model_dump() for ev in payload.events],
+    )

@@ -217,8 +217,19 @@ function kindOf(element: Fillable, labels: string[], section: 'work' | 'school' 
 /** What a person reads beside the box, if anything: a name like "input_17" says nothing. */
 function visibleQuestion(element: Fillable): string | null {
   const question = visibleLabelsOf(element)[0];
-  if (!question || question.length < 3 || question.length > 100 || TOO_VAGUE.test(question)) return null;
-  return /[a-z]{2}/.test(question) ? question : null;
+  if (!question || question.length < 3 || TOO_VAGUE.test(question)) return null;
+  if (!/[a-z]{2}/.test(question)) return null;
+  // Long labels (e.g. Capgemini consent sentences) are valid questions — we just
+  // truncate them to 100 chars for use as a key.  The full text is kept for display.
+  return question;
+}
+
+/** Stable key for any question text, including long consent/policy sentences. */
+function questionKeyOf(question: string): string {
+  // Truncate to first 100 chars before normalising, so long sentences still
+  // produce a key that is stable across the same question on different pages.
+  const truncated = question.slice(0, 100);
+  return questionKey(truncated);
 }
 
 /** Every field on the page we know how to fill, in the order it appears. */
@@ -240,9 +251,18 @@ export function findFields(doc: Document): Field[] {
     let key: string = kind;
     const question = visibleQuestion(element);
     if (kind === 'question') {
-      // A question nobody can read cannot be matched on the next form.
-      if (question === null) continue;
-      key = questionKey(question);
+      if (question !== null) {
+        key = questionKeyOf(question);
+      } else if (element instanceof HTMLSelectElement) {
+        // Consent / EEO dropdowns often have no readable label but are still
+        // worth remembering per-site.  Use the element's name or id as key.
+        const fallback = element.getAttribute('name') || element.id;
+        if (!fallback) continue;
+        key = `q_${fallback.replace(/[^a-z0-9]+/gi, '_').toLowerCase().slice(0, 56)}`;
+      } else {
+        // A text input with no readable label can't be matched next time.
+        continue;
+      }
     }
 
     let index = 0;
@@ -270,6 +290,16 @@ export function hasApplicationForm(doc: Document): boolean {
   for (const password of doc.querySelectorAll('input[type="password"]')) {
     if (password instanceof HTMLElement && isOnScreen(password)) return false;
   }
+
+  // Multi-step career portals (e.g. Capgemini) show only consent/EEO dropdowns
+  // on the final step — no name or email field is visible.  Trust the URL if it
+  // clearly says this is a career page, so learning still fires on late steps.
+  if (APPLICATION_WORDS.test(`${doc.title} ${doc.location?.pathname ?? ''}`)) {
+    // Still require at least one visible, fillable select or input on the page.
+    const fields = findFields(doc);
+    if (fields.length > 0) return true;
+  }
+
   // An unknown question is in every kind of form, so it says nothing about this one.
   const kinds = new Set(
     findFields(doc)

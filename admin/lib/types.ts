@@ -39,3 +39,20 @@ export type SocialPostWrite = Schemas['SocialPostWrite'];
 export type SocialPostPage = Schemas['Page_SocialPostRead_'];
 export type ConnectUrl = Schemas['ConnectUrl'];
 export type ImageUploaded = Schemas['ImageUploaded'];
+
+// Extension usage analytics (defined locally — not yet in the generated schema)
+export type ExtEventStats = {
+  hours: number;
+  totals: {
+    autofill_offered: number;
+    autofill_filled: number;
+    autofill_failed: number;
+    autofill_learned: number;
+    job_scored: number;
+    panel_opened: number;
+    apply_clicked: number;
+    fill_rate_pct: number;
+  };
+  daily: { day: string; autofill_offered: number; autofill_filled: number; job_scored: number; apply_clicked: number }[];
+  top_sites: { host: string; offered: number; filled: number; fill_rate_pct: number }[];
+};
