@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ai.profile_understanding import understand_profile
 from backend.core import storage
+from backend.modules.ai_calls.service import called_by
 from backend.modules.domain_catalogs import service as domain_catalogs
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches.local.domain_catalogs import HAND_AUTHORED_FIELDS
@@ -44,7 +45,8 @@ async def _resume_understanding(db: AsyncSession, user_id: uuid.UUID):
         return None
     text = "\n".join(line.text for line in lines)
     user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
-    return await understand_profile(text, user_api_key=user_api_key)
+    with called_by(user_id, "other"):
+        return await understand_profile(text, user_api_key=user_api_key)
 
 
 async def backfill_domain_fields(db: AsyncSession) -> list[str]:

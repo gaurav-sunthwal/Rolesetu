@@ -236,7 +236,12 @@ class Started:
 
 
 async def start_match(
-    db: AsyncSession, *, user_id: uuid.UUID, payload: MatchCreate, paid_reads: bool = True
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    payload: MatchCreate,
+    paid_reads: bool = True,
+    source: "ai_calls.Source" = "dashboard",
 ) -> Started:
     """Scores the job, or returns a result that can be reused.
 
@@ -329,8 +334,9 @@ async def start_match(
     if engine == "local":
         # A catalog is built only for the field this person is in.
         catalog_keys = field_keys_for_profile(profile)
-        for field_key in catalog_keys:
-            await domain_catalogs_service.ensure_catalog(db, field_key)
+        with ai_calls.called_by(user_id, source):
+            for field_key in catalog_keys:
+                await domain_catalogs_service.ensure_catalog(db, field_key)
         job_title = role or payload.role
         job_field = fields.field_of(job_title) if job_title else None
         if job_field is not None and job_field.key not in catalog_keys:

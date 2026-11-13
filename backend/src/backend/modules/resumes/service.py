@@ -15,6 +15,7 @@ from backend.core.exceptions import (
     RateLimitedError,
     ValidationFailedError,
 )
+from backend.modules.ai_calls.service import called_by
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches.local.semantic import usable_lines, warm_up_chunks
 from backend.modules.profiles import service as profiles_service
@@ -185,7 +186,8 @@ async def create_upload(
     ):
         raise RateLimitedError("You can update your resume twice a day. Try again tomorrow.")
     user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
-    profile = await read_pdf(data, user_api_key=user_api_key)
+    with called_by(user_id, "resume"):
+        profile = await read_pdf(data, user_api_key=user_api_key)
 
     resume_id = uuid.uuid4()
     storage_key = f"resumes/{user_id}/{resume_id}.pdf"

@@ -45,11 +45,13 @@ async def create_match(
       WAIT_FOR_RESULT_SECONDS for the finished result, and gets it pending only
       if it takes longer.
     """
+    source: Source = "extension" if current_user.via_extension else "dashboard"
     started = await service.start_match(
         db,
         user_id=user.id,
         payload=payload,
         paid_reads=True if payload.jd_text is None else not current_user.via_extension,
+        source=source,
     )
     match = started.match
     if started.save is not None:
@@ -59,7 +61,6 @@ async def create_match(
         return match
     # Commit first: the runner opens its own session and must see the row.
     await db.commit()
-    source: Source = "extension" if current_user.via_extension else "dashboard"
     if prefer is not None and "respond-async" in prefer.lower():
         background_tasks.add_task(service.run_match, match.id, source)
         response.headers["Preference-Applied"] = "respond-async"

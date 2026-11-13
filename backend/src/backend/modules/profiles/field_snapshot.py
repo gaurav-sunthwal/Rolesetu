@@ -6,6 +6,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import get_settings
+from backend.modules.ai_calls.service import called_by
 from backend.modules.domain_catalogs import service as domain_catalogs_service
 from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches.local import fields
@@ -28,13 +29,15 @@ async def build_field_snapshot(
     user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
 
     if field_key and field_key not in HAND_AUTHORED_FIELDS:
-        await domain_catalogs_service.ensure_catalog(db, field_key, user_api_key=user_api_key)
+        with called_by(user_id, "dashboard"):
+            await domain_catalogs_service.ensure_catalog(db, field_key, user_api_key=user_api_key)
 
     append_keys = field_keys_for_profile(profile)
     catalog_append = await domain_catalogs_service.catalog_append_for_fields(db, append_keys)
-    core = await domain_catalogs_service.core_skills_for_field(
-        db, field_key, user_api_key=user_api_key
-    )
+    with called_by(user_id, "dashboard"):
+        core = await domain_catalogs_service.core_skills_for_field(
+            db, field_key, user_api_key=user_api_key
+        )
 
     field_label = None
     inferred_label = None
