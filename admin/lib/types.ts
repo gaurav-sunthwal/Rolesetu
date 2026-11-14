@@ -77,3 +77,6 @@ export type ExtEventStats = {
 export type Leaderboard = Schemas['Leaderboard'];
 export type LeaderRow = Schemas['LeaderRow'];
 export type LeaderFeature = Schemas['Feature'];
+export type PaymentFunnel = Schemas['PaymentFunnel'];
+export type FunnelEvent = Schemas['FunnelEventRead'];
+export type DroppedUser = Schemas['DroppedUser'];

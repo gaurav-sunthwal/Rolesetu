@@ -169,6 +169,27 @@ export interface paths {
     patch: operations['update_application_api_v1_applications__application_id__patch'];
     trace?: never;
   };
+  '/api/v1/activity/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * My Activity
+     * @description Your activity per day over the last year, with your streaks. `tz` is your
+     *     time zone (e.g. Asia/Kolkata); unknown names fall back to UTC.
+     */
+    get: operations['my_activity_api_v1_activity_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/career-jobs/companies': {
     parameters: {
       query?: never;
@@ -362,6 +383,86 @@ export interface paths {
      * @description Turns on Pro once the checkout's signature and Razorpay both confirm the payment.
      */
     post: operations['verify_payment_api_v1_billing_orders_verify_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/subscriptions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start Autopay
+     * @description Starts monthly autopay. The price is the server's, never the caller's.
+     */
+    post: operations['start_autopay_api_v1_billing_subscriptions_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/subscriptions/verify': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify Autopay
+     * @description Turns on Pro once the mandate's signature and Razorpay both confirm it.
+     */
+    post: operations['verify_autopay_api_v1_billing_subscriptions_verify_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/subscriptions/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Cancel Autopay
+     * @description Stops future charges; the month already paid for keeps running.
+     */
+    post: operations['cancel_autopay_api_v1_billing_subscriptions_cancel_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/funnel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Record Funnel Event
+     * @description A step of the upgrade the browser saw: the page, the payment window, a failure.
+     */
+    post: operations['record_funnel_event_api_v1_billing_funnel_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1169,6 +1270,46 @@ export interface paths {
      * @description Lets the panel find out whether the signed-in account is an admin.
      */
     get: operations['read_admin_api_v1_admin_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/billing/funnel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Payment Funnel
+     * @description How many people reach each step of paying, why payments fail, and who left.
+     */
+    get: operations['read_payment_funnel_api_v1_admin_billing_funnel_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/billing-funnel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read User Payment Timeline
+     * @description Every payment step one person took, newest first.
+     */
+    get: operations['read_user_payment_timeline_api_v1_admin_users__user_id__billing_funnel_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2004,6 +2145,59 @@ export interface components {
       /** Note */
       note?: string | null;
     };
+    /** ActivityDay */
+    ActivityDay: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Applications
+       * @default 0
+       */
+      applications: number;
+      /**
+       * Job Checks
+       * @default 0
+       */
+      job_checks: number;
+      /**
+       * Extension
+       * @description Scores on job sites, autofill, saved answers.
+       * @default 0
+       */
+      extension: number;
+      /**
+       * Ai
+       * @description AI answers and resume-assistant messages.
+       * @default 0
+       */
+      ai: number;
+    };
+    /**
+     * ActivityYear
+     * @description One user's activity per day over the last year, oldest first, every day listed.
+     */
+    ActivityYear: {
+      /**
+       * Start
+       * Format: date
+       */
+      start: string;
+      /**
+       * End
+       * Format: date
+       */
+      end: string;
+      /** Timezone */
+      timezone: string;
+      /** Days */
+      days: components['schemas']['ActivityDay'][];
+      /** @description The year added up; its `date` is `end`. */
+      totals: components['schemas']['ActivityDay'];
+      streaks: components['schemas']['Streaks'];
+    };
     /** AddedSkill */
     AddedSkill: {
       /** Skill */
@@ -2626,6 +2820,29 @@ export interface components {
       /** Years Of Experience */
       years_of_experience: number;
     };
+    /** AutopayRead */
+    AutopayRead: {
+      /** Status */
+      status: string;
+      /** Amount */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /** Next Charge At */
+      next_charge_at: string | null;
+      /** Cancel At Cycle End */
+      cancel_at_cycle_end: boolean;
+      /**
+       * On
+       * @description Charging every month and not set to stop.
+       */
+      on: boolean;
+    };
+    /** AutopayStart */
+    AutopayStart: {
+      /** Attempt Id */
+      attempt_id?: string | null;
+    };
     /** BillingActionRead */
     BillingActionRead: {
       /**
@@ -2947,6 +3164,29 @@ export interface components {
       text: string;
       /** Style Line Id */
       style_line_id?: string | null;
+    };
+    /** DroppedUser */
+    DroppedUser: {
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Email */
+      email: string;
+      /** Name */
+      name: string | null;
+      /** Last Step */
+      last_step: string;
+      /**
+       * Last At
+       * Format: date-time
+       */
+      last_at: string;
+      /** Last Error */
+      last_error: string | null;
+      /** Reminded At */
+      reminded_at: string | null;
     };
     /** EditOutcome */
     EditOutcome: {
@@ -3644,6 +3884,17 @@ export interface components {
       /** Last Used At */
       last_used_at: string | null;
     };
+    /** FailureReason */
+    FailureReason: {
+      /** Step */
+      step: string;
+      /** Reason */
+      reason: string;
+      /** Count */
+      count: number;
+      /** Users */
+      users: number;
+    };
     /** Feature */
     Feature: {
       /** Key */
@@ -3699,6 +3950,53 @@ export interface components {
       title: string;
       /** Detail */
       detail: string;
+    };
+    /** FunnelEventRead */
+    FunnelEventRead: {
+      /** Step */
+      step: string;
+      /** Source */
+      source: string;
+      /** Detail */
+      detail: {
+        [key: string]: unknown;
+      };
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** FunnelEventWrite */
+    FunnelEventWrite: {
+      /**
+       * Step
+       * @enum {string}
+       */
+      step:
+        | 'plan_viewed'
+        | 'upgrade_clicked'
+        | 'checkout_opened'
+        | 'checkout_closed'
+        | 'payment_failed'
+        | 'payment_succeeded'
+        | 'verify_failed'
+        | 'one_time_chosen';
+      /** Attempt Id */
+      attempt_id?: string | null;
+      /** Detail */
+      detail?: {
+        [key: string]: string | number | boolean | null;
+      };
+    };
+    /** FunnelStep */
+    FunnelStep: {
+      /** Step */
+      step: string;
+      /** Label */
+      label: string;
+      /** Users */
+      users: number;
     };
     /** GrantWrite */
     GrantWrite: {
@@ -4362,6 +4660,21 @@ export interface components {
       /** Next Cursor */
       next_cursor: string | null;
     };
+    /** PaymentFunnel */
+    PaymentFunnel: {
+      /** Period Days */
+      period_days: number;
+      /** Steps */
+      steps: components['schemas']['FunnelStep'][];
+      /** Failures */
+      failures: components['schemas']['FailureReason'][];
+      /** Autopay */
+      autopay: {
+        [key: string]: number;
+      };
+      /** Dropped */
+      dropped: components['schemas']['DroppedUser'][];
+    };
     /** PaymentRead */
     PaymentRead: {
       /** Amount */
@@ -4501,6 +4814,7 @@ export interface components {
       referral_price: boolean;
       /** Payments */
       payments: components['schemas']['PaymentRead'][];
+      autopay?: components['schemas']['AutopayRead'] | null;
     };
     /** PlanWrite */
     PlanWrite: {
@@ -5055,6 +5369,60 @@ export interface components {
       error: string | null;
       /** Posted At */
       posted_at: string | null;
+    };
+    /** Streaks */
+    Streaks: {
+      /**
+       * Current
+       * @description Days in a row with activity, up to today (or yesterday).
+       */
+      current: number;
+      /** Longest */
+      longest: number;
+      /** Active Days */
+      active_days: number;
+    };
+    /**
+     * SubscriptionCheckout
+     * @description Everything Razorpay's window needs to set up the mandate. The key id is public.
+     */
+    SubscriptionCheckout: {
+      /** Subscription Id */
+      subscription_id: string;
+      /** Key Id */
+      key_id: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string;
+      /** Email */
+      email: string;
+      /**
+       * First Amount
+       * @description What the first charge will be, in paise.
+       */
+      first_amount: number;
+      /**
+       * Amount
+       * @description What each later month costs, in paise.
+       */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /**
+       * Starts At
+       * @description Set when the first charge is later.
+       */
+      starts_at: string | null;
+    };
+    /** SubscriptionVerify */
+    SubscriptionVerify: {
+      /** Razorpay Subscription Id */
+      razorpay_subscription_id: string;
+      /** Razorpay Payment Id */
+      razorpay_payment_id: string;
+      /** Razorpay Signature */
+      razorpay_signature: string;
     };
     /**
      * TailorRequest
@@ -5640,6 +6008,37 @@ export interface operations {
       };
     };
   };
+  my_activity_api_v1_activity_me_get: {
+    parameters: {
+      query?: {
+        tz?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActivityYear'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   list_companies_api_v1_career_jobs_companies_get: {
     parameters: {
       query?: never;
@@ -5996,6 +6395,123 @@ export interface operations {
         content: {
           'application/json': components['schemas']['PlanRead'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  start_autopay_api_v1_billing_subscriptions_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AutopayStart'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SubscriptionCheckout'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  verify_autopay_api_v1_billing_subscriptions_verify_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubscriptionVerify'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  cancel_autopay_api_v1_billing_subscriptions_cancel_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanRead'];
+        };
+      };
+    };
+  };
+  record_funnel_event_api_v1_billing_funnel_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FunnelEventWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -7192,6 +7708,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AdminRead'];
+        };
+      };
+    };
+  };
+  read_payment_funnel_api_v1_admin_billing_funnel_get: {
+    parameters: {
+      query?: {
+        days?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaymentFunnel'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_user_payment_timeline_api_v1_admin_users__user_id__billing_funnel_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FunnelEventRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };

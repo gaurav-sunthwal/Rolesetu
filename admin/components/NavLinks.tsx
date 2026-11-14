@@ -13,6 +13,7 @@ const LINKS = [
   { href: '/extension-installs', label: 'Installs' },
   { href: '/users', label: 'Users' },
   { href: '/billing', label: 'Payments' },
+  { href: '/payment-funnel', label: 'Payment funnel' },
   { href: '/job-checks', label: 'Job checks' },
   { href: '/applications', label: 'Applications' },
   { href: '/previews', label: 'Landing previews' },
