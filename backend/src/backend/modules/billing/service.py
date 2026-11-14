@@ -34,10 +34,12 @@ from backend.core.exceptions import (
     RateLimitedError,
     UnavailableError,
 )
-from backend.modules.billing import prices, razorpay, repository
+from backend.modules.billing import funnel, prices, razorpay, repository, subscriptions
+from backend.modules.billing import subscriptions_repository as subs_repo
 from backend.modules.billing.models import BillingOrder
 from backend.modules.billing.plans import PRO_MONTH, REFERRAL_AMOUNT, RENEW_WITHIN_DAYS, Price
 from backend.modules.billing.schemas import (
+    AutopayRead,
     OrderRead,
     PaymentRead,
     PaymentVerify,
@@ -128,7 +130,24 @@ async def get_plan(db: AsyncSession, *, user_id: uuid.UUID) -> PlanRead:
     paid = await repository.paid_orders(db, user_id, _PAID_READ)
     price, _ = await prices.current_price(db, PRO_MONTH.plan)
     referral = await referrals.has_reward(db, user_id=user_id)
-    return _plan_from(paid, datetime.now(UTC), price, referral=referral)
+    plan = _plan_from(paid, datetime.now(UTC), price, referral=referral)
+    plan.autopay = await _autopay(db, user_id)
+    return plan
+
+
+async def _autopay(db: AsyncSession, user_id: uuid.UUID) -> AutopayRead | None:
+    row = await subs_repo.latest(db, user_id)
+    if row is None or row.status == "created":
+        return None  # a mandate never approved is not shown
+    live = row.status in ("authenticated", "active", "pending", "paused")
+    return AutopayRead(
+        status=row.status,
+        amount=row.amount,
+        currency=row.currency,
+        next_charge_at=row.charge_at if live and not row.cancel_at_cycle_end else None,
+        cancel_at_cycle_end=row.cancel_at_cycle_end,
+        on=live and not row.cancel_at_cycle_end,
+    )
 
 
 def _day(moment: datetime) -> str:
@@ -140,6 +159,10 @@ async def create_order(db: AsyncSession, *, user_id: uuid.UUID, email: str, plan
     price, on_sale = await prices.current_price(db, plan)
     if not on_sale:
         raise UnavailableError("Pro is not on sale right now. Nothing was charged.")
+    if await subscriptions.is_on(db, user_id=user_id):
+        raise ConflictError(
+            "Autopay is on, so your next month is paid for you. Nothing was charged."
+        )
     now = datetime.now(UTC)
 
     started, until = await repository.order_checks(db, user_id, now - timedelta(hours=1))
@@ -161,16 +184,24 @@ async def create_order(db: AsyncSession, *, user_id: uuid.UUID, email: str, plan
         price = _referral_price(price)
 
     row_id = uuid.uuid4()
-    made = await razorpay.create_order(
-        amount=price.amount,
-        currency=price.currency,
-        receipt=str(row_id),
-        notes={
-            "user_id": str(user_id),
-            "plan": price.plan,
-            "referral": "yes" if reward is not None else "no",
-        },
-    )
+    try:
+        made = await razorpay.create_order(
+            amount=price.amount,
+            currency=price.currency,
+            receipt=str(row_id),
+            notes={
+                "user_id": str(user_id),
+                "plan": price.plan,
+                "referral": "yes" if reward is not None else "no",
+            },
+        )
+    except UnavailableError:
+        await funnel.record_failure(
+            user_id=user_id,
+            step="start_failed",
+            detail={"reason": "razorpay_unavailable", "kind": "one_time"},
+        )
+        raise
     order_id = made.get("id")
     if (
         not isinstance(order_id, str)
@@ -199,6 +230,13 @@ async def create_order(db: AsyncSession, *, user_id: uuid.UUID, email: str, plan
     if reward is not None:
         # After the order exists: the reward points at it. Spent only once it is paid.
         referrals.set_aside(reward, order_id=row_id)
+    funnel.record(
+        db,
+        user_id=user_id,
+        step="order_created",
+        source="server",
+        detail={"amount": price.amount, "kind": "one_time"},
+    )
     return OrderRead(
         order_id=order_id,
         amount=price.amount,
@@ -279,6 +317,11 @@ async def verify_payment(
         secret=found_keys.key_secret,
     ):
         logger.warning("Payment signature did not match for user %s", user_id)
+        await funnel.record_failure(
+            user_id=user_id,
+            step="verify_failed",
+            detail={"reason": "bad_signature", "kind": "one_time"},
+        )
         raise BadRequestError(
             "We could not confirm this payment. If money left your account, it is refunded"
             " by Razorpay automatically; otherwise please try again."
@@ -304,11 +347,23 @@ async def verify_payment(
         await _confirmed(order, payment)
     except _NotPaid as reason:
         logger.warning("Order %s not settled: %s", order.id, reason)
+        await funnel.record_failure(
+            user_id=user_id,
+            step="verify_failed",
+            detail={"reason": str(reason)[:120], "kind": "one_time"},
+        )
         raise BadRequestError(
             "Razorpay has not confirmed this payment. If you were charged, Pro turns on by"
             " itself within a few minutes; otherwise please try again."
         ) from None
     settled = _settle(order, payload.razorpay_payment_id, paid)
+    funnel.record(
+        db,
+        user_id=user_id,
+        step="charge_recorded",
+        source="server",
+        detail={"amount": order.amount, "kind": "one_time"},
+    )
     await db.flush()
     await referrals.mark_used(db, order_id=order.id)
     referral = await referrals.has_reward(db, user_id=user_id)
@@ -333,6 +388,14 @@ async def handle_webhook(db: AsyncSession, *, body: bytes, signature: str | None
         event = WebhookEvent.model_validate(json.loads(body))
     except (ValueError, ValidationError):
         logger.warning("Signed Razorpay webhook that could not be read")
+        return
+    if event.event.startswith("subscription.") and event.payload.subscription is not None:
+        await subscriptions.handle_event(
+            db,
+            event=event.event,
+            subscription_id=event.payload.subscription.entity.id,
+            payment_id=event.payload.payment.entity.id if event.payload.payment else None,
+        )
         return
     if event.event not in _PAID_EVENTS or event.payload.payment is None:
         return

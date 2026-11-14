@@ -22,7 +22,7 @@ from backend.core.config import get_settings
 from backend.core.exceptions import ConflictError, NotFoundError, UnavailableError
 from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.modules.billing import admin_repository as repo
-from backend.modules.billing import prices, razorpay, repository
+from backend.modules.billing import prices, razorpay, repository, subscriptions
 from backend.modules.billing.admin_schemas import (
     BillingActionRead,
     BillingOverview,
@@ -273,6 +273,9 @@ async def refund(
         return await _read(db, order)
     if order.status != "paid" or order.amount == 0 or not order.razorpay_payment_id:
         raise ConflictError("Only a paid payment can be refunded. Remove a given month instead.")
+    # A refund means they should not be charged again: autopay stops first, so if
+    # Razorpay cannot be reached nothing has happened yet.
+    await subscriptions.stop_all(db, user_id=order.user_id, reason="admin_refund")
 
     refund_id: str | None = None
     try:
@@ -319,6 +322,7 @@ async def revoke(
         return await _read(db, order)
     if order.status != "paid":
         raise ConflictError("Only an active or upcoming month can be removed.")
+    await subscriptions.stop_all(db, user_id=order.user_id, reason="admin_revoke")
     order.status = "revoked"
     order.note = note
     await _restack_user(db, order.user_id)
@@ -343,6 +347,7 @@ async def end_pro(
     if not await repo.user_exists(db, user_id):
         raise NotFoundError("User not found.")
     await repository.lock_user(db, user_id)
+    await subscriptions.stop_all(db, user_id=user_id, reason="admin_end_pro")
     now = datetime.now(UTC)
     ended = 0
     for order in await repository.paid_orders(db, user_id, _ALL_PAID):

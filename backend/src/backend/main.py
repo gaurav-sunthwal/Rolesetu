@@ -11,6 +11,7 @@ from backend.core.exceptions import register_exception_handlers
 from backend.core.timing import add_timing, watch_queries
 from backend.db.session import get_engine
 from backend.modules.billing import razorpay
+from backend.modules.billing import reminders as payment_reminders
 from backend.modules.career_jobs import schedule as career_jobs_schedule
 from backend.modules.feedback import service as feedback
 from backend.modules.matches.local import semantic
@@ -28,12 +29,14 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         else None
     )
     feedback_emails = asyncio.create_task(feedback.run_forever())
+    payment_emails = asyncio.create_task(payment_reminders.run_forever())
     social_posts = (
         asyncio.create_task(social_publisher.run_forever())
         if get_settings().publishes_social_posts
         else None
     )
     yield
+    payment_emails.cancel()
     await razorpay.close()
     if social_posts is not None:
         social_posts.cancel()

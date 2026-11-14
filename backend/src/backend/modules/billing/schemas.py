@@ -33,6 +33,17 @@ class PlanRead(BaseModel):
         default=False, description="The price is lowered by a friend's referral reward."
     )
     payments: list[PaymentRead]
+    autopay: "AutopayRead | None" = None
+
+
+class AutopayRead(BaseModel):
+    status: str
+    amount: int
+    currency: str
+    # The next charge; None once autopay is cancelled or stopped.
+    next_charge_at: datetime | None
+    cancel_at_cycle_end: bool
+    on: bool = Field(description="Charging every month and not set to stop.")
 
 
 class OrderCreate(BaseModel):
@@ -60,8 +71,17 @@ class _WebhookPaymentWrapper(BaseModel):
     entity: _WebhookPayment
 
 
+class _WebhookSubscription(BaseModel):
+    id: str
+
+
+class _WebhookSubscriptionWrapper(BaseModel):
+    entity: _WebhookSubscription
+
+
 class _WebhookPayload(BaseModel):
     payment: _WebhookPaymentWrapper | None = None
+    subscription: _WebhookSubscriptionWrapper | None = None
 
 
 class WebhookEvent(BaseModel):

@@ -123,6 +123,15 @@ async def mark_used(db: AsyncSession, *, order_id: uuid.UUID) -> None:
     await repository.mark_used(db, order_id, datetime.now(UTC))
 
 
+async def spend(db: AsyncSession, *, referral_id: uuid.UUID, order_id: uuid.UUID) -> None:
+    """An autopay's first charge was paid at the referral price: the reward it was
+    made with is spent on that charge."""
+    reward = await db.get(Referral, referral_id, with_for_update=True)
+    if reward is not None and reward.used_at is None:
+        reward.order_id = order_id
+        reward.used_at = datetime.now(UTC)
+
+
 async def release(db: AsyncSession, *, order_id: uuid.UUID) -> None:
     """The order was refunded: its reward can be used again."""
     await repository.release(db, order_id)

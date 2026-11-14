@@ -36,6 +36,7 @@ from backend.modules.admin.schemas import (
     WaitlistRow,
 )
 from backend.modules.billing import admin as billing_admin
+from backend.modules.billing import funnel_admin
 from backend.modules.billing.admin_schemas import (
     BillingOverview,
     GrantWrite,
@@ -46,6 +47,7 @@ from backend.modules.billing.admin_schemas import (
     PlanWrite,
     UserBillingAdmin,
 )
+from backend.modules.billing.funnel_admin import FunnelEventRead, PaymentFunnel
 from backend.modules.ext_events import repository as events_repo
 from backend.modules.ext_events.schemas import ExtAnalytics, ExtEventRead, ExtEventStats
 from backend.modules.ext_installs import repository as installs_repo
@@ -60,6 +62,24 @@ Limit = Annotated[int, Query(ge=1, le=100)]
 async def read_admin(admin: Admin = Depends(get_admin)) -> AdminRead:
     """Lets the panel find out whether the signed-in account is an admin."""
     return AdminRead(email=admin.email)
+
+
+@router.get("/billing/funnel", response_model=PaymentFunnel)
+async def read_payment_funnel(
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> PaymentFunnel:
+    """How many people reach each step of paying, why payments fail, and who left."""
+    return await funnel_admin.funnel(db, days=days)
+
+
+@router.get("/users/{user_id}/billing-funnel", response_model=list[FunnelEventRead])
+async def read_user_payment_timeline(
+    user_id: uuid.UUID, _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> list[FunnelEventRead]:
+    """Every payment step one person took, newest first."""
+    return await funnel_admin.timeline(db, user_id=user_id)
 
 
 @router.get("/leaderboard", response_model=Leaderboard)

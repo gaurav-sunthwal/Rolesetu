@@ -168,6 +168,12 @@ class Settings(BaseSettings):
     razorpay_key_id: str | None = None
     razorpay_key_secret: str | None = None
     razorpay_webhook_secret: str | None = None
+    # A Razorpay offer (made in the Razorpay Dashboard: flat ₹50 off, Subscriptions,
+    # first payment only) attached to autopay started with a referral reward, so the
+    # first charge is ₹149. Unset: referral rewards do not lower autopay.
+    razorpay_referral_offer_id: str | None = None
+    # One reminder email this long after someone opened the payment window and left.
+    payment_reminder_after_minutes: int = 60
     razorpay_timeout_seconds: float = 10.0
 
     # Observability

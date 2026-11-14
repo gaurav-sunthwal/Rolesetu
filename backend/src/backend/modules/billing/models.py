@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, IdMixin, TimestampMixin
@@ -89,3 +90,76 @@ class BillingAdminAction(IdMixin, TimestampMixin, Base):
     note: Mapped[str | None] = mapped_column(String(200), default=None)
     amount: Mapped[int | None] = mapped_column(default=None)
     days: Mapped[int | None] = mapped_column(default=None)
+
+
+class RazorpayPlan(TimestampMixin, Base):
+    """The Razorpay plan made for one price. A Razorpay plan's amount can never
+    change, so each price Rolesetu charges gets its own, made the first time it is
+    needed and reused after."""
+
+    __tablename__ = "billing_razorpay_plans"
+    __table_args__ = (UniqueConstraint("amount", "currency", name="uq_razorpay_plan_price"),)
+
+    razorpay_plan_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    amount: Mapped[int]
+    currency: Mapped[str] = mapped_column(String(3))
+
+
+# Razorpay states in which a subscription can still charge.
+LIVE_SUBSCRIPTION_STATES = ("created", "authenticated", "active", "pending", "paused")
+
+
+class BillingSubscription(IdMixin, TimestampMixin, Base):
+    """One autopay mandate. Its state is copied from Razorpay (never trusted from a
+    browser); each monthly charge becomes a paid BillingOrder, which is what makes
+    the user Pro."""
+
+    __tablename__ = "billing_subscriptions"
+    __table_args__ = (
+        Index("ix_billing_subscriptions_user_created", "user_id", "created_at"),
+        Index("ix_billing_subscriptions_status_updated", "status", "updated_at"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    razorpay_subscription_id: Mapped[str] = mapped_column(String(64), unique=True)
+    razorpay_plan_id: Mapped[str] = mapped_column(String(64))
+    amount: Mapped[int]
+    currency: Mapped[str] = mapped_column(String(3))
+    days: Mapped[int]
+    status: Mapped[str] = mapped_column(String(16), default="created")
+    offer_id: Mapped[str | None] = mapped_column(String(32), default=None)
+    # The referral reward the first charge's discount spends.
+    referral_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("referrals.id", ondelete="SET NULL"), default=None
+    )
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    current_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    current_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    charge_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    cancel_at_cycle_end: Mapped[bool] = mapped_column(default=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class BillingFunnelEvent(IdMixin, TimestampMixin, Base):
+    """One step someone took (or one thing that went wrong) on the way to paying:
+    the page seen, the window opened or closed, a failure with Razorpay's reason,
+    a charge. Read by the admin Payment funnel and the reminder emails."""
+
+    __tablename__ = "billing_funnel_events"
+    __table_args__ = (
+        Index("ix_billing_funnel_created", "created_at"),
+        Index("ix_billing_funnel_user_created", "user_id", "created_at"),
+        Index("ix_billing_funnel_step_created", "step", "created_at"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    # One upgrade attempt, from the click to its end, shares this id.
+    attempt_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), default=None)
+    step: Mapped[str] = mapped_column(String(32))
+    # "client" (the dashboard said so), "server" or "webhook".
+    source: Mapped[str] = mapped_column(String(8))
+    detail: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

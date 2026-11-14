@@ -207,3 +207,109 @@ async def refund_payment(payment_id: str, *, amount: int, key: str) -> dict[str,
         headers={"X-Refund-Idempotency": key},
     )
     return _json(response)
+
+
+# --- Autopay (Razorpay Subscriptions) ---------------------------------------------
+
+
+async def _post(path: str, body: dict[str, Any], what: str) -> dict[str, Any]:
+    """A write. Not retried: a lost answer must not make a second plan, subscription
+    or cancellation behind the user's back; the caller reads back what happened."""
+    found = require_keys()
+    try:
+        return _json(await _client(found).post(path, json=body))
+    except (httpx.HTTPError, RazorpayError) as error:
+        logger.warning("Razorpay %s failed: %s", what, error)
+        raise UnavailableError(_UNAVAILABLE) from error
+
+
+async def create_plan(*, amount: int, currency: str, name: str, description: str) -> dict[str, Any]:
+    """A monthly Razorpay plan at a fixed amount. One per price: a plan's amount can
+    never change, so a new price needs a new plan."""
+    return await _post(
+        "/plans",
+        {
+            "period": "monthly",
+            "interval": 1,
+            "item": {
+                "name": name,
+                "amount": amount,
+                "currency": currency,
+                "description": description,
+            },
+            "notes": {"rolesetu_price": f"{currency}:{amount}"},
+        },
+        "plan creation",
+    )
+
+
+async def create_subscription(
+    *,
+    plan_id: str,
+    total_count: int,
+    notes: dict[str, str],
+    start_at: int | None = None,
+    offer_id: str | None = None,
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "plan_id": plan_id,
+        "total_count": total_count,
+        "quantity": 1,
+        "customer_notify": 1,
+        "notes": notes,
+    }
+    if start_at is not None:
+        body["start_at"] = start_at
+    if offer_id:
+        body["offer_id"] = offer_id
+    return await _post("/subscriptions", body, "subscription creation")
+
+
+async def fetch_subscription(subscription_id: str) -> dict[str, Any]:
+    """The subscription as Razorpay has it: the only source trusted for its state."""
+    try:
+        return await _get(f"/subscriptions/{subscription_id}")
+    except (httpx.HTTPError, RazorpayError) as error:
+        logger.warning("Could not read Razorpay subscription %s: %s", subscription_id, error)
+        raise UnavailableError(
+            "We could not check your autopay with Razorpay just now. If you were charged,"
+            " Pro turns on by itself within a few minutes; otherwise please try again."
+        ) from error
+
+
+async def fetch_invoice(invoice_id: str) -> dict[str, Any]:
+    """Which subscription a charge was for: a payment names its invoice, and the
+    invoice names its subscription."""
+    try:
+        return await _get(f"/invoices/{invoice_id}")
+    except (httpx.HTTPError, RazorpayError) as error:
+        logger.warning("Could not read Razorpay invoice %s: %s", invoice_id, error)
+        raise UnavailableError(_UNAVAILABLE) from error
+
+
+async def cancel_subscription(subscription_id: str, *, at_cycle_end: bool) -> dict[str, Any]:
+    """Stops future charges. `at_cycle_end` keeps the month already paid for running.
+    Asking to cancel a cancelled subscription fails, so on any failure the
+    subscription is read back and returned as it is."""
+    found = require_keys()
+    try:
+        return _json(
+            await _client(found).post(
+                f"/subscriptions/{subscription_id}/cancel",
+                json={"cancel_at_cycle_end": 1 if at_cycle_end else 0},
+            )
+        )
+    except (httpx.HTTPError, RazorpayError) as error:
+        logger.warning(
+            "Cancelling subscription %s did not answer cleanly: %s", subscription_id, error
+        )
+        return await fetch_subscription(subscription_id)
+
+
+def subscription_signature_ok(
+    *, payment_id: str, subscription_id: str, signature: str, secret: str
+) -> bool:
+    """The checkout's proof for an autopay mandate: HMAC-SHA256 of
+    "payment_id|subscription_id" with the key secret, compared in constant time."""
+    expected = _sign(f"{payment_id}|{subscription_id}".encode(), secret)
+    return hmac.compare_digest(expected, signature)

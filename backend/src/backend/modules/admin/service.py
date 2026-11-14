@@ -47,6 +47,7 @@ from backend.modules.admin.schemas import (
     WaitlistRow,
 )
 from backend.modules.ai_calls import repository as ai_calls_repository
+from backend.modules.billing import subscriptions as billing_subscriptions
 from backend.modules.errors import repository as errors_repository
 from backend.modules.profiles import service as profiles_service
 
@@ -339,6 +340,9 @@ async def delete_user(db: AsyncSession, *, user_id: uuid.UUID, confirm_email: st
         raise NotFoundError("User not found")
     if confirm_email.strip().lower() != user.email.lower():
         raise ValidationFailedError("Type the account's email address exactly to confirm.")
+    # Stop any autopay before anything is deleted: a deleted account must never be
+    # charged again. If Razorpay cannot be reached, nothing is deleted.
+    await billing_subscriptions.stop_all(db, user_id=user_id, reason="account_deleted")
     for resume in await repository.resumes(db, user_id):
         try:
             await storage.delete_file(resume.storage_key)
