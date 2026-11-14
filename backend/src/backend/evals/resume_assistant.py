@@ -149,7 +149,7 @@ async def run_case(case: Case) -> bool:
         rows = [entry.label for entry in section.entries if entry.label]
     request = AssistRequest(resume_id=uuid.uuid4(), message=case.message)
     context = assistant.build_context(layout, rows, request, case.profile)
-    answer = await resume_assistant.propose_edits(context.prompt, user_api_key=None)
+    answer = await resume_assistant.propose_edits(context.prompt)
     edits = assistant.check_answer(answer, context)
     passed = case.check(answer.reply, edits, layout)
     print(f"{'PASS' if passed else 'FAIL'}  {case.name}")

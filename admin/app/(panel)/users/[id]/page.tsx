@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { UserBillingCard } from '@/components/billing/UserBillingCard';
+import { ExtensionTimeline } from '@/components/ExtensionTimeline';
 import { ResumeModal } from '@/components/ResumeModal';
 import { UserEmail } from '@/components/UserEmail';
 import {
@@ -259,6 +261,8 @@ export default function UserPage() {
         </dl>
       </Card>
 
+      <UserBillingCard userId={user.id} email={user.email} />
+
       <ProfileSection profile={profile} />
 
       <ResumeFiles userId={user.id} resumes={resumes} />
@@ -351,6 +355,8 @@ export default function UserPage() {
           </div>
         )}
       </Section>
+
+      <ExtensionTimeline userId={user.id} />
 
       <UserEmail userId={user.id} sent={detail.data.panel_emails} />
 

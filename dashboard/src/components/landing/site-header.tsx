@@ -10,6 +10,7 @@ export const NAV_LINKS = [
   { href: '/#editor', label: 'Resume editor' },
   { href: '/#extension', label: 'Extension' },
   { href: '/#features', label: 'Features' },
+  { href: '/#pricing', label: 'Pricing' },
   { href: '/#faq', label: 'FAQ' },
 ] as const;
 

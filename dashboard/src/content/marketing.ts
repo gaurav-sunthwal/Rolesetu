@@ -200,7 +200,7 @@ export const FEATURE_PAGES: FeaturePage[] = [
       {
         question: 'Does the AI assistant need my own AI key?',
         answer:
-          'No. It works without one. If you add your own Gemini key in Settings, the assistant uses your key first and Rolesetu’s only if yours cannot answer.',
+          'No. It runs on Rolesetu’s AI. Each message uses one AI credit: Free includes 30 a month, Pro 400.',
       },
       {
         question: 'Can the AI add experience I do not have?',
@@ -545,7 +545,7 @@ export const HOME_FAQS: Faq[] = [
   {
     question: 'Do I need an AI subscription or an API key?',
     answer:
-      'No. Reading your resume, checking jobs and fresh jobs run without an AI model, and the resume assistant works without a key of your own. If you add your own Gemini key in Settings, AI features use it first.',
+      'No. Reading your resume, checking jobs and fresh jobs run without an AI model. Features that do use AI, like the resume assistant and AI answers on forms, run on Rolesetu’s AI and use monthly AI credits: 30 on Free, 400 on Pro.',
   },
   {
     question: 'Is Rolesetu genuine, safe, and trustworthy?',
@@ -560,7 +560,12 @@ export const HOME_FAQS: Faq[] = [
   {
     question: 'Is Rolesetu free?',
     answer:
-      'Yes. Rolesetu is free to use today: create an account, upload your resume and check a job.',
+      'Yes. Checking jobs, the match score, extension autofill, tailored resumes and the application tracker are free and unlimited. Free also includes 30 AI credits a month. Pro is ₹199 a month for 400 AI credits, paid once a month with no autopay.',
+  },
+  {
+    question: 'How does inviting a friend work?',
+    answer:
+      'Share your invite link from the Plan page. When a friend signs up with it, uploads a resume and checks 3 jobs, your next Pro month costs ₹149 instead of ₹199. Every friend unlocks one cheaper month. You never see their resume or jobs.',
   },
 ];
 

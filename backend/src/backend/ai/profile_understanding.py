@@ -35,9 +35,7 @@ class ProfileUnderstanding(BaseModel):
     scope_chunks: list[str] = Field(default_factory=list)
 
 
-async def understand_profile(
-    resume_text: str, *, user_api_key: str | None = None
-) -> ProfileUnderstanding | None:
+async def understand_profile(resume_text: str) -> ProfileUnderstanding | None:
     """Extracts role, field context, categorized skills, and chunked scope from resume text."""
     if not resume_text.strip():
         return None
@@ -46,7 +44,6 @@ async def understand_profile(
             resume_text[:12000],
             ProfileUnderstanding,
             purpose="profile-understanding",
-            user_api_key=user_api_key,
             system_instruction=load_prompt("understand_profile", PROMPT_VERSION),
             timeout_seconds=20.0,
         )

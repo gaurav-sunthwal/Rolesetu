@@ -56,9 +56,7 @@ def load_fixture(field_key: str) -> tuple[str, list[str]] | None:
     return _format_catalog(catalog_lines), core
 
 
-async def generate_catalog(
-    field_key: str, *, user_api_key: str | None = None
-) -> GeneratedCatalog | None:
+async def generate_catalog(field_key: str) -> GeneratedCatalog | None:
     try:
         field_label = fields.label(field_key)
     except KeyError:
@@ -71,7 +69,6 @@ async def generate_catalog(
             f"Produce the skill dictionary for {field_label}.",
             GeneratedCatalog,
             purpose="generate-domain-catalog",
-            user_api_key=user_api_key,
             system_instruction=system,
             timeout_seconds=25.0,
         )
@@ -85,8 +82,6 @@ async def generate_catalog(
 async def ensure_catalog(
     db: AsyncSession,
     field_key: str,
-    *,
-    user_api_key: str | None = None,
 ) -> DomainSkillCatalog | None:
     if field_key in HAND_AUTHORED_FIELDS or not field_key:
         return None
@@ -105,7 +100,7 @@ async def ensure_catalog(
             core_skill_names=core,
         )
 
-    generated = await generate_catalog(field_key, user_api_key=user_api_key)
+    generated = await generate_catalog(field_key)
     if generated is None:
         return None
     return await repository.upsert(
@@ -123,16 +118,14 @@ async def catalog_append_for_fields(db: AsyncSession, field_keys: set[str]) -> s
     return "\n".join(row.catalog_text for row in rows if row.catalog_text.strip())
 
 
-async def core_skills_for_field(
-    db: AsyncSession, field_key: str | None, *, user_api_key: str | None = None
-) -> list[str]:
+async def core_skills_for_field(db: AsyncSession, field_key: str | None) -> list[str]:
     if not field_key:
         return []
     if field_key in HAND_AUTHORED_FIELDS:
         return core_skills_for_hand_field(field_key)
     row = await repository.get(db, field_key)
     if row is None:
-        row = await ensure_catalog(db, field_key, user_api_key=user_api_key)
+        row = await ensure_catalog(db, field_key)
     if row is None:
         return []
     return list(row.core_skill_names)

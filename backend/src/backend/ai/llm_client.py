@@ -5,19 +5,18 @@ Two fallbacks, because two different things go wrong:
 - Models: when a model is overloaded (5xx) or times out, that is true for every
   key, so we move to the next model in `llm_model` + `llm_fallback_models` and
   use the first one that answers.
-- Keys: the caller's own saved key (if they added one in Settings) is always
-  tried first, so their quota is spent before ours. When a key is rejected, or
-  out of quota on this model, we move to the next key: server key 1, then
-  server key 2. A rejected key is not tried again; a key that is only out of
-  quota is, because quota is counted per model.
+- Keys: Rolesetu's own, server key 1 then server key 2. When a key is rejected,
+  or out of quota on this model, we move to the next one. A rejected key is not
+  tried again; a key that is only out of quota is, because quota is counted per
+  model. How much each user may use them is set by their plan's AI credits.
 
-Only once every model has failed do we raise, and the message points the user
-at adding their own key.
+Only once every model has failed do we raise.
 """
 
 import asyncio
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from google import genai
@@ -49,75 +48,20 @@ _QUOTA_COOLDOWN_SECONDS = 60.0
 _out_of_quota_until: dict[tuple[str, str], float] = {}
 
 
-def _models_to_try() -> list[str]:
+def _models_to_try(preferred: Sequence[str] | None = None) -> list[str]:
     """Healthy models first; ones cooling down are kept as a last resort."""
     now = time.monotonic()
-    models = _candidate_models()
+    models = list(dict.fromkeys(preferred)) if preferred else _candidate_models()
     healthy = [m for m in models if _cooling_until.get(m, 0.0) <= now]
     return healthy + [m for m in models if m not in healthy]
 
 
 class LLMUnavailableError(AppError):
     status_code = 503
-    detail = "AI service is temporarily unavailable. Add your own Gemini API key in Settings."
-
-
-class InvalidLLMKeyError(AppError):
-    status_code = 422
     detail = (
-        "Google rejected this API key. Check that you copied the whole key "
-        "and that the Gemini API is enabled for it."
+        "Rolesetu's AI is busy right now. Your AI credit was not used. Please try again in a"
+        " minute."
     )
-
-
-class LLMKeyQuotaError(AppError):
-    status_code = 422
-    detail = (
-        "This key is valid, but Google says it has no quota left right now. "
-        "Check its usage limits in Google AI Studio, then try again."
-    )
-
-
-class LLMKeyCheckUnavailableError(AppError):
-    status_code = 503
-    detail = "Could not reach Google to test this key, so nothing was saved. Please try again."
-
-
-_KEY_REJECTED_CODES = {400, 401, 403}
-
-
-async def verify_api_key(key: str) -> None:
-    """Prove a key can actually generate by making the smallest possible model call.
-
-    Listing models would be cheaper, but it passes for keys that cannot generate,
-    which is the only thing a saved key is ever used for.
-    """
-    settings = get_settings()
-    client = genai.Client(api_key=key)
-    last_error: Exception | None = None
-    for model in _candidate_models():
-        try:
-            await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model,
-                    contents="ping",
-                    config={"max_output_tokens": 1, "temperature": 0},
-                ),
-                timeout=settings.llm_key_check_timeout_seconds,
-            )
-            return
-        except errors.ClientError as exc:
-            if exc.code in _KEY_REJECTED_CODES:
-                raise InvalidLLMKeyError() from exc
-            if exc.code == 429:
-                raise LLMKeyQuotaError() from exc
-            logger.warning("Key check on %s failed (status %s): %s", model, exc.code, exc.message)
-            last_error = exc
-        except (errors.APIError, TimeoutError) as exc:
-            # An outage on one model says nothing about the key; try the next model.
-            logger.warning("Key check on %s could not complete: %s", model, type(exc).__name__)
-            last_error = exc
-    raise LLMKeyCheckUnavailableError() from last_error
 
 
 def _candidate_models() -> list[str]:
@@ -125,10 +69,11 @@ def _candidate_models() -> list[str]:
     return list(dict.fromkeys([settings.llm_model, *settings.llm_fallback_models]))
 
 
-def _candidate_keys(user_api_key: str | None) -> list[str]:
-    """The user's own key first; Rolesetu's keys only when theirs cannot answer."""
+def _candidate_keys() -> list[str]:
+    """Rolesetu's keys, in order. How much each user may use them is decided by
+    their plan's AI credits (`modules/credits`), before a call is made."""
     settings = get_settings()
-    keys = (user_api_key, settings.llm_api_key_1, settings.llm_api_key_2)
+    keys = (settings.llm_api_key_1, settings.llm_api_key_2)
     return list(dict.fromkeys(k for k in keys if k))
 
 
@@ -148,6 +93,7 @@ async def _call_once[T: BaseModel](
     response_schema: type[T] | type[list[T]],
     system_instruction: str | None,
     timeout_seconds: float | None = None,
+    thinking: bool = True,
 ) -> _Answer[T]:
     settings = get_settings()
     config: genai.types.GenerateContentConfigDict = {
@@ -155,6 +101,10 @@ async def _call_once[T: BaseModel](
         "response_schema": response_schema,
         "temperature": 0,
     }
+    # Gemini 2.5 models think before answering unless told not to: slower, and the
+    # thinking is billed. Other families take other settings, so they are left alone.
+    if not thinking and model.startswith("gemini-2.5"):
+        config["thinking_config"] = {"thinking_budget": 0}
     if system_instruction:
         config["system_instruction"] = system_instruction
 
@@ -200,11 +150,14 @@ async def generate_structured[T: BaseModel](
     response_schema: type[T] | type[list[T]],
     *,
     purpose: str = "other",
-    user_api_key: str | None = None,
     system_instruction: str | None = None,
     timeout_seconds: float | None = None,
+    models: Sequence[str] | None = None,
+    thinking: bool = True,
 ) -> T | list[T]:
     """`purpose` says what the call is for, so the admin panel can count it.
+    `models` replaces the usual model order for one call; `thinking=False` asks the
+    models that think by default to answer straight away.
     `timeout_seconds` overrides the default for one call: a person waiting on
     the answer is better served by moving to the next model sooner.
     """
@@ -215,7 +168,12 @@ async def generate_structured[T: BaseModel](
 
     try:
         answer = await _answer(
-            prompt, response_schema, user_api_key, system_instruction, timeout_seconds
+            prompt,
+            response_schema,
+            system_instruction,
+            timeout_seconds,
+            models,
+            thinking,
         )
     except LLMUnavailableError as exc:
         cause = exc.__cause__
@@ -231,7 +189,7 @@ async def generate_structured[T: BaseModel](
     await ai_calls.record(
         purpose=purpose,
         model=answer.model,
-        own_key=answer.key == user_api_key,
+        own_key=False,
         ok=True,
         duration_ms=elapsed_ms(),
         input_tokens=answer.input_tokens,
@@ -243,19 +201,21 @@ async def generate_structured[T: BaseModel](
 async def _answer[T: BaseModel](
     prompt: str,
     response_schema: type[T] | type[list[T]],
-    user_api_key: str | None,
     system_instruction: str | None,
     timeout_seconds: float | None,
+    models: Sequence[str] | None = None,
+    thinking: bool = True,
 ) -> _Answer[T]:
     """The first answer any model gives, trying every model and key in turn."""
-    keys = _candidate_keys(user_api_key)
+    keys = _candidate_keys()
     if not keys:
         raise LLMUnavailableError("No Gemini API key is configured")
 
     unusable_keys: set[str] = set()
     last_error: Exception | None = None
 
-    for model in _models_to_try():
+    order = _models_to_try(models)
+    for model in order:
         for number, key in enumerate(keys, start=1):
             if key in unusable_keys:
                 continue
@@ -271,9 +231,15 @@ async def _answer[T: BaseModel](
                 ):
                     with attempt:
                         result = await _call_once(
-                            key, model, prompt, response_schema, system_instruction, timeout_seconds
+                            key,
+                            model,
+                            prompt,
+                            response_schema,
+                            system_instruction,
+                            timeout_seconds,
+                            thinking,
                         )
-                if model != get_settings().llm_model:
+                if model != (models[0] if models else get_settings().llm_model):
                     logger.warning("Answered by fallback model %s", model)
                 return result
             except errors.ClientError as exc:

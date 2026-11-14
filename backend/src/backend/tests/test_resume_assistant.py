@@ -11,7 +11,6 @@ import pytest
 from backend.ai import resume_assistant
 from backend.ai.resume_assistant import AssistantAnswer, ProposedEdit
 from backend.core import storage
-from backend.core.exceptions import RateLimitedError
 from backend.modules.resume_editor import assistant
 from backend.modules.resume_editor import pdf as engine
 from backend.modules.resume_editor.schemas import AssistRequest, DraftLine, DraftNewLine
@@ -145,14 +144,6 @@ def test_edits_to_lines_the_user_added_point_at_them() -> None:
     ]
 
 
-def test_too_many_messages_are_slowed_down() -> None:
-    key = uuid.uuid4().hex
-    for _ in range(assistant.MAX_MESSAGES):
-        assistant.check_rate(key)
-    with pytest.raises(RateLimitedError):
-        assistant.check_rate(key)
-
-
 @pytest.fixture
 def bucket(monkeypatch: pytest.MonkeyPatch) -> dict[str, bytes]:
     files: dict[str, bytes] = {}
@@ -177,7 +168,7 @@ async def test_the_endpoint_answers_with_checked_edits(
 ) -> None:
     shown: list[str] = []
 
-    async def fake_model(prompt: str, *, user_api_key: str | None) -> AssistantAnswer:
+    async def fake_model(prompt: str) -> AssistantAnswer:
         shown.append(prompt)
         return answer(
             ProposedEdit(action="change", line=line_id("Razorpay"), text="Razorpay Inc"),

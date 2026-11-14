@@ -12,40 +12,18 @@
 """
 
 import re
-import time
-from collections import deque
 from dataclasses import dataclass, field
 
 from backend.ai.resume_assistant import AssistantAnswer
-from backend.core.exceptions import RateLimitedError
 from backend.modules.matches.local.catalog import find_skills
 from backend.modules.profiles.schemas import ProfileRead
 from backend.modules.resume_editor import pdf as engine
 from backend.modules.resume_editor.links import URL, href_for
 from backend.modules.resume_editor.schemas import AssistEdit, AssistRequest
 
-# A soft guard on cost, counted per server process. A second instance lets
-# a busy user through twice as often; the keys' own quotas are the hard limit.
-MAX_MESSAGES = 30
-WINDOW_SECONDS = 600.0
-_recent: dict[str, deque[float]] = {}
-
 MAX_EDITS = 25
 _ADDRESS = re.compile(r"^(?:https?://\S+|mailto:\S+|tel:\S+)$")
 _NUMBER = re.compile(r"(?<![\w.])\d[\d,.]*[%+xkKmM]?")
-
-
-def check_rate(user_key: str) -> None:
-    now = time.monotonic()
-    sent = _recent.setdefault(user_key, deque())
-    while sent and sent[0] < now - WINDOW_SECONDS:
-        sent.popleft()
-    if len(sent) >= MAX_MESSAGES:
-        raise RateLimitedError(
-            f"You have sent the assistant {MAX_MESSAGES} messages in the last 10 minutes. "
-            "Please wait a few minutes, or keep editing the lines yourself."
-        )
-    sent.append(now)
 
 
 @dataclass

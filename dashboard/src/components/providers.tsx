@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
 
 import { ThemeProvider } from '@/components/theme-provider';
+import { ReferralCapture } from '@/features/billing/referrals';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ApiError } from '@/lib/api/client';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
@@ -50,6 +51,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ClearCacheOnAccountChange />
+          <ReferralCapture />
           <TooltipProvider>
             {children}
             <Toaster richColors position="top-right" />

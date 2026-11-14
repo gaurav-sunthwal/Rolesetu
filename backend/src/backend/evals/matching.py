@@ -52,7 +52,7 @@ async def run_pair(profile_key: str, job_key: str, *, use_model: bool) -> Outcom
     match = Match(job=job, profile_version=1)
     try:
         if use_model:
-            await service.score_with_model(job, match, profile, user_api_key=None)
+            await service.score_with_model(job, match, profile)
         else:
             service.score_without_model(job, match, profile, get_matcher())
     except AppError as exc:

@@ -12,7 +12,7 @@ from backend.ai import resume_assistant
 from backend.core import storage
 from backend.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
 from backend.modules.ai_calls import service as ai_calls
-from backend.modules.llm_keys.service import get_decrypted_user_llm_key
+from backend.modules.credits import service as credits
 from backend.modules.profiles import service as profiles_service
 from backend.modules.resume_editor import assistant
 from backend.modules.resume_editor import pdf as engine
@@ -336,8 +336,8 @@ def _layout_for_assistant(pdf: bytes) -> tuple[engine.Layout, list[str] | None]:
 async def assist(db: AsyncSession, *, user_id: uuid.UUID, payload: AssistRequest) -> AssistReply:
     """Turns the user's request into edits for the editor. Nothing is changed
     or saved here: the editor applies the edits to its draft, and the user saves.
+    Each message spends an AI credit, taken just before the model is called.
     """
-    assistant.check_rate(str(user_id))
     _resume, original = await _stored(db, user_id, payload.resume_id)
     try:
         layout, rows = await asyncio.to_thread(_layout_for_assistant, original)
@@ -347,11 +347,10 @@ async def assist(db: AsyncSession, *, user_id: uuid.UUID, payload: AssistRequest
 
     profile = await profiles_service.get_profile(db, user_id=user_id)
     context = assistant.build_context(layout, rows, payload, assistant.profile_text(profile))
-    # The user's own key goes first; Rolesetu's keys are the fallback.
-    user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
+    await credits.spend(db, user_id=user_id, action="resume_assistant")
     started = time.monotonic()
     with ai_calls.called_by(user_id, "resume"):
-        answer = await resume_assistant.propose_edits(context.prompt, user_api_key=user_api_key)
+        answer = await resume_assistant.propose_edits(context.prompt)
     edits = assistant.check_answer(answer, context)
     logger.info(
         "Resume assistant answered",

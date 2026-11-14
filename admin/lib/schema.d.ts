@@ -30,7 +30,12 @@ export interface paths {
     };
     /** Read My Llm Key Status */
     get: operations['read_my_llm_key_status_api_v1_llm_keys_me_get'];
-    /** Set My Llm Key */
+    /**
+     * Set My Llm Key
+     * @deprecated
+     * @description Retired: keys are no longer saved. Kept for one release so an open, older
+     *     dashboard gets a clear answer instead of a missing page.
+     */
     put: operations['set_my_llm_key_api_v1_llm_keys_me_put'];
     post?: never;
     /** Delete My Llm Key */
@@ -298,6 +303,83 @@ export interface paths {
      * @description A shared score card. Works without signing in: the link is the permission.
      */
     get: operations['read_public_share_api_v1_public_shares__slug__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** My Plan */
+    get: operations['my_plan_api_v1_billing_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/orders': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create Order
+     * @description Starts a payment. The price is the server's, never the caller's.
+     */
+    post: operations['create_order_api_v1_billing_orders_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/billing/orders/verify': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify Payment
+     * @description Turns on Pro once the checkout's signature and Razorpay both confirm the payment.
+     */
+    post: operations['verify_payment_api_v1_billing_orders_verify_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/credits/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * My Credits
+     * @description This month's AI credits: used, left, and when they come back.
+     */
+    get: operations['my_credits_api_v1_credits_me_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -607,6 +689,149 @@ export interface paths {
      * @description The Undo for an answer that was new when it was learned.
      */
     delete: operations['forget_answer_api_v1_extension_learned_answers__question_key__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/answer-matches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Match Saved Answers
+     * @description Saved answers for a form's questions that are worded differently from
+     *     before. Sent once per form, for every question no answer is stored under.
+     */
+    post: operations['match_saved_answers_api_v1_extension_answer_matches_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/pitch-answers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Write Pitch Answers
+     * @description Answers to a form's "Why this company?"-type questions, made for this job
+     *     from the user's saved answers and profile. No model call: free and instant.
+     */
+    post: operations['write_pitch_answers_api_v1_extension_pitch_answers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/ai-answers/usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Ai Answer Usage */
+    get: operations['read_ai_answer_usage_api_v1_extension_ai_answers_usage_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/ai-answers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Write Ai Answer
+     * @description Writes or improves one answer with the model, when the user asks. Spends one
+     *     AI credit; every claim is checked against the user's own data.
+     */
+    post: operations['write_ai_answer_api_v1_extension_ai_answers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Record Events
+     * @description Usage events from the extension, sent in batches. Each event carries the
+     *     extension's own id for it, so a retried batch is stored once.
+     */
+    post: operations['record_events_api_v1_extension_events_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/installs/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Record Install Events
+     * @description An install's steps before it is connected: from the extension (installed,
+     *     setup opened...) and from the website's setup pages (page seen, signed in...).
+     */
+    post: operations['record_install_events_api_v1_extension_installs_events_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/extension/installs/{install_id}/uninstalled': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Install Removed
+     * @description Chrome opens this when the extension is removed. It records the removal and
+     *     sends the person on to a page asking why (one click, optional).
+     */
+    get: operations['install_removed_api_v1_extension_installs__install_id__uninstalled_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1259,6 +1484,270 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/ext-events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Ext Event Stats
+     * @description Extension usage analytics: what users do inside the extension,
+     *     aggregated by event type, day, and site. No personal data is returned.
+     */
+    get: operations['read_ext_event_stats_api_v1_admin_ext_events_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/ext-analytics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Ext Analytics
+     * @description How the extension is used in the period: who is active, on which version,
+     *     how far people get from finding a form to reusing an answer, what AI costs,
+     *     which sites work, and what breaks. Counts only: no page content, no user text.
+     */
+    get: operations['read_ext_analytics_api_v1_admin_ext_analytics_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/ext-events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read User Ext Events
+     * @description One user's latest extension events, newest first: for support questions.
+     */
+    get: operations['read_user_ext_events_api_v1_admin_users__user_id__ext_events_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/ext-installs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Ext Installs
+     * @description What happened to each new install in the period, signed in or not: how far
+     *     people got in setting up, on which browsers and systems, and the latest installs.
+     */
+    get: operations['read_ext_installs_api_v1_admin_ext_installs_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/ext-installs/{install_id}/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Install Journey
+     * @description Everything one install did, newest first, from install to its latest use.
+     */
+    get: operations['read_install_journey_api_v1_admin_ext_installs__install_id__events_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/billing': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Billing Overview
+     * @description Who has Pro, what came in, prices, and the latest admin changes.
+     */
+    get: operations['read_billing_overview_api_v1_admin_billing_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/billing/orders': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Billing Orders
+     * @description Every payment, given month and abandoned checkout, newest first.
+     */
+    get: operations['read_billing_orders_api_v1_admin_billing_orders_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/billing/plans/{plan}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Billing Plan
+     * @description Changes a plan's price, length or whether it is on sale, from the next order on.
+     */
+    put: operations['update_billing_plan_api_v1_admin_billing_plans__plan__put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/billing/orders/{order_id}/refund': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Refund Billing Order
+     * @description Refunds a payment in full through Razorpay and ends the Pro it bought.
+     */
+    post: operations['refund_billing_order_api_v1_admin_billing_orders__order_id__refund_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/billing/orders/{order_id}/revoke': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Revoke Billing Order
+     * @description Removes the Pro one payment or given month gave, without a refund.
+     */
+    post: operations['revoke_billing_order_api_v1_admin_billing_orders__order_id__revoke_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/billing': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read User Billing
+     * @description One user's plan, every payment and given month, and the changes admins made.
+     */
+    get: operations['read_user_billing_api_v1_admin_users__user_id__billing_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/billing/grant': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Grant User Pro
+     * @description Gives Pro for some days, after any paid time already bought.
+     */
+    post: operations['grant_user_pro_api_v1_admin_users__user_id__billing_grant_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{user_id}/billing/end': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * End User Pro
+     * @description Ends someone's Pro now (every running and upcoming month), without refunds.
+     */
+    post: operations['end_user_pro_api_v1_admin_users__user_id__billing_end_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/social': {
     parameters: {
       query?: never;
@@ -1716,6 +2205,51 @@ export interface components {
       /** Last Check At */
       last_check_at: string | null;
     };
+    /** AiAnswerRead */
+    AiAnswerRead: {
+      /** Text */
+      text: string;
+      /** Removed */
+      removed: string[];
+      usage: components['schemas']['AiUsageRead'];
+    };
+    /**
+     * AiAnswerRequest
+     * @description One box to write, or improve, with the model.
+     */
+    AiAnswerRequest: {
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'write' | 'improve';
+      /** Question */
+      question: string;
+      /**
+       * Context
+       * @default
+       */
+      context: string;
+      /** Company */
+      company?: string | null;
+      /** Role */
+      role?: string | null;
+      /**
+       * Job Text
+       * @default
+       */
+      job_text: string;
+      /**
+       * Current
+       * @default
+       */
+      current: string;
+      /**
+       * Max Length
+       * @default 2000
+       */
+      max_length: number;
+    };
     /** AiCallRead */
     AiCallRead: {
       /**
@@ -1767,6 +2301,13 @@ export interface components {
       by_source: {
         [key: string]: number;
       };
+    };
+    /** AiUsageRead */
+    AiUsageRead: {
+      /** Left */
+      left: number | null;
+      /** Limit */
+      limit: number;
     };
     /** ApplicationCreate */
     ApplicationCreate: {
@@ -2024,6 +2565,66 @@ export interface components {
       /** Years Of Experience */
       years_of_experience: number;
     };
+    /** BillingActionRead */
+    BillingActionRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Action */
+      action: string;
+      /** Admin Email */
+      admin_email: string;
+      /** User Id */
+      user_id: string | null;
+      /** User Email */
+      user_email: string | null;
+      /** Order Id */
+      order_id: string | null;
+      /** Note */
+      note: string | null;
+      /** Amount */
+      amount: number | null;
+      /** Days */
+      days: number | null;
+    };
+    /** BillingOverview */
+    BillingOverview: {
+      /** Payments Enabled */
+      payments_enabled: boolean;
+      /** Webhook Enabled */
+      webhook_enabled: boolean;
+      /** Plans */
+      plans: components['schemas']['PlanAdminRead'][];
+      /** Pro Now */
+      pro_now: number;
+      /** Paying Now */
+      paying_now: number;
+      /** Granted Now */
+      granted_now: number;
+      /** Expiring 7D */
+      expiring_7d: number;
+      /** Currency */
+      currency: string;
+      /** Revenue 30D */
+      revenue_30d: number;
+      /** Revenue Total */
+      revenue_total: number;
+      /** Refunded Total */
+      refunded_total: number;
+      /** Orders 30D */
+      orders_30d: number;
+      /** Paid 30D */
+      paid_30d: number;
+      /** Recent Actions */
+      recent_actions: components['schemas']['BillingActionRead'][];
+    };
     /** Body_read_resume_identity_api_v1_public_resume_identity_post */
     Body_read_resume_identity_api_v1_public_resume_identity_post: {
       /** File */
@@ -2087,15 +2688,9 @@ export interface components {
       collected_at: string | null;
       /** Candidate Years */
       candidate_years: number;
-      /**
-       * Scored Percent
-       * @description How much of the current collection has been scored, 0 to 100. 100 only when `items` is that finished list.
-       */
+      /** Scored Percent */
       scored_percent: number;
-      /**
-       * Refreshing
-       * @description True while `items` is an older list for this profile and a newer one is still scoring.
-       */
+      /** Refreshing */
       refreshing: boolean;
     };
     /** CareerJobRead */
@@ -2177,6 +2772,40 @@ export interface components {
     ConnectUrl: {
       /** Url */
       url: string;
+    };
+    /** CreditsRead */
+    CreditsRead: {
+      /**
+       * Plan
+       * @enum {string}
+       */
+      plan: 'free' | 'pro';
+      /** Used */
+      used: number;
+      /**
+       * Limit
+       * @description Credits this plan gives per calendar month (UTC).
+       */
+      limit: number;
+      /** Left */
+      left: number;
+      /**
+       * Resets At
+       * Format: date-time
+       */
+      resets_at: string;
+      /**
+       * Pro Limit
+       * @description What Pro gives, to show next to an upgrade.
+       */
+      pro_limit: number;
+      /**
+       * Costs
+       * @description Credits each AI action costs.
+       */
+      costs: {
+        [key: string]: number;
+      };
     };
     /** DailyActivity */
     DailyActivity: {
@@ -2590,6 +3219,351 @@ export interface components {
        */
       description: string;
     };
+    /** ExtAiStats */
+    ExtAiStats: {
+      /** Requested */
+      requested: number;
+      /** Succeeded */
+      succeeded: number;
+      /** Failed */
+      failed: number;
+      /** Limit Hits */
+      limit_hits: number;
+      /** By Mode */
+      by_mode: components['schemas']['ExtCountRow'][];
+      /** Failures */
+      failures: components['schemas']['ExtCountRow'][];
+      /** Paid Calls */
+      paid_calls: number;
+      /** Own Key Calls */
+      own_key_calls: number;
+      /** Input Tokens */
+      input_tokens: number;
+      /** Output Tokens */
+      output_tokens: number;
+    };
+    /**
+     * ExtAnalytics
+     * @description Everything on the admin panel's extension page, for one period.
+     */
+    ExtAnalytics: {
+      /** Hours */
+      hours: number;
+      overview: components['schemas']['ExtOverview'];
+      /** Versions */
+      versions: components['schemas']['ExtVersionRow'][];
+      /** Daily */
+      daily: components['schemas']['ExtDayRow'][];
+      /** Funnel */
+      funnel: components['schemas']['ExtFunnelStep'][];
+      /** Features */
+      features: components['schemas']['ExtFeatureRow'][];
+      ai: components['schemas']['ExtAiStats'];
+      /** Sites */
+      sites: components['schemas']['ExtSiteRow'][];
+      /** Errors */
+      errors: components['schemas']['ExtErrorRow'][];
+    };
+    /** ExtCountRow */
+    ExtCountRow: {
+      /** Label */
+      label: string;
+      /** Events */
+      events: number;
+    };
+    /** ExtDayRow */
+    ExtDayRow: {
+      /** Day */
+      day: string;
+      /** Active Users */
+      active_users: number;
+      /** Autofill Filled */
+      autofill_filled: number;
+      /** Answers Saved */
+      answers_saved: number;
+      /** Suggestions Used */
+      suggestions_used: number;
+      /** Ai Answers */
+      ai_answers: number;
+      /** Jobs Scored */
+      jobs_scored: number;
+    };
+    /** ExtErrorRow */
+    ExtErrorRow: {
+      /** Where */
+      where: string;
+      /** Version */
+      version: string | null;
+      /** Events */
+      events: number;
+      /** Users */
+      users: number;
+      /**
+       * Last Seen
+       * Format: date-time
+       */
+      last_seen: string;
+    };
+    /**
+     * ExtEventDay
+     * @description Per-day breakdown for the chart.
+     */
+    ExtEventDay: {
+      /** Day */
+      day: string;
+      /**
+       * Autofill Offered
+       * @default 0
+       */
+      autofill_offered: number;
+      /**
+       * Autofill Filled
+       * @default 0
+       */
+      autofill_filled: number;
+      /**
+       * Job Scored
+       * @default 0
+       */
+      job_scored: number;
+      /**
+       * Apply Clicked
+       * @default 0
+       */
+      apply_clicked: number;
+    };
+    /**
+     * ExtEventRead
+     * @description One event in a user's timeline.
+     */
+    ExtEventRead: {
+      /**
+       * At
+       * Format: date-time
+       */
+      at: string;
+      /** Name */
+      name: string;
+      /** Host */
+      host: string | null;
+      /** Count */
+      count: number | null;
+      /** Version */
+      version: string | null;
+      /** Props */
+      props: {
+        [key: string]: string | number | boolean;
+      } | null;
+    };
+    /**
+     * ExtEventSiteRow
+     * @description Top sites, by how many autofills were offered.
+     */
+    ExtEventSiteRow: {
+      /** Host */
+      host: string;
+      /** Offered */
+      offered: number;
+      /** Filled */
+      filled: number;
+      /** Fill Rate Pct */
+      fill_rate_pct: number;
+    };
+    /**
+     * ExtEventStats
+     * @description Full payload returned by GET /admin/ext-events.
+     */
+    ExtEventStats: {
+      /** Hours */
+      hours: number;
+      totals: components['schemas']['ExtEventTotals'];
+      /** Daily */
+      daily: components['schemas']['ExtEventDay'][];
+      /** Top Sites */
+      top_sites: components['schemas']['ExtEventSiteRow'][];
+    };
+    /**
+     * ExtEventTotals
+     * @description Aggregate counts for the admin overview card.
+     */
+    ExtEventTotals: {
+      /**
+       * Autofill Offered
+       * @default 0
+       */
+      autofill_offered: number;
+      /**
+       * Autofill Filled
+       * @default 0
+       */
+      autofill_filled: number;
+      /**
+       * Autofill Failed
+       * @default 0
+       */
+      autofill_failed: number;
+      /**
+       * Autofill Learned
+       * @default 0
+       */
+      autofill_learned: number;
+      /**
+       * Job Scored
+       * @default 0
+       */
+      job_scored: number;
+      /**
+       * Panel Opened
+       * @default 0
+       */
+      panel_opened: number;
+      /**
+       * Apply Clicked
+       * @default 0
+       */
+      apply_clicked: number;
+      /**
+       * Fill Rate Pct
+       * @default 0
+       */
+      fill_rate_pct: number;
+    };
+    /**
+     * ExtEventWrite
+     * @description One event sent from the extension.
+     */
+    ExtEventWrite: {
+      /**
+       * Name
+       * @enum {string}
+       */
+      name:
+        | 'extension_installed'
+        | 'extension_updated'
+        | 'extension_connected'
+        | 'extension_uninstalled'
+        | 'setup_opened'
+        | 'setup_page_seen'
+        | 'signup_started'
+        | 'sign_in_failed'
+        | 'signed_in'
+        | 'connect_failed'
+        | 'uninstall_reason'
+        | 'popup_opened'
+        | 'page_checked'
+        | 'job_detected'
+        | 'form_detected'
+        | 'panel_opened'
+        | 'job_scored'
+        | 'apply_clicked'
+        | 'application_tracked'
+        | 'autofill_offered'
+        | 'autofill_filled'
+        | 'autofill_failed'
+        | 'autofill_undone'
+        | 'autofill_learned'
+        | 'answer_saved'
+        | 'suggestion_shown'
+        | 'suggestion_used'
+        | 'ai_requested'
+        | 'ai_succeeded'
+        | 'ai_failed'
+        | 'ext_error';
+      /** Host */
+      host?: string | null;
+      /** Count */
+      count?: number | null;
+      /** Id */
+      id?: string | null;
+      /** Version */
+      version?: string | null;
+      /** Session */
+      session?: string | null;
+      /** Props */
+      props?: {
+        [key: string]: string | number | boolean;
+      } | null;
+      /** At */
+      at?: string | null;
+    };
+    /**
+     * ExtEventsWrite
+     * @description A batch: up to 50 events in one request (more after a long time offline).
+     */
+    ExtEventsWrite: {
+      /** Events */
+      events: components['schemas']['ExtEventWrite'][];
+      /** Install */
+      install?: string | null;
+    };
+    /** ExtFeatureRow */
+    ExtFeatureRow: {
+      /** Name */
+      name: string;
+      /** Events */
+      events: number;
+      /** Users */
+      users: number;
+    };
+    /**
+     * ExtFunnelStep
+     * @description People (and times) who got this far in the period.
+     */
+    ExtFunnelStep: {
+      /** Step */
+      step: string;
+      /** Label */
+      label: string;
+      /** Users */
+      users: number;
+      /** Events */
+      events: number;
+    };
+    /** ExtOverview */
+    ExtOverview: {
+      /** Active 1D */
+      active_1d: number;
+      /** Active 7D */
+      active_7d: number;
+      /** Active 30D */
+      active_30d: number;
+      /** Events */
+      events: number;
+      /** Installs */
+      installs: number;
+      /** Updates */
+      updates: number;
+      /** Connects */
+      connects: number;
+      /** Errors */
+      errors: number;
+    };
+    /** ExtSiteRow */
+    ExtSiteRow: {
+      /** Host */
+      host: string;
+      /** Users */
+      users: number;
+      /** Offered */
+      offered: number;
+      /** Filled */
+      filled: number;
+      /** Failed */
+      failed: number;
+      /** Suggestions Used */
+      suggestions_used: number;
+      /** Ai Answers */
+      ai_answers: number;
+      /** Fill Rate Pct */
+      fill_rate_pct: number;
+    };
+    /** ExtVersionRow */
+    ExtVersionRow: {
+      /** Version */
+      version: string;
+      /** Users */
+      users: number;
+    };
     /** ExtensionConnected */
     ExtensionConnected: {
       /** Token */
@@ -2653,6 +3627,13 @@ export interface components {
       /** Detail */
       detail: string;
     };
+    /** GrantWrite */
+    GrantWrite: {
+      /** Days */
+      days: number;
+      /** Note */
+      note: string;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -2690,6 +3671,127 @@ export interface components {
       lookback_days: number;
       /** Review Count */
       review_count: number;
+    };
+    /**
+     * InstallEventsWrite
+     * @description Sent without signing in: an install's steps before it is connected.
+     */
+    InstallEventsWrite: {
+      install: components['schemas']['InstallInfo'];
+      /** Events */
+      events?: components['schemas']['ExtEventWrite'][];
+    };
+    /** InstallGroupRow */
+    InstallGroupRow: {
+      /** Label */
+      label: string;
+      /** Installs */
+      installs: number;
+      /** Connected */
+      connected: number;
+    };
+    /**
+     * InstallInfo
+     * @description What an install says about itself. Everything but the id is optional: the
+     *     website's setup pages know only the id (from the link the extension opened).
+     */
+    InstallInfo: {
+      /** Id */
+      id: string;
+      /** Version */
+      version?: string | null;
+      /** Browser */
+      browser?: string | null;
+      /** Os */
+      os?: string | null;
+      /** Arch */
+      arch?: string | null;
+      /** Language */
+      language?: string | null;
+      /** Timezone */
+      timezone?: string | null;
+      /** Automated */
+      automated?: boolean | null;
+    };
+    /** InstallRow */
+    InstallRow: {
+      /** Install Id */
+      install_id: string;
+      /**
+       * Installed At
+       * Format: date-time
+       */
+      installed_at: string;
+      /**
+       * Last Seen At
+       * Format: date-time
+       */
+      last_seen_at: string;
+      /** Version */
+      version: string | null;
+      /** Browser */
+      browser: string | null;
+      /** Os */
+      os: string | null;
+      /** Language */
+      language: string | null;
+      /** Timezone */
+      timezone: string | null;
+      /** Automated */
+      automated: boolean | null;
+      /** Same Address */
+      same_address: number;
+      /** Reached */
+      reached: string;
+      /** User Id */
+      user_id: string | null;
+      /** Uninstalled At */
+      uninstalled_at: string | null;
+    };
+    /**
+     * InstallStats
+     * @description GET /admin/ext-installs: what happens to new installs in the period.
+     */
+    InstallStats: {
+      /** Hours */
+      hours: number;
+      /** Installs */
+      installs: number;
+      /** Connected */
+      connected: number;
+      /** Uninstalled */
+      uninstalled: number;
+      /** Silent */
+      silent: number;
+      /** Automated */
+      automated: number;
+      /** Crowded */
+      crowded: number;
+      /** Funnel */
+      funnel: components['schemas']['InstallStep'][];
+      /** By Os */
+      by_os: components['schemas']['InstallGroupRow'][];
+      /** By Browser */
+      by_browser: components['schemas']['InstallGroupRow'][];
+      /** By Language */
+      by_language: components['schemas']['InstallGroupRow'][];
+      /** By Timezone */
+      by_timezone: components['schemas']['InstallGroupRow'][];
+      /** By Version */
+      by_version: components['schemas']['InstallGroupRow'][];
+      /** Uninstall Reasons */
+      uninstall_reasons: components['schemas']['InstallGroupRow'][];
+      /** Recent */
+      recent: components['schemas']['InstallRow'][];
+    };
+    /** InstallStep */
+    InstallStep: {
+      /** Step */
+      step: string;
+      /** Label */
+      label: string;
+      /** Installs */
+      installs: number;
     };
     /** InterviewRead */
     InterviewRead: {
@@ -2870,6 +3972,11 @@ export interface components {
       /** Company */
       company?: string | null;
     };
+    /** MatchQuestionsRequest */
+    MatchQuestionsRequest: {
+      /** Questions */
+      questions: components['schemas']['QuestionToMatch'][];
+    };
     /** MatchRead */
     MatchRead: {
       /**
@@ -2929,6 +4036,94 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /** NoteWrite */
+    NoteWrite: {
+      /** Note */
+      note: string;
+    };
+    /** OrderAdminRead */
+    OrderAdminRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** User Email */
+      user_email: string;
+      /** Plan */
+      plan: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'payment' | 'grant';
+      /** Amount */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'created' | 'paid' | 'refunded' | 'revoked';
+      /** Razorpay Order Id */
+      razorpay_order_id: string | null;
+      /** Razorpay Payment Id */
+      razorpay_payment_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Paid At */
+      paid_at: string | null;
+      /** Pro Starts At */
+      pro_starts_at: string | null;
+      /** Pro Ends At */
+      pro_ends_at: string | null;
+      /** Refunded At */
+      refunded_at: string | null;
+      /** Refund Id */
+      refund_id: string | null;
+      /** Note */
+      note: string | null;
+      /** Razorpay Url */
+      razorpay_url: string | null;
+    };
+    /** OrderCreate */
+    OrderCreate: {
+      /**
+       * Plan
+       * @default pro_month
+       * @constant
+       */
+      plan: 'pro_month';
+    };
+    /**
+     * OrderRead
+     * @description Everything the Razorpay checkout needs. The key id is public by design.
+     */
+    OrderRead: {
+      /** Order Id */
+      order_id: string;
+      /** Amount */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /** Key Id */
+      key_id: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string;
+      /** Email */
+      email: string;
     };
     /** OutreachRead */
     OutreachRead: {
@@ -3009,6 +4204,13 @@ export interface components {
       /** Next Cursor */
       next_cursor: string | null;
     };
+    /** Page[OrderAdminRead] */
+    Page_OrderAdminRead_: {
+      /** Items */
+      items: components['schemas']['OrderAdminRead'][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
     /** Page[SocialPostRead] */
     Page_SocialPostRead_: {
       /** Items */
@@ -3023,12 +4225,165 @@ export interface components {
       /** Next Cursor */
       next_cursor: string | null;
     };
+    /** PaymentRead */
+    PaymentRead: {
+      /** Amount */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /**
+       * Paid At
+       * Format: date-time
+       */
+      paid_at: string;
+      /**
+       * Pro Starts At
+       * Format: date-time
+       */
+      pro_starts_at: string;
+      /**
+       * Pro Ends At
+       * Format: date-time
+       */
+      pro_ends_at: string;
+    };
+    /** PaymentVerify */
+    PaymentVerify: {
+      /** Razorpay Order Id */
+      razorpay_order_id: string;
+      /** Razorpay Payment Id */
+      razorpay_payment_id: string;
+      /** Razorpay Signature */
+      razorpay_signature: string;
+    };
+    /** PitchAnswerRead */
+    PitchAnswerRead: {
+      /** Key */
+      key: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'why_company' | 'why_hire' | 'about_you' | 'note_to_founder';
+      /** Text */
+      text: string;
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: 'your_answer' | 'profile';
+      /** Uses */
+      uses: string[];
+      /** Company */
+      company: string | null;
+    };
+    /**
+     * PitchAnswersRequest
+     * @description A form's written questions, with the job the user is applying to.
+     */
+    PitchAnswersRequest: {
+      /** Questions */
+      questions: components['schemas']['PitchQuestion'][];
+      /** Company */
+      company?: string | null;
+      /** Role */
+      role?: string | null;
+      /**
+       * Job Text
+       * @default
+       */
+      job_text: string;
+    };
+    /** PitchQuestion */
+    PitchQuestion: {
+      /** Key */
+      key: string;
+      /** Text */
+      text: string;
+      /**
+       * Context
+       * @default
+       */
+      context: string;
+    };
     /** PlaceCount */
     PlaceCount: {
       /** Name */
       name: string;
       /** Count */
       count: number;
+    };
+    /** PlanAdminRead */
+    PlanAdminRead: {
+      /** Plan */
+      plan: string;
+      /** Description */
+      description: string;
+      /**
+       * Amount
+       * @description In the currency's smallest unit (paise for INR).
+       */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /** Days */
+      days: number;
+      /** Active */
+      active: boolean;
+      /** Updated By */
+      updated_by: string | null;
+      /** Updated At */
+      updated_at: string | null;
+    };
+    /** PlanRead */
+    PlanRead: {
+      /**
+       * Plan
+       * @enum {string}
+       */
+      plan: 'free' | 'pro';
+      /**
+       * Pro Until
+       * @description When the paid time ends, including months bought in advance.
+       */
+      pro_until: string | null;
+      /**
+       * Renew From
+       * @description From when the next month can be bought; None if it can be bought now.
+       */
+      renew_from: string | null;
+      /** Payments Enabled */
+      payments_enabled: boolean;
+      price: components['schemas']['PriceRead'];
+      /** Payments */
+      payments: components['schemas']['PaymentRead'][];
+    };
+    /** PlanWrite */
+    PlanWrite: {
+      /** Description */
+      description: string;
+      /** Amount */
+      amount: number;
+      /** Days */
+      days: number;
+      /** Active */
+      active: boolean;
+      /** Note */
+      note?: string | null;
+    };
+    /** PriceRead */
+    PriceRead: {
+      /** Plan */
+      plan: string;
+      /**
+       * Amount
+       * @description In the currency's smallest unit (paise for INR).
+       */
+      amount: number;
+      /** Currency */
+      currency: string;
+      /** Days */
+      days: number;
     };
     /**
      * ProfileRead
@@ -3119,6 +4474,35 @@ export interface components {
       provider: 'linkedin' | 'meta';
       /** Configured */
       configured: boolean;
+    };
+    /**
+     * QuestionMatchRead
+     * @description A saved answer to a question asked in other words.
+     */
+    QuestionMatchRead: {
+      /** Key */
+      key: string;
+      /** Answer */
+      answer: string;
+      /** Matched Key */
+      matched_key: string;
+      /** Matched Question */
+      matched_question: string;
+      /**
+       * Confidence
+       * @enum {string}
+       */
+      confidence: 'high' | 'medium';
+    };
+    /**
+     * QuestionToMatch
+     * @description A question on a form that no saved answer is stored under.
+     */
+    QuestionToMatch: {
+      /** Key */
+      key: string;
+      /** Text */
+      text: string;
     };
     /**
      * Respell
@@ -3540,6 +4924,20 @@ export interface components {
       interviews: number;
       /** Offers */
       offers: number;
+    };
+    /** UserBillingAdmin */
+    UserBillingAdmin: {
+      /**
+       * Plan
+       * @enum {string}
+       */
+      plan: 'free' | 'pro';
+      /** Pro Until */
+      pro_until: string | null;
+      /** Orders */
+      orders: components['schemas']['OrderAdminRead'][];
+      /** Actions */
+      actions: components['schemas']['BillingActionRead'][];
     };
     /** UserRead */
     UserRead: {
@@ -4334,6 +5732,112 @@ export interface operations {
       };
     };
   };
+  my_plan_api_v1_billing_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanRead'];
+        };
+      };
+    };
+  };
+  create_order_api_v1_billing_orders_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OrderCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  verify_payment_api_v1_billing_orders_verify_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PaymentVerify'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  my_credits_api_v1_credits_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreditsRead'];
+        };
+      };
+    };
+  };
   upload_resume_api_v1_resume_post: {
     parameters: {
       query?: never;
@@ -4789,6 +6293,218 @@ export interface operations {
     responses: {
       /** @description Successful Response */
       204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  match_saved_answers_api_v1_extension_answer_matches_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MatchQuestionsRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['QuestionMatchRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  write_pitch_answers_api_v1_extension_pitch_answers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PitchAnswersRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PitchAnswerRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_ai_answer_usage_api_v1_extension_ai_answers_usage_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiUsageRead'];
+        };
+      };
+    };
+  };
+  write_ai_answer_api_v1_extension_ai_answers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AiAnswerRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiAnswerRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  record_events_api_v1_extension_events_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExtEventsWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  record_install_events_api_v1_extension_installs_events_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InstallEventsWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  install_removed_api_v1_extension_installs__install_id__uninstalled_get: {
+    parameters: {
+      query?: {
+        v?: string | null;
+      };
+      header?: never;
+      path: {
+        install_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      303: {
         headers: {
           [name: string]: unknown;
         };
@@ -5843,6 +7559,423 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OutreachRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_ext_event_stats_api_v1_admin_ext_events_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtEventStats'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_ext_analytics_api_v1_admin_ext_analytics_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtAnalytics'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_user_ext_events_api_v1_admin_users__user_id__ext_events_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtEventRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_ext_installs_api_v1_admin_ext_installs_get: {
+    parameters: {
+      query?: {
+        hours?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InstallStats'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_install_journey_api_v1_admin_ext_installs__install_id__events_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        install_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtEventRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_billing_overview_api_v1_admin_billing_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BillingOverview'];
+        };
+      };
+    };
+  };
+  read_billing_orders_api_v1_admin_billing_orders_get: {
+    parameters: {
+      query?: {
+        status?: ('created' | 'paid' | 'refunded' | 'revoked') | null;
+        kind?: ('payment' | 'grant') | null;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Page_OrderAdminRead_'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_billing_plan_api_v1_admin_billing_plans__plan__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plan: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PlanWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanAdminRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  refund_billing_order_api_v1_admin_billing_orders__order_id__refund_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        order_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NoteWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderAdminRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  revoke_billing_order_api_v1_admin_billing_orders__order_id__revoke_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        order_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NoteWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderAdminRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_user_billing_api_v1_admin_users__user_id__billing_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserBillingAdmin'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  grant_user_pro_api_v1_admin_users__user_id__billing_grant_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GrantWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrderAdminRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  end_user_pro_api_v1_admin_users__user_id__billing_end_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NoteWrite'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserBillingAdmin'];
         };
       };
       /** @description Validation Error */

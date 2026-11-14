@@ -3,21 +3,7 @@ import { listMatches } from '@/features/matches/api';
 import { getProfile, listSavedAnswers } from '@/features/profile/api';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import type { Application, LlmKeyStatus } from '@/lib/api/types';
-
-export async function getLlmKeyStatus(): Promise<LlmKeyStatus> {
-  const { data } = await api.get<LlmKeyStatus>('/llm-keys/me');
-  return data;
-}
-
-export async function saveLlmKey(apiKey: string): Promise<LlmKeyStatus> {
-  const { data } = await api.put<LlmKeyStatus>('/llm-keys/me', { api_key: apiKey });
-  return data;
-}
-
-export async function deleteLlmKey(): Promise<void> {
-  await api.delete('/llm-keys/me');
-}
+import type { Application } from '@/lib/api/types';
 
 /** Everything the account holds, gathered for a download. */
 export async function collectExport() {

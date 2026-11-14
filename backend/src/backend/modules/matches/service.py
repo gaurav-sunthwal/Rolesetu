@@ -23,10 +23,10 @@ from backend.core.exceptions import (
 from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.db.session import get_sessionmaker
 from backend.modules.ai_calls import service as ai_calls
+from backend.modules.credits import service as credits
 from backend.modules.domain_catalogs import repository as domain_catalogs_repository
 from backend.modules.domain_catalogs import service as domain_catalogs_service
 from backend.modules.errors import service as errors_service
-from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches import repository, scoring
 from backend.modules.matches.fetching.job_page import JobPage
 from backend.modules.matches.fetching.reader import load_job_page
@@ -353,6 +353,9 @@ async def start_match(
         # lambda in a thread and drop the save it returns without running it.
         return Started(answer, save=functools.partial(_save_in_background, job, match))
 
+    # The model engine costs money per check: two AI credits, taken now and given
+    # back by `run_match` if the check fails.
+    await credits.spend(db, user_id=user_id, action="deep_check")
     await _save(db, job, match)
     return Started(to_read(match, now), needs_model=True)
 
@@ -805,7 +808,6 @@ def _saved_extraction(job_json: dict[str, object] | None) -> matching.ExtractedJ
 
 async def _score(db: AsyncSession, match: Match) -> None:
     profile = await profiles_service.get_profile(db, user_id=match.user_id)
-    user_api_key = await get_decrypted_user_llm_key(db, user_id=match.user_id)
     # Reading the job does not depend on who reads it, so it is done once per
     # posting: this user's earlier check of it (their profile has changed since),
     # or anyone's. Only judging the skills against this profile is new work.
@@ -828,7 +830,6 @@ async def _score(db: AsyncSession, match: Match) -> None:
         match.job,
         match,
         profile,
-        user_api_key=user_api_key,
         known=known,
         remembered=remembered,
     )
@@ -839,7 +840,6 @@ async def score_with_model(
     match: Match,
     profile: ProfileRead,
     *,
-    user_api_key: str | None,
     known: matching.ExtractedJob | None = None,
     remembered: dict[str, SkillResult] | None = None,
 ) -> None:
@@ -859,7 +859,7 @@ async def score_with_model(
 
     evidence = build_evidence(profile)
 
-    extracted = known or await matching.extract_job(job.jd_text, user_api_key=user_api_key)
+    extracted = known or await matching.extract_job(job.jd_text)
     required = _dedupe(extracted.required_skills, exclude=set(), limit=MAX_REQUIRED_SKILLS)
     nice = _dedupe(
         extracted.nice_to_have_skills,
@@ -894,9 +894,7 @@ async def score_with_model(
 
     to_ask = [position for position in range(len(skills)) if position not in settled]
     asked = (
-        await matching.judge_skills(
-            [skills[position][0] for position in to_ask], evidence, user_api_key=user_api_key
-        )
+        await matching.judge_skills([skills[position][0] for position in to_ask], evidence)
         if to_ask
         else {}
     )
@@ -960,12 +958,13 @@ async def run_match(match_id: uuid.UUID, source: ai_calls.Source = "dashboard") 
         match = await repository.get_by_id(db, match_id)
         if match is None or match.status != "pending":
             return
+        user_id, spent_at = match.user_id, match.created_at
         try:
-            with ai_calls.called_by(match.user_id, source):
+            with ai_calls.called_by(user_id, source):
                 await _score(db, match)
         except AppError as exc:
             await db.rollback()
-            await _mark_failed(db, match_id, exc.detail)
+            await _mark_failed(db, match_id, exc.detail, user_id=user_id, spent_at=spent_at)
             await errors_service.record(
                 source="job-check", level="warning", exc=exc, message=exc.detail
             )
@@ -973,15 +972,30 @@ async def run_match(match_id: uuid.UUID, source: ai_calls.Source = "dashboard") 
         except Exception as exc:
             logger.exception("Match %s failed", match_id)
             await db.rollback()
-            await _mark_failed(db, match_id, "Scoring failed unexpectedly. Please try again.")
+            await _mark_failed(
+                db,
+                match_id,
+                "Scoring failed unexpectedly. Please try again.",
+                user_id=user_id,
+                spent_at=spent_at,
+            )
             await errors_service.record(source="job-check", exc=exc, message=str(exc))
             return
         await db.commit()
 
 
-async def _mark_failed(db: AsyncSession, match_id: uuid.UUID, message: str) -> None:
+async def _mark_failed(
+    db: AsyncSession,
+    match_id: uuid.UUID,
+    message: str,
+    *,
+    user_id: uuid.UUID,
+    spent_at: datetime,
+) -> None:
+    """Marks the check failed and gives back the credits it took, in one commit."""
     match = await repository.get_by_id(db, match_id)
-    if match is not None:
+    if match is not None and match.status == "pending":
         match.status = "failed"
         match.error = message
+        await credits.give_back(db, user_id=user_id, action="deep_check", spent_at=spent_at)
         await db.commit()

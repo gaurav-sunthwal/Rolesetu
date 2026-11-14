@@ -16,7 +16,6 @@ from backend.core.exceptions import (
     ValidationFailedError,
 )
 from backend.modules.ai_calls.service import called_by
-from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches.local.semantic import usable_lines, warm_up_chunks
 from backend.modules.profiles import service as profiles_service
 from backend.modules.profiles.field_detection import resolve_field
@@ -95,7 +94,7 @@ async def _run_parser[T](read: Callable[[bytes], T], data: bytes) -> T:
         ) from exc
 
 
-async def read_pdf(data: bytes, user_api_key: str | None = None) -> ProfileWrite:
+async def read_pdf(data: bytes) -> ProfileWrite:
     """Reads a resume into a cleaned profile with AI-assisted understanding."""
     raw = await _run_parser(parser.parse_pdf, data)
     profile = normalize.to_profile(raw)
@@ -104,7 +103,7 @@ async def read_pdf(data: bytes, user_api_key: str | None = None) -> ProfileWrite
     try:
         raw_lines = await _run_parser(extract_lines, data)
         full_text = "\n".join(line.text for line in raw_lines)
-        ai_profile = await understand_profile(full_text, user_api_key=user_api_key)
+        ai_profile = await understand_profile(full_text)
         if ai_profile is not None:
             existing = {s.name.lower() for s in profile.skills}
             # Gather all categorized and flat skills
@@ -185,9 +184,8 @@ async def create_upload(
         >= MAX_RESUME_READS_PER_DAY
     ):
         raise RateLimitedError("You can update your resume twice a day. Try again tomorrow.")
-    user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
     with called_by(user_id, "resume"):
-        profile = await read_pdf(data, user_api_key=user_api_key)
+        profile = await read_pdf(data)
 
     resume_id = uuid.uuid4()
     storage_key = f"resumes/{user_id}/{resume_id}.pdf"

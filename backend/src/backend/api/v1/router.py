@@ -2,13 +2,17 @@ from fastapi import APIRouter
 
 from backend.modules.admin.router import router as admin_router
 from backend.modules.applications.router import router as applications_router
+from backend.modules.billing.router import router as billing_router
 from backend.modules.career_jobs.router import router as career_jobs_router
+from backend.modules.credits.router import router as credits_router
+from backend.modules.ext_installs.router import router as ext_installs_router
 from backend.modules.extension.router import router as extension_router
 from backend.modules.inbox.router import router as inbox_router
 from backend.modules.llm_keys.router import router as llm_keys_router
 from backend.modules.matches.router import router as matches_router
 from backend.modules.previews.router import router as previews_router
 from backend.modules.profiles.router import router as profiles_router
+from backend.modules.referrals.router import router as referrals_router
 from backend.modules.resume_editor.router import router as resume_editor_router
 from backend.modules.resumes.router import public_router as resumes_public_router
 from backend.modules.resumes.router import router as resumes_router
@@ -28,10 +32,14 @@ api_router.include_router(applications_router)
 api_router.include_router(career_jobs_router)
 api_router.include_router(matches_router)
 api_router.include_router(shares_router)
+api_router.include_router(billing_router)
+api_router.include_router(credits_router)
+api_router.include_router(referrals_router)
 api_router.include_router(resumes_router)
 api_router.include_router(resumes_public_router)
 api_router.include_router(resume_editor_router)
 api_router.include_router(extension_router)
+api_router.include_router(ext_installs_router)
 api_router.include_router(tailoring_router)
 api_router.include_router(inbox_router)
 api_router.include_router(previews_router)

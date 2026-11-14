@@ -51,6 +51,14 @@ class Settings(BaseSettings):
         "gemini-flash-lite-latest",
     ]
     llm_timeout_seconds: float = 30.0
+    # For short text a person is waiting on (an answer on a form): fast models, with
+    # thinking off. Measured 2026-11-14 on one answer: gemini-2.5-flash without
+    # thinking 2.0s; gemini-flash-latest still nothing after 45s.
+    fast_llm_models: list[str] = [
+        "gemini-2.5-flash",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash-lite",
+    ]
 
     # How job checks are scored. "local" uses the skills dictionary and makes no
     # model call (instant, free). "llm" asks Gemini to read the job and judge it.
@@ -59,6 +67,10 @@ class Settings(BaseSettings):
     # Off for now: on the jobs measured it changed almost no verdicts while
     # costing about 220 MB of memory. Set SEMANTIC_MATCHING=true to turn it on.
     semantic_matching: bool = False
+    # The same model, used to reuse a saved answer for a question asked in other
+    # words. Without it, saved answers are matched by their words alone. Both
+    # flags share one loaded model. Set SEMANTIC_ANSWERS=true to turn it on.
+    semantic_answers: bool = False
 
     # Context.dev: reads job pages our own fetch cannot (sites that block bots or
     # need JavaScript). Paid per call, so it is only tried after our fetch fails.
@@ -149,6 +161,15 @@ class Settings(BaseSettings):
     # Symmetric key (Fernet) used to encrypt user-supplied API keys at rest.
     encryption_key: str | None = None
 
+    # Razorpay. The key id is public (the checkout shows it); the key secret signs
+    # and checks payments and never leaves the server. Payments are off unless both
+    # are set. The webhook secret is a third value, chosen when the webhook is added
+    # in the Razorpay dashboard; without it the webhook route refuses every call.
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    razorpay_webhook_secret: str | None = None
+    razorpay_timeout_seconds: float = 10.0
+
     # Observability
     sentry_dsn: str | None = None
     langfuse_public_key: str | None = None
@@ -160,6 +181,14 @@ class Settings(BaseSettings):
         # even when DEBUG was left unset.
         if self.environment == "production":
             self.debug = False
+        return self
+
+    @model_validator(mode="after")
+    def razorpay_keys_come_in_pairs(self) -> Self:
+        # One without the other would show a checkout whose payments can never be
+        # checked, so a half-set pair stops the server at startup.
+        if bool(self.razorpay_key_id) != bool(self.razorpay_key_secret):
+            raise ValueError("Set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither.")
         return self
 
 

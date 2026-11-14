@@ -29,12 +29,11 @@ class AssistantAnswer(BaseModel):
     edits: list[ProposedEdit] = Field(default_factory=list)
 
 
-async def propose_edits(context: str, *, user_api_key: str | None) -> AssistantAnswer:
+async def propose_edits(context: str) -> AssistantAnswer:
     result = await generate_structured(
         context,
         AssistantAnswer,
         purpose="resume-assistant",
-        user_api_key=user_api_key,
         system_instruction=load_prompt("edit_resume", PROMPT_VERSION),
     )
     assert isinstance(result, AssistantAnswer)

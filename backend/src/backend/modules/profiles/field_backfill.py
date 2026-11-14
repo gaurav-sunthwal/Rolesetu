@@ -15,7 +15,6 @@ from backend.ai.profile_understanding import understand_profile
 from backend.core import storage
 from backend.modules.ai_calls.service import called_by
 from backend.modules.domain_catalogs import service as domain_catalogs
-from backend.modules.llm_keys.service import get_decrypted_user_llm_key
 from backend.modules.matches.local.domain_catalogs import HAND_AUTHORED_FIELDS
 from backend.modules.profiles.field_detection import resolve_field
 from backend.modules.profiles.models import Profile
@@ -44,9 +43,8 @@ async def _resume_understanding(db: AsyncSession, user_id: uuid.UUID):
         logger.info("Could not reread the stored resume for %s", user_id)
         return None
     text = "\n".join(line.text for line in lines)
-    user_api_key = await get_decrypted_user_llm_key(db, user_id=user_id)
     with called_by(user_id, "other"):
-        return await understand_profile(text, user_api_key=user_api_key)
+        return await understand_profile(text)
 
 
 async def backfill_domain_fields(db: AsyncSession) -> list[str]:

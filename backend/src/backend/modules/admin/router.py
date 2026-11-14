@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.ai.answer_writer import PURPOSE as AI_ANSWER_PURPOSE
 from backend.core.pagination import Page
 from backend.db.session import get_db
 from backend.modules.admin import service
@@ -33,8 +34,21 @@ from backend.modules.admin.schemas import (
     OutreachRead,
     WaitlistRow,
 )
+from backend.modules.billing import admin as billing_admin
+from backend.modules.billing.admin_schemas import (
+    BillingOverview,
+    GrantWrite,
+    NoteWrite,
+    OrderAdminRead,
+    OrderStatus,
+    PlanAdminRead,
+    PlanWrite,
+    UserBillingAdmin,
+)
 from backend.modules.ext_events import repository as events_repo
-from backend.modules.ext_events.schemas import ExtEventStats
+from backend.modules.ext_events.schemas import ExtAnalytics, ExtEventRead, ExtEventStats
+from backend.modules.ext_installs import repository as installs_repo
+from backend.modules.ext_installs.schemas import InstallStats
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -353,3 +367,158 @@ async def read_ext_event_stats(
     d = await events_repo.daily(db, since=since)
     s = await events_repo.top_sites(db, since=since)
     return ExtEventStats(hours=hours, totals=t, daily=d, top_sites=s)
+
+
+@router.get("/ext-analytics", response_model=ExtAnalytics)
+async def read_ext_analytics(
+    hours: Hours = 168,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> ExtAnalytics:
+    """How the extension is used in the period: who is active, on which version,
+    how far people get from finding a form to reusing an answer, what AI costs,
+    which sites work, and what breaks. Counts only: no page content, no user text.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    return ExtAnalytics(
+        hours=hours,
+        overview=await events_repo.overview(db, since),
+        versions=await events_repo.versions(db, since),
+        daily=await events_repo.daily_rows(db, since),
+        funnel=await events_repo.funnel(db, since),
+        features=await events_repo.features(db, since),
+        ai=await events_repo.ai_stats(db, since, AI_ANSWER_PURPOSE),
+        sites=await events_repo.sites(db, since),
+        errors=await events_repo.errors(db, since),
+    )
+
+
+@router.get("/users/{user_id}/ext-events", response_model=list[ExtEventRead])
+async def read_user_ext_events(
+    user_id: uuid.UUID,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[ExtEventRead]:
+    """One user's latest extension events, newest first: for support questions."""
+    return await events_repo.timeline(db, user_id, limit)
+
+
+@router.get("/ext-installs", response_model=InstallStats)
+async def read_ext_installs(
+    hours: Hours = 168,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> InstallStats:
+    """What happened to each new install in the period, signed in or not: how far
+    people got in setting up, on which browsers and systems, and the latest installs.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    return await installs_repo.stats(db, since, hours)
+
+
+@router.get("/ext-installs/{install_id}/events", response_model=list[ExtEventRead])
+async def read_install_journey(
+    install_id: Annotated[str, Path(pattern=r"^[0-9a-f-]{36}$")],
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[ExtEventRead]:
+    """Everything one install did, newest first, from install to its latest use."""
+    return await installs_repo.journey(db, install_id)
+
+
+# ── Payments and Pro ──────────────────────────────────────────────────────────
+
+
+@router.get("/billing", response_model=BillingOverview)
+async def read_billing_overview(
+    _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> BillingOverview:
+    """Who has Pro, what came in, prices, and the latest admin changes."""
+    return await billing_admin.overview(db)
+
+
+@router.get("/billing/orders", response_model=Page[OrderAdminRead])
+async def read_billing_orders(
+    status: OrderStatus | None = None,
+    kind: Literal["payment", "grant"] | None = None,
+    cursor: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> Page[OrderAdminRead]:
+    """Every payment, given month and abandoned checkout, newest first."""
+    return await billing_admin.list_orders(db, status=status, kind=kind, cursor=cursor, limit=limit)
+
+
+@router.put("/billing/plans/{plan}", response_model=PlanAdminRead)
+async def update_billing_plan(
+    plan: Annotated[str, Path(max_length=32)],
+    payload: PlanWrite,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> PlanAdminRead:
+    """Changes a plan's price, length or whether it is on sale, from the next order on."""
+    return await billing_admin.update_plan(db, admin_email=admin.email, plan=plan, body=payload)
+
+
+@router.post("/billing/orders/{order_id}/refund", response_model=OrderAdminRead)
+async def refund_billing_order(
+    order_id: uuid.UUID,
+    payload: NoteWrite,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> OrderAdminRead:
+    """Refunds a payment in full through Razorpay and ends the Pro it bought."""
+    return await billing_admin.refund(
+        db, admin_email=admin.email, order_id=order_id, note=payload.note
+    )
+
+
+@router.post("/billing/orders/{order_id}/revoke", response_model=OrderAdminRead)
+async def revoke_billing_order(
+    order_id: uuid.UUID,
+    payload: NoteWrite,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> OrderAdminRead:
+    """Removes the Pro one payment or given month gave, without a refund."""
+    return await billing_admin.revoke(
+        db, admin_email=admin.email, order_id=order_id, note=payload.note
+    )
+
+
+@router.get("/users/{user_id}/billing", response_model=UserBillingAdmin)
+async def read_user_billing(
+    user_id: uuid.UUID, _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> UserBillingAdmin:
+    """One user's plan, every payment and given month, and the changes admins made."""
+    return await billing_admin.user_billing(db, user_id)
+
+
+@router.post("/users/{user_id}/billing/grant", response_model=OrderAdminRead, status_code=201)
+async def grant_user_pro(
+    user_id: uuid.UUID,
+    payload: GrantWrite,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> OrderAdminRead:
+    """Gives Pro for some days, after any paid time already bought."""
+    return await billing_admin.grant(db, admin_email=admin.email, user_id=user_id, body=payload)
+
+
+@router.post("/users/{user_id}/billing/end", response_model=UserBillingAdmin)
+async def end_user_pro(
+    user_id: uuid.UUID,
+    payload: NoteWrite,
+    admin: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> UserBillingAdmin:
+    """Ends someone's Pro now (every running and upcoming month), without refunds."""
+    return await billing_admin.end_pro(
+        db, admin_email=admin.email, user_id=user_id, note=payload.note
+    )

@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/layout/app-sidebar';
 import { AuthGuard } from '@/components/layout/auth-guard';
 import { Topbar } from '@/components/layout/topbar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { ReferralClaimer } from '@/features/billing/referrals';
 import { WelcomeGate } from '@/features/welcome/components/welcome-gate';
 import { SITE_NAME } from '@/lib/site';
 
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 export default function DashboardLayout({ children }: LayoutProps<'/app'>) {
   return (
     <AuthGuard>
+      <ReferralClaimer />
       <WelcomeGate>
         <SidebarProvider>
           <AppSidebar />

@@ -276,9 +276,7 @@ async def test_a_saved_reading_of_the_job_saves_the_model_call(
     job, match = new_match("mechanical_design_engineer")
     # A skill the dictionary does not know, so the model is asked to judge it.
     known = ExtractedJob(role="Mechanical Design Engineer", required_skills=["Gearbox packaging"])
-    await service.score_with_model(
-        job, match, person("mechanical_engineer"), user_api_key=None, known=known
-    )
+    await service.score_with_model(job, match, person("mechanical_engineer"), known=known)
     assert asked == [list[SkillJudgement]]  # judged only; the job was not read again
     assert match.status == "completed"
     assert job.job_json is not None
@@ -338,7 +336,6 @@ async def test_each_skill_is_judged_by_the_cheapest_thing_that_can(
         job,
         match,
         person("data_architect"),
-        user_api_key=None,
         known=known,
         remembered=remembered,
     )
@@ -363,9 +360,7 @@ async def test_a_job_whose_skills_are_all_known_costs_no_judging_call(
     known = ExtractedJob(
         role="Senior Data Engineer", required_skills=["SQL", "Python", "Snowflake"]
     )
-    await service.score_with_model(
-        job, match, person("data_architect"), user_api_key=None, known=known
-    )
+    await service.score_with_model(job, match, person("data_architect"), known=known)
     assert match.status == "completed" and match.score is not None
 
 

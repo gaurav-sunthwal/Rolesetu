@@ -74,8 +74,11 @@ async def create_match(
     await asyncio.wait({task}, timeout=WAIT_FOR_RESULT_SECONDS)
     if not task.done():
         return match
+    # Read before expiring: an expired attribute would be reloaded outside the
+    # async driver's context and fail.
+    user_id = user.id
     db.expire_all()
-    return await service.get_match(db, user_id=user.id, match_id=match.id)
+    return await service.get_match(db, user_id=user_id, match_id=match.id)
 
 
 @router.get("", response_model=Page[MatchRead])

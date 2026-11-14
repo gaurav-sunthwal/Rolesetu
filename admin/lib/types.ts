@@ -40,7 +40,18 @@ export type SocialPostPage = Schemas['Page_SocialPostRead_'];
 export type ConnectUrl = Schemas['ConnectUrl'];
 export type ImageUploaded = Schemas['ImageUploaded'];
 
-// Extension usage analytics (defined locally — not yet in the generated schema)
+export type ExtAnalytics = Schemas['ExtAnalytics'];
+export type ExtEventRead = Schemas['ExtEventRead'];
+export type InstallStats = Schemas['InstallStats'];
+
+export type BillingOverview = Schemas['BillingOverview'];
+export type BillingOrder = Schemas['OrderAdminRead'];
+export type BillingOrderPage = Schemas['Page_OrderAdminRead_'];
+export type BillingPlan = Schemas['PlanAdminRead'];
+export type BillingAction = Schemas['BillingActionRead'];
+export type UserBilling = Schemas['UserBillingAdmin'];
+
+// The first extension usage page's figures (kept while the panel moves to ExtAnalytics)
 export type ExtEventStats = {
   hours: number;
   totals: {
@@ -53,6 +64,12 @@ export type ExtEventStats = {
     apply_clicked: number;
     fill_rate_pct: number;
   };
-  daily: { day: string; autofill_offered: number; autofill_filled: number; job_scored: number; apply_clicked: number }[];
+  daily: {
+    day: string;
+    autofill_offered: number;
+    autofill_filled: number;
+    job_scored: number;
+    apply_clicked: number;
+  }[];
   top_sites: { host: string; offered: number; filled: number; fill_rate_pct: number }[];
 };

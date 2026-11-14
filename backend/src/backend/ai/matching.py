@@ -47,12 +47,11 @@ class EvidenceItem:
     text: str
 
 
-async def extract_job(jd_text: str, *, user_api_key: str | None) -> ExtractedJob:
+async def extract_job(jd_text: str) -> ExtractedJob:
     result = await generate_structured(
         f"JOB DESCRIPTION:\n<<<\n{jd_text}\n>>>",
         ExtractedJob,
         purpose="job-read",
-        user_api_key=user_api_key,
         system_instruction=load_prompt("extract_job", EXTRACT_PROMPT_VERSION),
         timeout_seconds=CALL_TIMEOUT_SECONDS,
     )
@@ -61,7 +60,7 @@ async def extract_job(jd_text: str, *, user_api_key: str | None) -> ExtractedJob
 
 
 async def judge_skills(
-    skills: list[str], evidence: list[EvidenceItem], *, user_api_key: str | None
+    skills: list[str], evidence: list[EvidenceItem]
 ) -> dict[int, SkillJudgement]:
     """Returns judgements keyed by the skill's index in `skills`."""
     skill_lines = "\n".join(f"K{i + 1}: {name}" for i, name in enumerate(skills))
@@ -70,7 +69,6 @@ async def judge_skills(
         f"SKILLS:\n{skill_lines}\n\nEVIDENCE:\n<<<\n{evidence_lines}\n>>>",
         list[SkillJudgement],
         purpose="skill-judge",
-        user_api_key=user_api_key,
         system_instruction=load_prompt("judge_skills", JUDGE_PROMPT_VERSION),
         timeout_seconds=CALL_TIMEOUT_SECONDS,
     )

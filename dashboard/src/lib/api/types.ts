@@ -31,7 +31,10 @@ export type ShareCreate = Schemas['ShareCreate'];
 export type JobPreview = Schemas['JobPreviewRead'];
 export type WaitlistJoin = Schemas['WaitlistJoin'];
 
-export type LlmKeyStatus = Schemas['LlmKeyStatus'];
+export type Plan = Schemas['PlanRead'];
+export type CheckoutOrder = Schemas['OrderRead'];
+export type PaymentVerify = Schemas['PaymentVerify'];
+export type Credits = Schemas['CreditsRead'];
 
 export type CareerCompany = Schemas['CareerCompany'];
 export type CareerCompanyList = Schemas['CareerCompanyList'];

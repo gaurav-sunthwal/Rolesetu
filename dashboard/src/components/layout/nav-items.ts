@@ -1,5 +1,6 @@
 import {
   Briefcase,
+  Crown,
   FilePenLine,
   LayoutDashboard,
   Newspaper,
@@ -15,5 +16,6 @@ export const NAV_ITEMS = [
   { label: 'Applications', href: '/app/applications', icon: Briefcase },
   { label: 'Resume editor', href: '/app/resume', icon: FilePenLine },
   { label: 'Profile', href: '/app/profile', icon: User },
+  { label: 'Plan & invites', href: '/app/plan', icon: Crown },
   { label: 'Settings', href: '/app/settings', icon: Settings },
 ] as const;

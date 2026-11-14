@@ -54,6 +54,32 @@ class ValidationFailedError(AppError):
     detail = "Validation failed"
 
 
+class PlanLimitError(AppError):
+    """The plan's allowance is used up. 402, so the dashboard and extension can
+    offer the upgrade instead of "try again later"."""
+
+    status_code = 402
+    detail = "You have used this month's AI credits."
+
+
+class GoneError(AppError):
+    status_code = 410
+    detail = "This is no longer available."
+
+
+class BadRequestError(AppError):
+    status_code = 400
+    detail = "That request could not be accepted."
+
+
+class UnavailableError(AppError):
+    """Something Rolesetu depends on is down or not set up. Never 401: the
+    dashboard reads 401 as "signed out", which a payment provider's refusal is not."""
+
+    status_code = 503
+    detail = "This is not available right now. Please try again in a few minutes."
+
+
 # What a field is called when telling a person it was wrong.
 _FIELD_NAMES = {
     "jd_text": "The job description",

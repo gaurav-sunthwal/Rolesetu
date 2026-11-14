@@ -13,7 +13,6 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,8 @@ import {
   type Draft,
   toAssistLines,
 } from '@/features/resume-editor/draft';
-import { errorMessage } from '@/lib/api/client';
+import { UpgradeButton } from '@/features/billing/components/upgrade-button';
+import { ApiError, errorMessage } from '@/lib/api/client';
 import { newId } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -40,7 +40,7 @@ type Message =
       undo: AssistUndo | null;
       undone: boolean;
     }
-  | { id: string; role: 'error'; text: string; retry: string };
+  | { id: string; role: 'error'; text: string; retry: string; outOfCredits: boolean };
 
 const SUGGESTIONS = [
   'Add my latest project from my profile',
@@ -115,7 +115,13 @@ export function ResumeAssistant({
         onError: (error) =>
           setMessages((previous) => [
             ...previous,
-            { id: newId(), role: 'error', text: errorMessage(error), retry: message },
+            {
+              id: newId(),
+              role: 'error',
+              text: errorMessage(error),
+              retry: message,
+              outOfCredits: error instanceof ApiError && error.status === 402,
+            },
           ]),
       },
     );
@@ -193,26 +199,20 @@ export function ResumeAssistant({
             >
               <span className="flex items-start gap-2">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  {message.text}
-                  {/503|unavailable|key/i.test(message.text) ? (
-                    <>
-                      {' '}
-                      <Link href="/app/settings" className="underline underline-offset-2">
-                        Open Settings
-                      </Link>
-                    </>
-                  ) : null}
-                </span>
+                <span>{message.text}</span>
               </span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="self-start"
-                onClick={() => send(message.retry)}
-              >
-                Try again
-              </Button>
+              {message.outOfCredits ? (
+                <UpgradeButton size="sm" className="self-start" />
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="self-start"
+                  onClick={() => send(message.retry)}
+                >
+                  Try again
+                </Button>
+              )}
             </div>
           ) : (
             <AssistantMessage

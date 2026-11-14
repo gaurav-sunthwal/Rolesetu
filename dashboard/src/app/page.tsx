@@ -13,6 +13,9 @@ import { ResumeAssistantDemo } from '@/components/landing/resume-assistant-demo'
 import { ResumeEditDemo } from '@/components/landing/resume-edit-demo';
 import { Reveal } from '@/components/landing/reveal';
 import { LiquidTexture } from '@/components/brand/liquid-texture';
+import { PricingAction } from '@/components/landing/pricing-action';
+import { PlanComparison } from '@/components/pricing/plan-comparison';
+import { ReferralSteps } from '@/components/pricing/referral-steps';
 import { Display, Eyebrow, Texture } from '@/components/brand/primitives';
 import { SampleMatch } from '@/components/landing/sample-match';
 import { SiteFooter } from '@/components/landing/site-footer';
@@ -26,6 +29,7 @@ import {
   websiteData,
 } from '@/components/landing/structured-data';
 import { FEATURE_PAGES, featurePath, HOME_FAQS } from '@/content/marketing';
+import { CREDITS, PRICE } from '@/content/pricing';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = { alternates: { canonical: '/' } };
@@ -390,6 +394,63 @@ export default function LandingPage() {
                 apply.
               </p>
             </Steps>
+          </section>
+
+          <section
+            id="pricing"
+            className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
+          >
+            <Reveal className="mx-auto max-w-3xl text-center">
+              <Eyebrow>Pricing</Eyebrow>
+              <Display className="mt-6">
+                <span className="block">Free to start.</span>
+                <span className="text-primary block">
+                  {PRICE.currency}
+                  {PRICE.pro} a month when you want more AI.
+                </span>
+              </Display>
+              <p className="text-muted-foreground mx-auto mt-5 max-w-xl text-lg">
+                Checking jobs, autofill, tailored resumes and the tracker are free and unlimited.
+                Pro gives you {CREDITS.pro} AI credits a month for answers and resume help.
+              </p>
+            </Reveal>
+            <Reveal delay={120} className="mt-14">
+              <PlanComparison
+                freeAction={<PricingAction plan="free" />}
+                proAction={<PricingAction plan="pro" />}
+              />
+            </Reveal>
+          </section>
+
+          <section
+            id="invite"
+            className={cn(GUTTER, 'scroll-mt-16 border-t border-dashed py-20 sm:py-28')}
+          >
+            <div className="grid gap-12 lg:grid-cols-[5fr_7fr] lg:items-center lg:gap-16">
+              <Reveal>
+                <Eyebrow>Bring a friend</Eyebrow>
+                <Display className="mt-6">
+                  <span className="block">Invite a friend,</span>
+                  <span className="text-primary block">
+                    pay {PRICE.currency}
+                    {PRICE.referral}.
+                  </span>
+                </Display>
+                <p className="text-muted-foreground mt-6 max-w-md text-lg">
+                  Every friend who joins with your link and starts using Rolesetu makes one of your
+                  Pro months {PRICE.currency}
+                  {PRICE.referral} instead of {PRICE.currency}
+                  {PRICE.pro}. Bring one friend a month and every month is cheaper.
+                </p>
+                <p className="text-muted-foreground mt-4 max-w-md text-sm">
+                  Your friend gets Rolesetu free, like everyone. You never see their resume or their
+                  jobs, only that they joined.
+                </p>
+              </Reveal>
+              <Reveal delay={120}>
+                <ReferralSteps className="md:grid-cols-1" />
+              </Reveal>
+            </div>
           </section>
         </div>
 

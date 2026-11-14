@@ -51,14 +51,6 @@ async def test_an_answered_call_is_counted_once_with_its_model(
     assert call["model"] == "backup" and call["own_key"] is False
 
 
-async def test_a_call_paid_by_the_users_key_says_so(
-    monkeypatch: pytest.MonkeyPatch, recorded: list[dict[str, Any]]
-) -> None:
-    FakeGemini(monkeypatch, {})
-    await generate_structured("hi", Answer, user_api_key="mine")
-    assert recorded[0]["own_key"] is True
-
-
 async def test_a_failed_call_is_counted_as_failed(
     monkeypatch: pytest.MonkeyPatch, recorded: list[dict[str, Any]]
 ) -> None:
