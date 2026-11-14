@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { LiquidTexture } from '@/components/brand/liquid-texture';
 import { Greeting } from '@/components/layout/greeting';
 import { Button } from '@/components/ui/button';
+import { ActivityHeatmap } from '@/features/overview/components/activity-heatmap';
 import {
   NumbersGrid,
   RecentApplicationsList,
@@ -39,6 +40,8 @@ export default function OverviewPage() {
           </Button>
         </div>
       </section>
+
+      <ActivityHeatmap />
 
       <div className="grid gap-8 lg:grid-cols-5">
         <SetupSteps />

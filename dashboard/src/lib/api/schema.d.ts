@@ -169,6 +169,27 @@ export interface paths {
     patch: operations['update_application_api_v1_applications__application_id__patch'];
     trace?: never;
   };
+  '/api/v1/activity/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * My Activity
+     * @description Your activity per day over the last year, with your streaks. `tz` is your
+     *     time zone (e.g. Asia/Kolkata); unknown names fall back to UTC.
+     */
+    get: operations['my_activity_api_v1_activity_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/career-jobs/companies': {
     parameters: {
       query?: never;
@@ -1177,6 +1198,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/leaderboard': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Leaderboard
+     * @description The most active users over the last `days` (all time when left out), each
+     *     with the features they use most.
+     */
+    get: operations['read_leaderboard_api_v1_admin_leaderboard_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/stats': {
     parameters: {
       query?: never;
@@ -1982,6 +2024,59 @@ export interface components {
       sign_in_removed: boolean;
       /** Note */
       note?: string | null;
+    };
+    /** ActivityDay */
+    ActivityDay: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /**
+       * Applications
+       * @default 0
+       */
+      applications: number;
+      /**
+       * Job Checks
+       * @default 0
+       */
+      job_checks: number;
+      /**
+       * Extension
+       * @description Scores on job sites, autofill, saved answers.
+       * @default 0
+       */
+      extension: number;
+      /**
+       * Ai
+       * @description AI answers and resume-assistant messages.
+       * @default 0
+       */
+      ai: number;
+    };
+    /**
+     * ActivityYear
+     * @description One user's activity per day over the last year, oldest first, every day listed.
+     */
+    ActivityYear: {
+      /**
+       * Start
+       * Format: date
+       */
+      start: string;
+      /**
+       * End
+       * Format: date
+       */
+      end: string;
+      /** Timezone */
+      timezone: string;
+      /** Days */
+      days: components['schemas']['ActivityDay'][];
+      /** @description The year added up; its `date` is `end`. */
+      totals: components['schemas']['ActivityDay'];
+      streaks: components['schemas']['Streaks'];
     };
     /** AddedSkill */
     AddedSkill: {
@@ -3623,6 +3718,18 @@ export interface components {
       /** Last Used At */
       last_used_at: string | null;
     };
+    /** Feature */
+    Feature: {
+      /** Key */
+      key: string;
+      /** Label */
+      label: string;
+      /**
+       * Surface
+       * @enum {string}
+       */
+      surface: 'dashboard' | 'extension' | 'ai' | 'inbox';
+    };
     /**
      * FieldFitCheck
      * @description The job's line of work against the ones the candidate has worked in.
@@ -3926,6 +4033,70 @@ export interface components {
       title: components['schemas']['TitleCheck'] | null;
       /** Skills */
       skills: components['schemas']['SkillKeyword'][];
+    };
+    /** LeaderRow */
+    LeaderRow: {
+      /** Rank */
+      rank: number;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Email */
+      email: string;
+      /** Name */
+      name: string | null;
+      /** Headline */
+      headline: string | null;
+      /** Location */
+      location: string | null;
+      /**
+       * Joined At
+       * Format: date-time
+       */
+      joined_at: string;
+      /**
+       * Last Active At
+       * Format: date-time
+       */
+      last_active_at: string;
+      /**
+       * Plan
+       * @enum {string}
+       */
+      plan: 'free' | 'pro';
+      /** Has Resume */
+      has_resume: boolean;
+      /** Extension Connected */
+      extension_connected: boolean;
+      /** Gmail Connected */
+      gmail_connected: boolean;
+      /** Total Actions */
+      total_actions: number;
+      /** Active Days */
+      active_days: number;
+      /** Features */
+      features: {
+        [key: string]: number;
+      };
+      /** Top Features */
+      top_features: string[];
+    };
+    /** Leaderboard */
+    Leaderboard: {
+      /** Period Days */
+      period_days: number | null;
+      /** Features */
+      features: components['schemas']['Feature'][];
+      /** Totals */
+      totals: {
+        [key: string]: number;
+      };
+      /** Active Users */
+      active_users: number;
+      /** Users */
+      users: components['schemas']['LeaderRow'][];
     };
     /** LearnedAnswer */
     LearnedAnswer: {
@@ -4959,6 +5130,18 @@ export interface components {
       /** Posted At */
       posted_at: string | null;
     };
+    /** Streaks */
+    Streaks: {
+      /**
+       * Current
+       * @description Days in a row with activity, up to today (or yesterday).
+       */
+      current: number;
+      /** Longest */
+      longest: number;
+      /** Active Days */
+      active_days: number;
+    };
     /**
      * TailorRequest
      * @description The changes the user has chosen. Each is optional, but one is needed.
@@ -5530,6 +5713,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApplicationDetail'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  my_activity_api_v1_activity_me_get: {
+    parameters: {
+      query?: {
+        tz?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActivityYear'];
         };
       };
       /** @description Validation Error */
@@ -7095,6 +7309,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AdminRead'];
+        };
+      };
+    };
+  };
+  read_leaderboard_api_v1_admin_leaderboard_get: {
+    parameters: {
+      query?: {
+        days?: number | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Leaderboard'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };

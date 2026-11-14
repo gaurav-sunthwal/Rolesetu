@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from backend.modules.activity.router import router as activity_router
 from backend.modules.admin.router import router as admin_router
 from backend.modules.applications.router import router as applications_router
 from backend.modules.billing.router import router as billing_router
@@ -29,6 +30,7 @@ api_router.include_router(llm_keys_router)
 api_router.include_router(profiles_router)
 api_router.include_router(saved_answers_router)
 api_router.include_router(applications_router)
+api_router.include_router(activity_router)
 api_router.include_router(career_jobs_router)
 api_router.include_router(matches_router)
 api_router.include_router(shares_router)
