@@ -19,7 +19,7 @@ const LEVELS = [
   'bg-primary',
 ] as const;
 // About half the widest tooltip, to keep it inside the window.
-const TOOLTIP_HALF_WIDTH = 90;
+const TOOLTIP_HALF_WIDTH = 100;
 const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 const MONTH = new Intl.DateTimeFormat('en-IN', { month: 'short' });
 const LONG_DAY = new Intl.DateTimeFormat('en-IN', {
@@ -85,7 +85,8 @@ export function ActivityHeatmap() {
 function Year({ data }: { data: ActivityYear }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{
-    count: number;
+    applied: number;
+    checked: number;
     date: string;
     left: number;
     top: number;
@@ -143,11 +144,25 @@ function Year({ data }: { data: ActivityYear }) {
       <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
         <div>
           <h3 id="activity-title" className="text-muted-foreground text-sm font-medium">
-            Jobs applied this year
+            Your job hunt this year
           </h3>
-          <p className="mt-1 text-4xl font-semibold tracking-[-0.03em] tabular-nums">
-            {total.toLocaleString()}
-          </p>
+          <dl className="mt-1 flex items-end gap-8">
+            <div className="flex flex-col-reverse">
+              <dt className="text-muted-foreground mt-1 flex items-center gap-1.5 text-sm">
+                <span className="bg-primary size-2.5 rounded-full" aria-hidden />
+                Applied
+              </dt>
+              <dd className="text-4xl font-semibold tracking-[-0.03em] tabular-nums">
+                {total.toLocaleString()}
+              </dd>
+            </div>
+            <div className="flex flex-col-reverse">
+              <dt className="text-muted-foreground mt-1 text-sm">Checked</dt>
+              <dd className="text-4xl font-semibold tracking-[-0.03em] tabular-nums">
+                {data.totals.job_checks.toLocaleString()}
+              </dd>
+            </div>
+          </dl>
         </div>
         <dl className="flex gap-8">
           <div>
@@ -219,7 +234,8 @@ function Year({ data }: { data: ActivityYear }) {
                   const box = event.currentTarget.getBoundingClientRect();
                   const half = TOOLTIP_HALF_WIDTH;
                   setHover({
-                    count: day.applications,
+                    applied: day.applications,
+                    checked: day.job_checks,
                     date: day.date,
                     left: Math.min(
                       Math.max(box.left + box.width / 2, half + 8),
@@ -242,9 +258,14 @@ function Year({ data }: { data: ActivityYear }) {
               className="bg-foreground text-background pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-full flex-col items-center rounded-lg px-3 py-1.5 text-center whitespace-nowrap shadow-lg"
               style={{ left: hover.left, top: hover.top - 8 }}
             >
-              <span className="text-sm font-semibold">{jobs(hover.count)} applied</span>
-              <span className="text-background/70 text-xs">
-                {LONG_DAY.format(asDate(hover.date))}
+              <span className="text-xs opacity-70">{LONG_DAY.format(asDate(hover.date))}</span>
+              <span className="mt-1 flex gap-3 text-sm">
+                <span>
+                  <strong className="font-semibold tabular-nums">{hover.applied}</strong> applied
+                </span>
+                <span>
+                  <strong className="font-semibold tabular-nums">{hover.checked}</strong> checked
+                </span>
               </span>
             </span>
           ) : null}
@@ -254,7 +275,7 @@ function Year({ data }: { data: ActivityYear }) {
           <span>
             {total === 0
               ? 'No applications yet. Every job you apply to fills in a day.'
-              : 'Hover a day to see how many jobs you applied to.'}
+              : 'Hover a day to see how many jobs you applied to and checked.'}
           </span>
           <span className="flex items-center gap-1.5" aria-hidden>
             Less
