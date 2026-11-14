@@ -10,6 +10,7 @@ import {
   giveKeyToExtension,
 } from '@/features/settings/extension-bridge';
 import { errorMessage } from '@/lib/api/client';
+import { trackSetup } from '@/lib/install-events';
 
 export const extensionStatusKey = ['extension', 'status'] as const;
 export const extensionBrowserKey = ['extension', 'browser'] as const;
@@ -73,6 +74,10 @@ export function useExtensionConnection() {
       );
     },
     onError: (error, { automatic }) => {
+      trackSetup('connect_failed', {
+        automatic,
+        reason: error instanceof Error && error.message === 'not-installed' ? 'no_reply' : 'server',
+      });
       if (automatic) return;
       toast.error(
         error instanceof Error && error.message === 'not-installed'

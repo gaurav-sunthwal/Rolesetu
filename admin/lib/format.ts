@@ -20,3 +20,12 @@ export function formatBytes(bytes: number) {
     ? `${Math.max(1, Math.round(bytes / 1024))} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** An amount in paise (Razorpay's unit) as rupees: 19900 → "₹199". */
+export function formatMoney(paise: number, currency = 'INR') {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: paise % 100 === 0 ? 0 : 2,
+  }).format(paise / 100);
+}

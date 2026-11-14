@@ -18,7 +18,7 @@
  */
 
 import { parseBirthDate } from './dates';
-import { type Field, findFields, hasApplicationForm, type Kind } from './fields';
+import { type Field, findFields, isRadio, type Kind, radioGroup, radioText } from './fields';
 import { formatHint } from './fill';
 import { watchWidgets } from './widgets';
 
@@ -37,6 +37,7 @@ const LEARNED_KINDS: ReadonlySet<Kind> = new Set<Kind>([
   'nationality',
   'postal_code',
   'heard_from',
+  'why_this_role',
   'question',
 ]);
 
@@ -65,7 +66,7 @@ const SENSITIVE =
   /\brace\b|ethnic|disabilit|veteran|religio|\bcaste\b|sexual orientation|criminal|convict|medical|health condition|pregnan|marital/;
 const NOT_ANSWERS: ReadonlySet<string> = new Set(['password', 'hidden', 'file']);
 
-const MAX_ANSWER = 500;
+const MAX_ANSWER = 2000;
 /** Debounce for text inputs — wait until the user pauses typing. */
 const SAVE_AFTER_MS = 800;
 /** No debounce for select picks — the change is already intentional. */
@@ -82,7 +83,13 @@ const NAMES: Partial<Record<Kind, string>> = {
   nationality: 'Nationality',
   postal_code: 'Postal code',
   heard_from: 'How you heard about the job',
+  why_this_role: 'Why are you looking for a new role?',
 };
+
+/** Whether answers to this kind of field are kept in saved answers (not the profile). */
+export function isLearnedKind(kind: Kind): boolean {
+  return LEARNED_KINDS.has(kind);
+}
 
 /** What to call a field's answer when telling the user it was remembered. */
 export function answerName(field: Field): string {
@@ -102,13 +109,20 @@ function isPrivate(field: Field): boolean {
   return isPrivateQuestion(words);
 }
 
+/** The words on the picked option of a radio question, or null when none is picked. */
+function pickedRadio(radio: HTMLInputElement): string | null {
+  const picked = radioGroup(radio).find((option) => option.checked);
+  const text = picked ? radioText(picked) : '';
+  return text === '' || text.length > MAX_ANSWER ? null : text;
+}
+
 /** The answer worth keeping from this field for server-side learned answers, or null. */
 export function learnedAnswer(field: Field): string | null {
   const { element } = field;
   if (!LEARNED_KINDS.has(field.kind) || isPrivate(field)) return null;
+  // The words travel between forms; the radio's value ("opt_1") does not.
+  if (isRadio(element)) return pickedRadio(element);
   if (element instanceof HTMLInputElement && NOT_ANSWERS.has(element.type)) return null;
-  // Long answers are written for one job ("Why us?"), not reused.
-  if (element instanceof HTMLTextAreaElement) return null;
 
   let value = element.value;
   if (element instanceof HTMLSelectElement) {
@@ -137,8 +151,8 @@ export function learnedAnswer(field: Field): string | null {
 export function siteProfileAnswer(field: Field): string | null {
   const { element } = field;
   if (isPrivate(field)) return null;
+  if (isRadio(element)) return LEARNED_KINDS.has(field.kind) ? pickedRadio(element) : null;
   if (element instanceof HTMLInputElement && NOT_ANSWERS.has(element.type)) return null;
-  if (element instanceof HTMLTextAreaElement) return null;
 
   if (element instanceof HTMLSelectElement) {
     if (element.selectedIndex <= 0 || element.value === '') return null;
@@ -148,9 +162,8 @@ export function siteProfileAnswer(field: Field): string | null {
     return text === '' || text.length > MAX_ANSWER ? null : text;
   }
 
-  // For text inputs: only save if it belongs to LEARNED_KINDS (these are
-  // global preferences — e.g. "3 months" for notice period — and are equally
-  // valid as site-profile answers).
+  // For text inputs and textareas: save if it belongs to LEARNED_KINDS (e.g. why_this_role,
+  // notice period, questions)
   if (!LEARNED_KINDS.has(field.kind)) return null;
   const answer = element.value.replace(/\s+/g, ' ').trim();
   if (answer === '' || answer.length > MAX_ANSWER) return null;
@@ -205,9 +218,12 @@ export function watchAnswers(
       )
     )
       return;
-    const saved = known();
-    if (saved === null || !hasApplicationForm(doc)) return;
-    const field = findFields(doc).find((candidate) => candidate.element === target);
+    // A radio question is found by its first option; any option of it may be the one clicked.
+    const field = findFields(doc).find(
+      (candidate) =>
+        candidate.element === target ||
+        (isRadio(target) && isRadio(candidate.element) && target.name !== '' && candidate.element.name === target.name),
+    );
     if (!field) return;
 
     // --- Site profile: save select picks immediately (no debounce needed). ---
@@ -218,9 +234,11 @@ export function watchAnswers(
 
     // --- Server-side learned answers (debounced). ---
     const answer = learnedAnswer(field);
-    if (answer === null || saved[field.key] === answer) return;
+    const saved = known();
+    if (answer === null || (saved !== null && saved[field.key] === answer)) return;
 
-    const isSelect = target instanceof HTMLSelectElement;
+    // A pick is final at once; typing is saved once the user pauses.
+    const isSelect = target instanceof HTMLSelectElement || isRadio(target);
     queue.set(field.key, { answer: { question_key: field.key, answer }, name: answerName(field) });
     clearTimeout(timer);
     // Select picks are already final — flush immediately instead of waiting.

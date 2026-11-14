@@ -2,10 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ContentScriptContext } from '#imports';
 
 import { hasApplicationForm } from '@/lib/autofill/fields';
-import { fill, planAutofill } from '@/lib/autofill/fill';
+import {
+  asTemplate,
+  contextOf,
+  fill,
+  type JobNames,
+  planAutofill,
+  type Suggestion,
+  unansweredQuestions,
+  writtenQuestions,
+} from '@/lib/autofill/fill';
 import { type Learned, watchAnswers } from '@/lib/autofill/learn';
 import { getSiteProfile, mergeSiteAnswers, saveSiteProfile } from '@/lib/autofill/site-profiles';
-import { track } from '@/lib/analytics';
+import { type AiRequest, type AiResult, attachSaveButtons } from '@/lib/autofill/save-button';
+import { track, track as trackUsage, trackOnce } from '@/lib/analytics';
 import { detectJob } from '@/lib/job-detect';
 import { projectedScore } from '@/lib/projected-score';
 import { sameJob } from '@/lib/same-job';
@@ -170,6 +180,7 @@ function useApplyTracking(current: TrackedJob | null) {
     void ask({ type: 'pending-apply', action: 'clear' });
     setSaving(true);
     const result = await ask({ type: 'record-application', job: applied, status: 'applied' });
+    if (result.ok) track('application_tracked', { props: { status: 'applied' } });
     setSaving(false);
     setNotice(
       result.ok
@@ -238,11 +249,24 @@ function useApplyTracking(current: TrackedJob | null) {
 
 type Autofill =
   | { name: 'none' }
-  | { name: 'offer'; count: number }
+  // `drafts`: how many come from answers to similar questions, for the user to check.
+  | { name: 'offer'; count: number; drafts: number }
   | { name: 'connect' }
-  | { name: 'filled'; count: number }
+  | { name: 'filled'; count: number; drafts: number }
   | { name: 'learned'; names: string[]; changes: LearnedAnswerRead[] }
   | { name: 'failed'; message: string };
+
+/**
+ * The company's name as a person writes it in a message: without a listing's
+ * suffix ("Candid Health · W20", "Acme (S23)" become "Candid Health", "Acme").
+ */
+function companyName(raw: string | null | undefined): string | null {
+  const name = (raw ?? '')
+    .split(/\s+[·•|]\s+/)[0]
+    ?.replace(/\s*\((?:[WSFX]\d{2}|YC [WSFX]\d{2})\)\s*$/i, '')
+    .trim();
+  return name ? name : null;
+}
 
 const RESCAN_AFTER_MS = 800;
 const RESCAN_AT_MOST_MS = 3000;
@@ -259,34 +283,106 @@ function useAutofill(ctx: ContentScriptContext) {
   const dismissed = useRef(false);
   // A "filled" or "failed" message stays until it is closed or times out.
   const holding = useRef(false);
+  // Answers for this page's questions no answer is saved under, by the asked key:
+  // the user's answer to a reworded question, or one written for this company.
+  const suggestions = useRef(new Map<string, Suggestion>());
+  // The job being applied to, whose names go into answers saved with {company} and {role}.
+  const job = useRef<JobNames & { text: string }>({ company: null, role: null, text: '' });
+  // Keys already asked about, so a page that keeps changing is not asked again.
+  const asked = useRef(new Set<string>());
+
+  const ensureData = useCallback(async (): Promise<AutofillData | 'not-connected' | null> => {
+    if (data.current !== null) return data.current;
+    const result = await ask({ type: 'autofill-data' });
+    if (!result.ok) return result.status === 401 ? 'not-connected' : null;
+    let loaded = result.data;
+    const siteAnswers = await getSiteProfile(document.location.hostname);
+    if (Object.keys(siteAnswers).length > 0) {
+      loaded = {
+        ...loaded,
+        saved_answers: mergeSiteAnswers(loaded.saved_answers, siteAnswers),
+      };
+    }
+    data.current = loaded;
+    return loaded;
+  }, []);
+
+  /**
+   * Asks once about this page's questions no answer is saved under. One may be a
+   * rewording of a question answered before; a "Why this company?" one gets an
+   * answer made for this company. Both requests go out together.
+   */
+  const findSuggestions = useCallback(async (loaded: AutofillData) => {
+    const detected = detectJob(document, window.location.href);
+    job.current = {
+      company: companyName(detected?.company) ?? job.current.company,
+      role: detected?.title ?? job.current.role,
+      text: detected?.description ?? job.current.text,
+    };
+    const isNew = (question: { key: string }) => !asked.current.has(question.key);
+    const questions = unansweredQuestions(document, loaded).filter(isNew);
+    const written = writtenQuestions(document).filter(isNew);
+    if (questions.length === 0 && written.length === 0) return;
+    for (const { key } of [...questions, ...written]) asked.current.add(key);
+
+    const { company, role, text } = job.current;
+    const nothing = { ok: false } as const;
+    const [reused, pitched] = await Promise.all([
+      questions.length > 0 ? ask({ type: 'answer-matches', questions: questions.slice(0, 80) }) : nothing,
+      written.length > 0
+        ? ask({
+            type: 'pitch-answers',
+            request: { questions: written, company, role, job_text: text.slice(0, 20000) },
+          })
+        : nothing,
+    ]);
+    // Without them, the form is still filled from what is saved under the same words.
+    if (reused.ok) {
+      for (const match of reused.data) {
+        suggestions.current.set(match.key, {
+          answer: match.answer,
+          label: `Your answer to “${match.matched_question}”`,
+          draft: match.confidence !== 'high',
+          source: 'similar',
+        });
+      }
+    }
+    // A reused essay may name the last company; one made for this company wins.
+    if (pitched.ok) {
+      for (const answer of pitched.data) {
+        const named = answer.company ?? company;
+        // The pop-up named the company the page did not: saved answers get it as {company}.
+        if (job.current.company === null && named) job.current = { ...job.current, company: named };
+        suggestions.current.set(answer.key, {
+          answer: answer.text,
+          label:
+            answer.source === 'your_answer'
+              ? `Your answer, for ${named ?? 'this company'}`
+              : `Written for ${named ?? 'this job'} from your profile`,
+          draft: true,
+          preferred: true,
+          source: answer.source,
+        });
+      }
+    }
+  }, []);
 
   const scan = useCallback(async () => {
     if (ctx.isInvalid || dismissed.current || holding.current) return;
     if (!hasApplicationForm(document)) return setState({ name: 'none' });
 
-    if (data.current === null) {
-      const result = await ask({ type: 'autofill-data' });
-      if (!result.ok) {
-        // Only "not connected" is worth interrupting for; anything else stays quiet.
-        return setState(result.status === 401 ? { name: 'connect' } : { name: 'none' });
-      }
-      data.current = result.data;
-      // Merge site-specific answers (local storage, per-hostname) into the
-      // autofill data.  These are answers the user previously picked on this
-      // exact site — e.g. dropdown selections on Capgemini's career page.
-      // Server answers always win; site answers fill the gaps.
-      const siteAnswers = await getSiteProfile(document.location.hostname);
-      if (Object.keys(siteAnswers).length > 0) {
-        data.current = {
-          ...data.current,
-          saved_answers: mergeSiteAnswers(data.current.saved_answers, siteAnswers),
-        };
-      }
-    }
-    const count = planAutofill(document, data.current).length;
-    setState(count > 0 ? { name: 'offer', count } : { name: 'none' });
-    if (count > 0) track('autofill_offered', { count });
-  }, [ctx]);
+    const loaded = await ensureData();
+    if (loaded === 'not-connected') return setState({ name: 'connect' });
+    if (loaded === null) return setState({ name: 'none' });
+    await findSuggestions(loaded);
+    if (dismissed.current || holding.current) return;
+
+    const plan = planAutofill(document, loaded, suggestions.current, job.current);
+    const drafts = plan.filter((item) => item.draft).length;
+    setState(plan.length > 0 ? { name: 'offer', count: plan.length, drafts } : { name: 'none' });
+    // Worked out again whenever the page changes, but offered once per page.
+    if (plan.length > 0) trackOnce('offer', 'autofill_offered', { count: plan.length, props: { drafts } });
+  }, [ctx, ensureData, findSuggestions]);
 
   useEffect(() => {
     void scan();
@@ -301,28 +397,60 @@ function useAutofill(ctx: ContentScriptContext) {
 
   const run = useCallback(() => {
     if (data.current === null) return;
-    const count = fill(planAutofill(document, data.current));
+    const { filled: count, drafts } = fill(planAutofill(document, data.current, suggestions.current, job.current));
     holding.current = true;
     if (count > 0) {
-      track('autofill_filled', { count });
-      setState({ name: 'filled', count });
+      track('autofill_filled', { count, props: { drafts } });
+      setState({ name: 'filled', count, drafts });
     } else {
       track('autofill_failed');
       setState({ name: 'failed', message: 'This form did not accept the values. Please fill it by hand.' });
     }
   }, []);
 
+  /** The job's names, read from the page now if the scan has not found them yet. */
+  const jobNames = useCallback((): JobNames => {
+    if (job.current.company === null) {
+      const detected = detectJob(document, window.location.href);
+      if (detected) {
+        job.current = {
+          company: companyName(detected.company),
+          role: job.current.role ?? detected.title,
+          text: job.current.text || detected.description,
+        };
+      }
+    }
+    return job.current;
+  }, []);
+
   const remember = useCallback(
-    async (learned: Learned[]) => {
-      if (ctx.isInvalid || data.current === null) return;
+    /** Resolves to whether the server kept the answers. */
+    async (learned: Learned[]): Promise<boolean> => {
+      if (ctx.isInvalid) return false;
+      // A written answer is kept with {company} and {role} in place of this job's
+      // names, so the next company's names go in when it is reused.
+      learned = learned.map((item) => ({
+        ...item,
+        answer: { ...item.answer, answer: asTemplate(item.answer.answer, jobNames()) },
+      }));
       const result = await ask({ type: 'learn-answers', answers: learned.map((item) => item.answer) });
-      // Not worth interrupting the application for: the next change tries again.
-      if (!result.ok || data.current === null) return;
-      for (const { answer } of learned) data.current.saved_answers[answer.question_key] = answer.answer;
-      if (result.data.length === 0) return;
+      // Auto-learning stays quiet on failure (the next change tries again); "Save answer" says so.
+      if (!result.ok) return false;
+
+      if (data.current !== null) {
+        for (const { answer } of learned) {
+          data.current.saved_answers[answer.question_key] = answer.answer;
+        }
+      } else {
+        void ensureData();
+      }
+
+      if (result.data.length === 0) return true;
 
       const changed = new Set(result.data.map((change) => change.question_key));
       const names = learned.filter((item) => changed.has(item.answer.question_key)).map((item) => item.name);
+      if (names.length === 0) return true;
+
       track('autofill_learned', { count: names.length });
       holding.current = true;
       setState((shown) => {
@@ -335,8 +463,9 @@ function useAutofill(ctx: ContentScriptContext) {
           changes: [...shown.changes, ...result.data.filter((change) => !before.has(change.question_key))],
         };
       });
+      return true;
     },
-    [ctx],
+    [ctx, ensureData, jobNames],
   );
 
   useEffect(
@@ -351,6 +480,7 @@ function useAutofill(ctx: ContentScriptContext) {
   );
 
   const undo = useCallback(async (changes: LearnedAnswerRead[]) => {
+    track('autofill_undone', { count: changes.length });
     setState({ name: 'none' });
     holding.current = false;
     const results = await Promise.all(
@@ -382,7 +512,51 @@ function useAutofill(ctx: ContentScriptContext) {
     void scan();
   }, [scan]);
 
-  return { state, run, undo, close };
+  const suggestionFor = useCallback((key: string) => suggestions.current.get(key), []);
+
+  /** One answer written or improved by the model, for this job. Only on the user's click. */
+  const writeWithAi = useCallback(async (request: AiRequest): Promise<AiResult> => {
+    if (job.current.text === '' && job.current.company === null) {
+      const detected = detectJob(document, window.location.href);
+      if (detected) {
+        job.current = { company: companyName(detected.company), role: detected.title, text: detected.description };
+      }
+    }
+    const { company, role, text } = job.current;
+    track('ai_requested', { props: { mode: request.mode } });
+    const result = await ask({
+      type: 'ai-answer',
+      request: {
+        mode: request.mode,
+        question: request.question.slice(0, 500),
+        context: request.context,
+        company,
+        role,
+        job_text: text.slice(0, 20000),
+        current: request.current.slice(0, 5000),
+        max_length: Math.min(5000, Math.max(20, request.maxLength)),
+      },
+    });
+    if (!result.ok) {
+      const reason =
+        result.status === 429 || result.status === 402
+          ? 'limit'
+          : result.status === 422
+            ? 'no_answer'
+            : result.status === 401
+              ? 'not_connected'
+              : 'error';
+      track('ai_failed', { props: { mode: request.mode, reason } });
+      return {
+        ok: false,
+        message: result.status === 401 ? 'Connect Rolesetu to your account in Settings to use AI.' : result.message,
+      };
+    }
+    track('ai_succeeded', { count: result.data.removed.length, props: { mode: request.mode } });
+    return { ok: true, text: result.data.text, left: result.data.usage.left ?? null, removed: result.data.removed };
+  }, []);
+
+  return { state, run, undo, close, data, remember, suggestionFor, writeWithAi, jobNames };
 }
 
 export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolean }) {
@@ -579,6 +753,24 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   }, [phase]);
 
   const autofill = useAutofill(ctx);
+
+  // "Save answer" for questions autofill cannot learn by itself (extra-question
+  // pop-ups, assessment steps), and "Use your answer" for reworded questions.
+  // Runs on any page, not only full application forms: those pop-ups are not one.
+  const { data: autofillData, remember, suggestionFor, writeWithAi, jobNames } = autofill;
+  useEffect(
+    () =>
+      attachSaveButtons(
+        () => autofillData.current?.saved_answers ?? null,
+        remember,
+        suggestionFor,
+        writeWithAi,
+        contextOf,
+        jobNames,
+      ),
+    [autofillData, remember, suggestionFor, writeWithAi, jobNames],
+  );
+
   const autofillCard =
     autofill.state.name === 'none' ? null : (
       <AutofillCard
@@ -893,6 +1085,7 @@ function Result({
       job: trackedJobOf(job, match),
       status: 'saved',
     });
+    if (result.ok) trackUsage('application_tracked', { props: { status: 'saved' } });
     setTracking(result.ok ? 'done' : 'failed');
   }
 
@@ -1557,7 +1750,11 @@ function AutofillCard({
         <>
           <strong>Fill this form from your profile?</strong>
           <span className="muted small">
-            We can fill {fields(state.count)}. Nothing is sent: you check it and press Submit.
+            We can fill {fields(state.count)}
+            {state.drafts > 0
+              ? `, ${state.drafts} of them as drafts made from your saved answers and profile`
+              : ''}
+            . Nothing is sent: you check it and press Submit.
           </span>
           <div className="row">
             <button type="button" className="btn primary" onClick={onFill}>
@@ -1585,7 +1782,10 @@ function AutofillCard({
         <>
           <strong>Filled {fields(state.count)}</strong>
           <span className="muted small">
-            They are outlined in blue. Check them, add anything missing, then submit it yourself.
+            {state.drafts > 0
+              ? `${state.drafts} are drafts made for this job, outlined in dashed amber: read them and make them yours. `
+              : 'They are outlined in blue. '}
+            Check them, add anything missing, then submit it yourself.
           </span>
         </>
       ) : state.name === 'learned' ? (

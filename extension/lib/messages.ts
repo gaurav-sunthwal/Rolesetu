@@ -1,5 +1,7 @@
 import type { components } from '../../dashboard/src/lib/api/schema';
 
+import type { TrackedEvent } from './analytics';
+
 export type Match = components['schemas']['MatchRead'];
 export type SkillResult = components['schemas']['SkillResult'];
 export type AutofillData = components['schemas']['AutofillData'];
@@ -8,6 +10,12 @@ export type TailorRequest = components['schemas']['TailorRequest'];
 export type KeywordCheck = components['schemas']['KeywordCheck'];
 export type LearnedAnswer = components['schemas']['LearnedAnswer'];
 export type LearnedAnswerRead = components['schemas']['LearnedAnswerRead'];
+export type QuestionToMatch = components['schemas']['QuestionToMatch'];
+export type ReusedAnswer = components['schemas']['QuestionMatchRead'];
+export type PitchAnswer = components['schemas']['PitchAnswerRead'];
+export type PitchRequest = components['schemas']['PitchAnswersRequest'];
+export type AiAnswerRequest = components['schemas']['AiAnswerRequest'];
+export type AiAnswer = components['schemas']['AiAnswerRead'];
 
 export type DetectedJob = {
   title: string | null;
@@ -28,10 +36,13 @@ export type PendingApply = TrackedJob & { startedAt: number };
 /** Requests a page or the popup can make of the background worker. */
 export type Request =
   | { type: 'connection' }
-  | { type: 'activate' }
+  | { type: 'activate'; found?: 'job' | 'form' }
   | { type: 'autofill-data' }
   | { type: 'learn-answers'; answers: LearnedAnswer[] }
   | { type: 'forget-answer'; key: string }
+  | { type: 'answer-matches'; questions: QuestionToMatch[] }
+  | { type: 'pitch-answers'; request: PitchRequest }
+  | { type: 'ai-answer'; request: AiAnswerRequest }
   | { type: 'keyword-check'; matchId: string }
   | { type: 'tailor-resume'; changes: TailorRequest }
   | { type: 'keep-resume'; changes: TailorRequest }
@@ -41,7 +52,7 @@ export type Request =
   | { type: 'pending-apply'; action: 'set'; value: PendingApply }
   | { type: 'pending-apply'; action: 'clear' }
   | { type: 'open-dashboard'; path: string }
-  | { type: 'track-events'; events: { name: string; host?: string; count?: number }[] };
+  | { type: 'track-events'; events: TrackedEvent[] };
 
 export type Failure = { ok: false; status: number | null; message: string };
 export type Result<T> = { ok: true; data: T } | Failure;
@@ -52,6 +63,9 @@ export type Responses = {
   'autofill-data': Result<AutofillData>;
   'learn-answers': Result<LearnedAnswerRead[]>;
   'forget-answer': Result<null>;
+  'answer-matches': Result<ReusedAnswer[]>;
+  'pitch-answers': Result<PitchAnswer[]>;
+  'ai-answer': Result<AiAnswer>;
   'keyword-check': Result<KeywordCheck>;
   'tailor-resume': Result<Tailored>;
   'keep-resume': Result<{ filename: string; skills_added: string[] }>;

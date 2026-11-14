@@ -1,9 +1,17 @@
+import asyncio
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.exceptions import ValidationFailedError
+from backend.modules.matches.local.semantic import get_embedder
 from backend.modules.saved_answers import repository
+from backend.modules.saved_answers.matching import (
+    Confidence,
+    is_placeholder_key,
+    match_questions,
+)
 from backend.modules.saved_answers.models import SavedAnswer
 
 # Room for the questions autofill learns from forms, on top of the common ones.
@@ -43,6 +51,9 @@ async def learn_answers(
     learned: list[tuple[str, str | None]] = []
     count = await repository.count_for_user(db, user_id)
     for question_key, answer in answers:
+        # Saved under "this field is required", it would be offered for every box.
+        if is_placeholder_key(question_key):
+            continue
         row = await repository.get(db, user_id, question_key)
         if row is None:
             if count >= MAX_ANSWERS_PER_USER:
@@ -59,3 +70,46 @@ async def learn_answers(
 
 async def delete_answer(db: AsyncSession, *, user_id: uuid.UUID, question_key: str) -> None:
     await repository.remove(db, user_id, question_key)
+
+
+@dataclass(frozen=True)
+class ReusedAnswer:
+    asked_key: str
+    answer: str
+    matched_key: str
+    matched_question: str
+    confidence: Confidence
+
+
+async def reuse_answers(
+    db: AsyncSession, *, user_id: uuid.UUID, questions: list[tuple[str, str]]
+) -> list[ReusedAnswer]:
+    """Saved answers for questions (key, words) asked in other words than before.
+
+    A question whose key already has an answer is left out: the extension fills
+    those itself. Comparing runs off the event loop, because the embedding model
+    (when it is on) holds the CPU for a moment.
+    """
+    rows = {row.question_key: row for row in await repository.list_for_user(db, user_id)}
+    asked = [(key, text) for key, text in questions if key not in rows]
+    if not rows or not asked:
+        return []
+
+    embedder = get_embedder()
+    matches = await asyncio.to_thread(
+        match_questions,
+        [text for _, text in asked],
+        list(rows),
+        embedder.embed if embedder is not None else None,
+    )
+    return [
+        ReusedAnswer(
+            asked_key=key,
+            answer=rows[match.key].answer,
+            matched_key=match.key,
+            matched_question=match.question,
+            confidence=match.confidence,
+        )
+        for (key, _), match in zip(asked, matches, strict=True)
+        if match is not None
+    ]

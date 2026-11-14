@@ -3,7 +3,7 @@ import type { MetadataRoute } from 'next';
 import { SITE } from '@/lib/site';
 
 // The signed-in app holds private data and has nothing for a search engine.
-const PRIVATE = ['/app', '/login'];
+const PRIVATE = ['/app', '/login', '/goodbye'];
 
 // Crawlers that feed AI assistants and AI search. They follow the same rules as
 // everyone else; naming them makes it explicit that the public pages are theirs to read.

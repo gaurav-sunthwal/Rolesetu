@@ -1,6 +1,6 @@
 import { DASHBOARD_MATCHES } from '@/lib/config';
 import { EXTENSION_SOURCE, PAGE_SOURCE } from '@/lib/messages';
-import { accessKey } from '@/lib/storage';
+import { accessKey, analyticsOff, installId } from '@/lib/storage';
 
 type PageMessage =
   | { source: typeof PAGE_SOURCE; type: 'ping' }
@@ -18,6 +18,16 @@ export default defineContentScript({
     const reply = (type: string, extra: Record<string, unknown> = {}) =>
       window.postMessage({ source: EXTENSION_SOURCE, type, ...extra }, window.location.origin);
 
+    /**
+     * Says the extension is here and whether it is connected. Before it is, also
+     * this install's id, so the setup pages can report how far setting up got.
+     */
+    async function announce(): Promise<void> {
+      const connected = (await accessKey.getValue()) !== null;
+      const install = connected || (await analyticsOff.getValue()) ? null : await installId.getValue();
+      reply('present', install ? { connected, install } : { connected });
+    }
+
     window.addEventListener('message', (event: MessageEvent<PageMessage>) => {
       if (event.source !== window || event.origin !== window.location.origin) return;
       const message = event.data;
@@ -31,12 +41,12 @@ export default defineContentScript({
           await accessKey.setValue(null);
           reply('disconnected');
         } else if (message.type === 'ping') {
-          reply('present', { connected: (await accessKey.getValue()) !== null });
+          await announce();
         }
       })();
     });
 
     // Announce on load too, in case the page asked before this script was ready.
-    void accessKey.getValue().then((key) => reply('present', { connected: key !== null }));
+    void announce();
   },
 });

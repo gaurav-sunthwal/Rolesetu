@@ -2,6 +2,8 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { ALL_SITES } from '@/lib/config';
 
+import { watchErrors } from '@/lib/analytics';
+
 import { App } from './App';
 import { STYLES } from './styles';
 
@@ -29,6 +31,8 @@ export default defineContentScript({
       return;
     }
     window.__rolesetuMounted = true;
+    // Only failures in our own code: the page's errors are none of our business.
+    watchErrors('content', window);
     const manual = window.__rolesetuManual === true;
 
     const ui = await createShadowRootUi<Root>(ctx, {

@@ -17,6 +17,7 @@ export function messageFor(status: number, body: unknown): string {
     if (typeof first === 'string' && first.trim()) return first.replace(/^Value error, /, '');
   }
   if (status === 429) return 'You have done that a lot in a short time. Wait a minute and try again.';
+  if (status === 402) return 'You have used this month’s AI credits. Upgrade to Pro in Rolesetu Settings for more.';
   if (status === 413) return 'That is too large for Rolesetu to handle.';
   if (status === 404) return 'That is no longer there. Refresh the page and try again.';
   if (status === 403) return 'That can only be done from the Rolesetu dashboard.';

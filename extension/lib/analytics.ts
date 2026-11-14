@@ -1,71 +1,145 @@
 /**
- * Fire-and-forget usage analytics for the extension.
+ * Usage analytics for the extension: what people do with it, never what they
+ * write. An event is a name, the site's hostname, a small number and a few short
+ * labels (`props`): no page content, no URLs, no typed text, no answers.
  *
- * Usage:
- *   track('autofill_filled', { host: 'capgemini.com', count: 7 });
+ *   track('autofill_filled', { count: 7, props: { drafts: 2 } });
  *
- * Events are queued in memory and flushed in a single batch either when
- * the queue reaches 10 events, or after 5 seconds of inactivity — whichever
- * comes first. The background worker sends them to /extension/events.
- *
- * Failures are silently dropped: analytics must never disrupt the user.
- * The extension never sends page content, URLs, or personal data — only
- * the hostname (stripped of path) and a numeric count.
+ * Events go to the background worker, which stamps them (version, session) and
+ * keeps them in a queue that survives the worker sleeping and the browser not
+ * being connected yet (see `analytics-queue.ts`). The user can switch it off in
+ * the popup. Failures are dropped: analytics must never get in the user's way.
  */
 
 import { ask } from './messages';
 
 export type EventName =
+  | 'extension_installed'
+  | 'extension_updated'
+  | 'extension_connected'
+  | 'setup_opened'
+  | 'popup_opened'
+  | 'page_checked'
+  | 'job_detected'
+  | 'form_detected'
+  | 'panel_opened'
+  | 'job_scored'
+  | 'apply_clicked'
+  | 'application_tracked'
   | 'autofill_offered'
   | 'autofill_filled'
   | 'autofill_failed'
+  | 'autofill_undone'
   | 'autofill_learned'
-  | 'job_scored'
-  | 'panel_opened'
-  | 'apply_clicked';
+  | 'answer_saved'
+  | 'suggestion_shown'
+  | 'suggestion_used'
+  | 'ai_requested'
+  | 'ai_succeeded'
+  | 'ai_failed'
+  | 'ext_error';
+
+/** Short labels only: a source, a mode, a reason. Never anything the user wrote. */
+export type Props = Record<string, string | number | boolean>;
 
 export type TrackPayload = {
-  /** Hostname only — path is never sent. */
+  /** Hostname only: the path is never sent. Defaults to this page's. */
   host?: string;
-  /** A small number: fields found/filled, match score, learned count, etc. */
+  /** A small number: fields filled, match score, etc. */
   count?: number;
+  props?: Props;
 };
 
-type QueuedEvent = { name: EventName; host?: string; count?: number };
+/** One event as it travels to the background worker. */
+export type TrackedEvent = {
+  name: EventName;
+  id: string;
+  at: string;
+  host?: string;
+  count?: number;
+  props?: Props;
+};
 
-const MAX_BATCH = 10;
-const FLUSH_AFTER_MS = 5_000;
+const FLUSH_AFTER_MS = 2_000;
+const MAX_BATCH = 20;
 
-const queue: QueuedEvent[] = [];
+const queue: TrackedEvent[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 function flush(): void {
   clearTimeout(timer);
   if (queue.length === 0) return;
   const batch = queue.splice(0, queue.length);
-  // Fire-and-forget: don't await, don't surface errors to the caller.
   void ask({ type: 'track-events', events: batch }).catch(() => undefined);
 }
 
-/**
- * Records one extension usage event.
- * Safe to call from any content script context — goes through the background worker.
- */
-export function track(name: EventName, payload: TrackPayload = {}): void {
-  const host = payload.host ?? safeHostname();
-  queue.push({ name, ...(host ? { host } : {}), ...(payload.count !== undefined ? { count: payload.count } : {}) });
-  clearTimeout(timer);
-  if (queue.length >= MAX_BATCH) {
-    flush();
-  } else {
-    timer = setTimeout(flush, FLUSH_AFTER_MS);
-  }
+/** Builds an event with its own id and time, ready to queue. */
+export function newEvent(name: EventName, payload: TrackPayload = {}, host = pageHost()): TrackedEvent {
+  const event: TrackedEvent = { name, id: crypto.randomUUID(), at: new Date().toISOString() };
+  const where = payload.host ?? host;
+  if (where) event.host = where.slice(0, 120);
+  if (payload.count !== undefined) event.count = Math.max(0, Math.min(100_000, Math.round(payload.count)));
+  if (payload.props) event.props = payload.props;
+  return event;
 }
 
-/** Returns the current page hostname, stripping www. Never throws. */
-function safeHostname(): string | undefined {
+/** Records one event. Safe anywhere in a page or the popup; never throws. */
+export function track(name: EventName, payload: TrackPayload = {}): void {
   try {
-    return window.location.hostname.replace(/^www\./, '') || undefined;
+    queue.push(newEvent(name, payload));
+  } catch {
+    return;
+  }
+  clearTimeout(timer);
+  if (queue.length >= MAX_BATCH) flush();
+  else timer = setTimeout(flush, FLUSH_AFTER_MS);
+}
+
+const once = new Set<string>();
+
+/**
+ * Records an event once per `key` on this page: the autofill offer is worked out
+ * again every time the page changes, but it was offered once.
+ */
+export function trackOnce(key: string, name: EventName, payload: TrackPayload = {}): void {
+  const scoped = `${globalThis.location?.href ?? ''}|${name}|${key}`;
+  if (once.has(scoped)) return;
+  once.add(scoped);
+  track(name, payload);
+}
+
+let errorsSent = 0;
+const MAX_ERRORS_PER_PAGE = 5;
+
+/**
+ * Reports this extension's own failures (not the page's): which part failed and
+ * the error's kind ("TypeError"), never its message, which may hold page text.
+ */
+export function watchErrors(
+  where: string,
+  target: EventTarget,
+  report: (name: EventName, payload: TrackPayload) => void = track,
+): void {
+  const ours = (stack: unknown) =>
+    typeof stack === 'string' && stack.includes(browser.runtime.getURL('').replace(/\/$/, ''));
+  const onError = (error: unknown) => {
+    if (errorsSent >= MAX_ERRORS_PER_PAGE) return;
+    const stack = error instanceof Error ? error.stack : undefined;
+    // In a page, only errors from our own code; in our own pages, all of them.
+    if (where === 'content' && !ours(stack)) return;
+    errorsSent += 1;
+    report('ext_error', { props: { where, kind: error instanceof Error ? error.name : 'unknown' } });
+  };
+  target.addEventListener('error', (event: Event) => onError((event as ErrorEvent).error));
+  target.addEventListener('unhandledrejection', (event: Event) => onError((event as PromiseRejectionEvent).reason));
+}
+
+/** This page's hostname without "www.", only on a website (not the extension's own pages). Never throws. */
+function pageHost(): string | undefined {
+  try {
+    const { protocol, hostname } = globalThis.location;
+    if (protocol !== 'http:' && protocol !== 'https:') return undefined;
+    return hostname.replace(/^www\./, '') || undefined;
   } catch {
     return undefined;
   }

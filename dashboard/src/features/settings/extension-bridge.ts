@@ -8,7 +8,13 @@ const PAGE_SOURCE = 'rolesetu-dashboard';
 const EXTENSION_SOURCE = 'rolesetu-extension';
 const REPLY_TIMEOUT_MS = 1500;
 
-type Reply = { source: typeof EXTENSION_SOURCE; type: string; connected?: boolean };
+type Reply = {
+  source: typeof EXTENSION_SOURCE;
+  type: string;
+  connected?: boolean;
+  // The install's random id, sent by an extension that is not connected yet.
+  install?: string;
+};
 
 function send(message: Record<string, unknown>, expect: string): Promise<Reply | null> {
   return new Promise((resolve) => {
@@ -28,10 +34,19 @@ function send(message: Record<string, unknown>, expect: string): Promise<Reply |
   });
 }
 
-/** Whether the extension is installed here, and whether it already holds a key. */
-export async function findExtension(): Promise<{ installed: boolean; connected: boolean }> {
+/** Whether the extension is installed here, whether it already holds a key, and
+ * (before it does) which install it is. */
+export async function findExtension(): Promise<{
+  installed: boolean;
+  connected: boolean;
+  install: string | null;
+}> {
   const reply = await send({ type: 'ping' }, 'present');
-  return { installed: reply !== null, connected: reply?.connected === true };
+  return {
+    installed: reply !== null,
+    connected: reply?.connected === true,
+    install: typeof reply?.install === 'string' ? reply.install : null,
+  };
 }
 
 export async function giveKeyToExtension(token: string): Promise<boolean> {

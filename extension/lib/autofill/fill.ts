@@ -6,14 +6,124 @@
 
 import type { AutofillData } from '../messages';
 import { birthDateText } from './dates';
-import { type Field, type Fillable, findFields } from './fields';
+import { type Field, type Fillable, findFields, isRadio, radioBox, radioGroup, radioText } from './fields';
 import { type WidgetField, comboboxIsEmpty, fillWidget, findWidgetFields } from './widgets';
 
 type Profile = AutofillData['profile'];
 type Job = Profile['experience'][number];
 
-/** A field we have something for. `values` are tried in order (a dropdown may only offer one form). */
-export type PlannedFill = { field: Field; values: string[] } | { widget: WidgetField; values: string[] };
+/**
+ * A field we have something for. `values` are tried in order (a dropdown may only
+ * offer one form). `draft` is an answer the user gave to a question worded
+ * differently: it is filled in, but marked for the user to check.
+ */
+export type PlannedFill = ({ field: Field } | { widget: WidgetField }) & { values: string[]; draft: boolean };
+
+/**
+ * An answer for a question no answer is saved under: the user's answer to a
+ * similarly worded question, or one written for this company. `label` tells the
+ * user where it came from; `draft` ones are marked for the user to check.
+ */
+export type Suggestion = {
+  answer: string;
+  label: string;
+  draft: boolean;
+  /** Made for this company: used even over an answer saved under the same words, which may name the last one. */
+  preferred?: boolean;
+  /** Where it came from, for analytics: a reworded question, the user's own answer, or the profile. */
+  source: 'similar' | 'your_answer' | 'profile';
+};
+export type Suggestions = ReadonlyMap<string, Suggestion>;
+
+/** The job being applied to, for answers saved with {company} and {role} in them. */
+export type JobNames = { company: string | null; role: string | null };
+const NO_NAMES: JobNames = { company: null, role: null };
+
+/** A saved answer with this job's names in place of its tokens. */
+export function fillTokens(text: string, names: JobNames): string {
+  const role = names.role ?? 'open';
+  return text
+    // "a {role}" stays right for "an AI Engineer".
+    .replace(/\b([Aa])n? \{role\}/g, (_, a: string) => `${/^[aeiou]/i.test(role) ? `${a}n` : a} {role}`)
+    .replaceAll('{company}', names.company ?? 'your company')
+    .replaceAll('{role}', names.role ?? 'open')
+    .replaceAll('{founder}', 'there');
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * A written answer made reusable: this company's and role's names become
+ * {company} and {role}, so the next company's names go in their place. Short
+ * answers ("Yes", "30 days") are left as they are.
+ */
+export function asTemplate(text: string, names: JobNames): string {
+  return templateParts(text, names).text;
+}
+
+// Endings a listing adds that a person leaves out when writing the name.
+const LEGAL_ENDING =
+  /\s+(?:private limited|pvt\.? ?ltd\.?|ltd\.?|limited|inc\.?|llc|llp|corp(?:oration)?\.?|co\.?|gmbh|technologies|technology|systems|solutions|software|labs|india)$/i;
+// First words too common to stand for the company on their own ("Data" of "Data Axle").
+const COMMON_FIRST =
+  /^(?:the|team|global|digital|smart|data|tech|cloud|india|new|open|next|first|big|one|my|your|our|good|best|blue|red|green|united|national|international|people|life|health|ai)$/i;
+
+/**
+ * The ways an answer may write a company's name: as listed ("Finflock Systems
+ * Private Limited"), without its legal ending ("Finflock"), and by its own first
+ * word when that word is distinctive ("Loopr" of "Loopr AI"). Longest first.
+ */
+export function nameVariants(name: string): string[] {
+  const variants = new Set<string>();
+  let current = name.trim();
+  variants.add(current);
+  while (LEGAL_ENDING.test(current)) {
+    current = current.replace(LEGAL_ENDING, '').trim();
+    variants.add(current);
+  }
+  const words = current.split(/\s+/);
+  const [first] = words;
+  if (first && words.length > 1 && first.length >= 4 && !COMMON_FIRST.test(first)) variants.add(first);
+  return [...variants].filter((variant) => variant.length >= 2).sort((a, b) => b.length - a.length);
+}
+
+/**
+ * The answer with this job's names as tokens, and which names were swapped (to
+ * tell the user). Short answers ("Yes", "30 days") are left as they are.
+ */
+export function templateParts(text: string, names: JobNames): { text: string; swapped: string[] } {
+  if (text.length < 40) return { text, swapped: [] };
+  let template = text;
+  const swapped: string[] = [];
+  for (const [name, token] of [
+    [names.role, '{role}'],
+    [names.company, '{company}'],
+  ] as const) {
+    if (!name || name.trim().length < 2) continue;
+    for (const variant of token === '{company}' ? nameVariants(name) : [name.trim()]) {
+      const pattern = new RegExp(`(?<![\\w])${escapeRegExp(variant)}(?![\\w])`, 'gi');
+      if (!pattern.test(template)) continue;
+      template = template.replace(pattern, token);
+      swapped.push(variant);
+    }
+  }
+  return { text: template, swapped };
+}
+
+// Questions whose answer lives in saved answers, so one given to a differently
+// worded question can be reused. Profile fields (name, jobs...) come from the profile.
+const REUSABLE_KINDS: ReadonlySet<Field['kind']> = new Set<Field['kind']>([
+  'notice_period',
+  'current_ctc',
+  'expected_ctc',
+  'relocation',
+  'work_authorization',
+  'why_this_role',
+  'heard_from',
+  'question',
+]);
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -66,7 +176,7 @@ function yearsText(years: number): string {
   return years >= 1 ? String(Math.round(years)) : years.toFixed(1);
 }
 
-function valuesFor(field: Field, data: AutofillData): string[] {
+function valuesFor(field: Field, data: AutofillData, applyingTo: JobNames = NO_NAMES): string[] {
   const { profile, saved_answers: answers } = data;
   const names = (profile.full_name ?? '').split(/\s+/).filter(Boolean);
   const job = newestFirst(profile.experience)[field.entry];
@@ -92,7 +202,8 @@ function valuesFor(field: Field, data: AutofillData): string[] {
     case 'github':
       return one(profile.links.github);
     case 'portfolio':
-      return one(profile.links.portfolio);
+      // "Share a link to your work samples": a portfolio, else the code itself.
+      return [...one(profile.links.portfolio), ...one(profile.links.github)];
     case 'headline':
       return one(profile.headline);
     case 'years':
@@ -127,11 +238,13 @@ function valuesFor(field: Field, data: AutofillData): string[] {
     }
     default:
       // Saved answers, including every one learned from an earlier form.
-      return one(answers[field.key]);
+      const saved = answers[field.key];
+      return one(saved && fillTokens(saved, applyingTo));
   }
 }
 
 function isEmpty(element: Fillable): boolean {
+  if (isRadio(element)) return !radioGroup(element).some((radio) => radio.checked);
   if (element instanceof HTMLSelectElement) {
     const chosen = element.selectedOptions[0];
     // A dropdown still on its "Select..." placeholder counts as empty.
@@ -152,46 +265,64 @@ function isEmpty(element: Fillable): boolean {
  */
 export function optionFor(select: HTMLSelectElement, values: string[]): HTMLOptionElement | null {
   const options = [...select.options].filter((option) => !option.disabled && option.value !== '');
+  return bestChoice(
+    options.map((option) => ({ item: option, text: option.text, value: option.value })),
+    values,
+  );
+}
+
+/** The radio option that best matches the saved answer, by the words beside it. */
+export function radioFor(radio: HTMLInputElement, values: string[]): HTMLInputElement | null {
+  const options = radioGroup(radio).filter((option) => !option.disabled);
+  return bestChoice(
+    options.map((option) => ({ item: option, text: radioText(option), value: option.value })),
+    values,
+  );
+}
+
+type Choice<T> = { item: T; text: string; value: string };
+
+function bestChoice<T>(choices: Choice<T>[], values: string[]): T | null {
   const norm = (s: string) => s.trim().toLowerCase();
 
   for (const value of values) {
     const nv = norm(value);
 
     // 1. Exact match on option text or option value attribute.
-    const exact = options.find((o) => norm(o.text) === nv || norm(o.value) === nv);
-    if (exact) return exact;
+    const exact = choices.find((o) => norm(o.text) === nv || norm(o.value) === nv);
+    if (exact) return exact.item;
   }
 
   // 2. Leading yes/no keyword.
   const lead = /^(yes|no)\b/i.exec(values[0] ?? '')?.[1]?.toLowerCase();
   if (lead) {
-    const match = options.find((o) => norm(o.text).startsWith(lead));
-    if (match) return match;
+    const match = choices.find((o) => new RegExp(`^${lead}\\b`).test(norm(o.text)));
+    if (match) return match.item;
   }
 
   // 3. Substring / contains matching (saved answer appears inside option, or option inside answer).
   for (const value of values) {
     const nv = norm(value);
     if (nv.length < 3) continue; // too short — too many false positives
-    const sub = options.find(
-      (o) => norm(o.text).includes(nv) || nv.includes(norm(o.text)),
-    );
-    if (sub) return sub;
+    const sub = choices.find((o) => norm(o.text).includes(nv) || (norm(o.text).length >= 3 && nv.includes(norm(o.text))));
+    if (sub) return sub.item;
   }
 
   // 4. Synonym table.
   for (const value of values) {
     const nv = norm(value);
     const synonyms = ANSWER_SYNONYMS[nv] ?? [];
-    const syn = options.find((o) => synonyms.some((s) => norm(o.text).includes(s)));
-    if (syn) return syn;
+    const syn = choices.find((o) => synonyms.some((s) => norm(o.text).includes(s)));
+    if (syn) return syn.item;
     // Also check if the option's text maps to a synonym of our value.
     for (const [canonical, syns] of Object.entries(ANSWER_SYNONYMS)) {
       if (canonical === nv) continue;
-      if (syns.some((s) => norm(value).includes(s))) {
+      if (syns.some((s) => nv.includes(s))) {
         // Our value is a synonym of `canonical`; see if the option matches canonical.
-        const match = options.find((o) => norm(o.text) === canonical || norm(o.text).startsWith(canonical.split(' ')[0] ?? ''));
-        if (match) return match;
+        const match = choices.find(
+          (o) => norm(o.text) === canonical || norm(o.text).startsWith(canonical.split(' ')[0] ?? ''),
+        );
+        if (match) return match.item;
       }
     }
   }
@@ -204,7 +335,7 @@ export function optionFor(select: HTMLSelectElement, values: string[]): HTMLOpti
  * of each field and ignore a plain `element.value = ...`; going through the
  * browser's own setter and then firing the events makes them notice.
  */
-function type(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+export function setText(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const limit = element.maxLength > 0 ? element.maxLength : value.length;
   const owner =
     element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -214,6 +345,13 @@ function type(element: HTMLInputElement | HTMLTextAreaElement, value: string): v
 }
 
 function write(element: Fillable, values: string[]): boolean {
+  if (isRadio(element)) {
+    const option = radioFor(element, values);
+    if (!option) return false;
+    // A click, not `checked = true`: sites built with React only notice a click.
+    option.click();
+    return option.checked;
+  }
   if (element instanceof HTMLSelectElement) {
     const option = optionFor(element, values);
     if (!option) return false;
@@ -226,21 +364,102 @@ function write(element: Fillable, values: string[]): boolean {
   if (element instanceof HTMLInputElement && element.type === 'number' && Number.isNaN(Number(value))) {
     return false;
   }
-  type(element, value);
+  setText(element, value);
   return element.value !== '';
 }
 
-/** The empty fields on this page that the profile has a value for. */
-export function planAutofill(doc: Document, data: AutofillData): PlannedFill[] {
+/** A question on the page with no answer stored under its key: worth asking the server about. */
+export type UnansweredQuestion = { key: string; text: string };
+
+/**
+ * The empty questions on this page that no saved answer is stored under, with
+ * the words a person reads beside them. The server may have an answer the user
+ * gave to the same question worded differently.
+ */
+export function unansweredQuestions(doc: Document, data: AutofillData): UnansweredQuestion[] {
+  const found = new Map<string, string>();
+  for (const field of findFields(doc)) {
+    if (!REUSABLE_KINDS.has(field.kind) || !isEmpty(field.element)) continue;
+    if (valuesFor(field, data).length > 0) continue;
+    const text = field.question ?? field.label;
+    if (text.length >= 4) found.set(field.key, text.slice(0, 500));
+  }
+  for (const widget of findWidgetFields(doc)) {
+    if (!comboboxIsEmpty(widget.combobox) || data.saved_answers[widget.key]) continue;
+    if (widget.label.length >= 4) found.set(widget.key, widget.label.slice(0, 500));
+  }
+  return [...found].map(([key, text]) => ({ key, text }));
+}
+
+/**
+ * The words around a box whose own label says little: the heading and opening
+ * lines of the pop-up or section it sits in ("Reach out to the team at Encord.
+ * Share something about you...").
+ */
+export function contextOf(element: Element): string {
+  let box = element.closest('[role="dialog"], dialog, [aria-modal="true"]');
+  for (let up = element.parentElement, depth = 0; !box && up && depth < 8; up = up.parentElement, depth += 1) {
+    if (up.querySelector('h1, h2, h3, [role="heading"]')) box = up;
+  }
+  if (!box) return '';
+  const heading = box.querySelector('h1, h2, h3, [role="heading"]')?.textContent ?? '';
+  const intro = [...box.querySelectorAll('p')]
+    .slice(0, 2)
+    .map((paragraph) => paragraph.textContent ?? '');
+  return [heading, ...intro]
+    .map((text) => text.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('. ')
+    .slice(0, 1000);
+}
+
+/** A written question on the page, with the words around it. */
+export type WrittenQuestion = { key: string; text: string; context: string };
+
+/**
+ * The empty written-answer boxes on this page ("Why this company?", a message to
+ * the team), asked about even when an answer is saved under the same words: the
+ * same "Your message" box is on every company's page, so what was saved names the
+ * last company.
+ */
+export function writtenQuestions(doc: Document): WrittenQuestion[] {
+  const found = new Map<string, WrittenQuestion>();
+  for (const field of findFields(doc)) {
+    const written = field.element instanceof HTMLTextAreaElement || field.kind === 'why_this_role';
+    if (!written || !REUSABLE_KINDS.has(field.kind) || !isEmpty(field.element)) continue;
+    const text = (field.question ?? field.label).slice(0, 500);
+    if (text.length < 2) continue;
+    found.set(field.key, { key: field.key, text, context: contextOf(field.element) });
+  }
+  return [...found.values()].slice(0, 10);
+}
+
+/** The empty fields on this page that the profile, or an answer to a similar question, has a value for. */
+export function planAutofill(
+  doc: Document,
+  data: AutofillData,
+  suggestions: Suggestions = new Map(),
+  names: JobNames = NO_NAMES,
+): PlannedFill[] {
   const plan: PlannedFill[] = [];
 
   // Native <input>, <textarea>, <select> fields.
   for (const field of findFields(doc)) {
     if (!isEmpty(field.element)) continue;
-    const values = valuesFor(field, data);
+    let values = valuesFor(field, data, names);
+    let draft = false;
+    const suggested = suggestions.get(field.key);
+    if (suggested?.preferred && REUSABLE_KINDS.has(field.kind)) {
+      values = [suggested.answer];
+      draft = true;
+    } else if (values.length === 0 && suggested && REUSABLE_KINDS.has(field.kind)) {
+      values = [suggested.answer];
+      draft = suggested.draft;
+    }
     if (values.length === 0) continue;
     if (field.element instanceof HTMLSelectElement && !optionFor(field.element, values)) continue;
-    plan.push({ field, values });
+    if (isRadio(field.element) && !radioFor(field.element, values)) continue;
+    plan.push({ field, values, draft });
   }
 
   // Custom-widget dropdowns (SAP SuccessFactors / Capgemini, Workday, etc.)
@@ -248,39 +467,64 @@ export function planAutofill(doc: Document, data: AutofillData): PlannedFill[] {
     if (!comboboxIsEmpty(widget.combobox)) continue;
     // Use saved_answers for the widget key (same key format as Field).
     const saved = data.saved_answers[widget.key];
-    if (!saved) continue;
-    plan.push({ widget, values: [saved] });
+    const suggested = suggestions.get(widget.key);
+    if (saved) plan.push({ widget, values: [fillTokens(saved, names)], draft: false });
+    else if (suggested) plan.push({ widget, values: [suggested.answer], draft: suggested.draft });
   }
 
   return plan;
 }
 
+const FILLED_OUTLINE = '2px solid #2f5fe0';
+// Amber: an answer given to a similar question. It stays until the user edits the field.
+const DRAFT_OUTLINE = '2px dashed #d97706';
+
 function flash(element: HTMLElement): void {
   const before = element.style.outline;
-  element.style.outline = '2px solid #2f5fe0';
+  element.style.outline = FILLED_OUTLINE;
   setTimeout(() => {
     element.style.outline = before;
   }, 2500);
 }
 
-/** Fills the planned fields and returns how many took the value. */
-export function fill(plan: PlannedFill[]): number {
-  let filled = 0;
+export function markDraft(element: HTMLElement): void {
+  const before = element.style.outline;
+  element.style.outline = DRAFT_OUTLINE;
+  const clear = (event: Event) => {
+    if (!event.isTrusted) return;
+    element.style.outline = before;
+    element.removeEventListener('input', clear);
+    element.removeEventListener('change', clear);
+  };
+  element.addEventListener('input', clear);
+  element.addEventListener('change', clear);
+}
+
+export type FillResult = { filled: number; drafts: number };
+
+/** Fills the planned fields and counts how many took the value, and how many of those are drafts to check. */
+export function fill(plan: PlannedFill[]): FillResult {
+  const result: FillResult = { filled: 0, drafts: 0 };
   for (const item of plan) {
+    let element: HTMLElement;
     if ('widget' in item) {
       // Custom widget field (SAP SuccessFactors / combobox pattern).
       if (!comboboxIsEmpty(item.widget.combobox)) continue; // already filled
-      if (fillWidget(item.widget, item.values)) {
-        flash(item.widget.combobox);
-        filled += 1;
-      }
+      if (!fillWidget(item.widget, item.values)) continue;
+      element = item.widget.combobox;
     } else {
       const { field, values } = item;
       if (!field.element.isConnected || !isEmpty(field.element)) continue;
       if (!write(field.element, values)) continue;
-      flash(field.element);
-      filled += 1;
+      element = isRadio(field.element) ? radioBox(field.element) : field.element;
+    }
+    result.filled += 1;
+    if (item.draft) {
+      result.drafts += 1;
+      markDraft(element);
+    } else {
+      flash(element);
     }
   }
-  return filled;
+  return result;
 }

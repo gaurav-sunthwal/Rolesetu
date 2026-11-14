@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -12,8 +12,9 @@ class SavedAnswerWrite(BaseModel):
 
 class LearnedAnswer(BaseModel):
     question_key: QuestionKey
-    # Short: a learned answer is a fact (a date, a city, a choice), not an essay.
-    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+    # Long enough for a written answer ("Why should we hire you?"): those are the
+    # questions every form asks again, and the ones most worth not retyping.
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
 
 
 class LearnedAnswersWrite(BaseModel):
@@ -34,3 +35,27 @@ class SavedAnswerRead(BaseModel):
     question_key: str
     answer: str
     updated_at: datetime
+
+
+class QuestionToMatch(BaseModel):
+    """A question on a form that no saved answer is stored under."""
+
+    key: QuestionKey
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=500)]
+
+
+class MatchQuestionsRequest(BaseModel):
+    questions: Annotated[list[QuestionToMatch], Field(min_length=1, max_length=80)]
+
+
+class QuestionMatchRead(BaseModel):
+    """A saved answer to a question asked in other words."""
+
+    # The asked question's key, as sent.
+    key: str
+    answer: str
+    # The question the answer was saved for, shown so the user sees why it was offered.
+    matched_key: str
+    matched_question: str
+    # "high": filled in. "medium": filled in as a draft for the user to check.
+    confidence: Literal["high", "medium"]

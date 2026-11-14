@@ -1,32 +1,97 @@
-from typing import Literal
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 EventName = Literal[
+    # Lifecycle
+    "extension_installed",
+    "extension_updated",
+    "extension_connected",
+    "extension_uninstalled",
+    # Getting set up (sent before the browser is connected, by the extension and
+    # by the website's setup pages)
+    "setup_opened",
+    "setup_page_seen",
+    "signup_started",
+    "sign_in_failed",
+    "signed_in",
+    "connect_failed",
+    "uninstall_reason",
+    "popup_opened",
+    "page_checked",
+    # What the extension found
+    "job_detected",
+    "form_detected",
+    # The job panel
+    "panel_opened",
+    "job_scored",
+    "apply_clicked",
+    "application_tracked",
+    # Autofill
     "autofill_offered",
     "autofill_filled",
     "autofill_failed",
+    "autofill_undone",
     "autofill_learned",
-    "job_scored",
-    "panel_opened",
-    "apply_clicked",
+    # Saved answers
+    "answer_saved",
+    "suggestion_shown",
+    "suggestion_used",
+    # AI answers
+    "ai_requested",
+    "ai_succeeded",
+    "ai_failed",
+    # Health
+    "ext_error",
 ]
+
+# A label's value: short words or a number, never something the user wrote.
+PropValue = Annotated[str, StringConstraints(max_length=60)] | int | bool
+_PROP_KEY = Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,24}$")]
+# The random id an install of the extension made for itself (a UUID).
+InstallId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f-]{36}$")]
+# Events buffered before the browser was connected are sent later with their own time.
+_OLDEST = timedelta(days=7)
 
 
 class ExtEventWrite(BaseModel):
     """One event sent from the extension."""
 
     name: EventName
-    # Hostname only — the extension strips the path before sending.
+    # Hostname only: the extension strips the path before sending.
     host: str | None = Field(None, max_length=120)
     # Meaning depends on the event: fields filled, match score, etc.
     count: int | None = Field(None, ge=0, le=100_000)
+    # The extension's own id for the event, so a retried batch is stored once.
+    id: Annotated[str, StringConstraints(pattern=r"^[0-9a-f-]{8,36}$")] | None = None
+    version: Annotated[str, StringConstraints(pattern=r"^[0-9][0-9.]{0,19}$")] | None = None
+    session: Annotated[str, StringConstraints(pattern=r"^[0-9a-f-]{8,36}$")] | None = None
+    props: dict[_PROP_KEY, PropValue] | None = None
+    # When it happened, if the extension held it back (not connected yet, offline).
+    at: datetime | None = None
+
+    @field_validator("props")
+    @classmethod
+    def _few_props(cls, props: dict[str, object] | None) -> dict[str, object] | None:
+        if props is not None and len(props) > 6:
+            raise ValueError("At most 6 properties per event")
+        return props
+
+    def happened_at(self, now: datetime) -> datetime | None:
+        """Its own time if believable (not in the future, not older than a week)."""
+        if self.at is None:
+            return None
+        at = self.at if self.at.tzinfo else self.at.replace(tzinfo=UTC)
+        return at if now - _OLDEST <= at <= now else None
 
 
 class ExtEventsWrite(BaseModel):
-    """A micro-batch: up to 20 events in one request."""
+    """A batch: up to 50 events in one request (more after a long time offline)."""
 
-    events: list[ExtEventWrite] = Field(..., min_length=1, max_length=20)
+    events: list[ExtEventWrite] = Field(..., min_length=1, max_length=50)
+    # The install these came from, so its journey before connecting joins this account.
+    install: InstallId | None = None
 
 
 # ── Admin read schemas ────────────────────────────────────────────────────────
@@ -72,3 +137,112 @@ class ExtEventStats(BaseModel):
     totals: ExtEventTotals
     daily: list[ExtEventDay]
     top_sites: list[ExtEventSiteRow]
+
+
+# ── Admin: the extension analytics page ───────────────────────────────────────
+
+
+class ExtOverview(BaseModel):
+    # People who used the extension at all (any event), over the last day/week/month.
+    active_1d: int
+    active_7d: int
+    active_30d: int
+    # In the chosen period:
+    events: int
+    installs: int
+    updates: int
+    connects: int
+    errors: int
+
+
+class ExtVersionRow(BaseModel):
+    version: str
+    users: int
+
+
+class ExtDayRow(BaseModel):
+    day: str  # YYYY-MM-DD
+    active_users: int
+    autofill_filled: int
+    answers_saved: int
+    suggestions_used: int
+    ai_answers: int
+    jobs_scored: int
+
+
+class ExtFunnelStep(BaseModel):
+    """People (and times) who got this far in the period."""
+
+    step: str
+    label: str
+    users: int
+    events: int
+
+
+class ExtFeatureRow(BaseModel):
+    name: str
+    events: int
+    users: int
+
+
+class ExtCountRow(BaseModel):
+    label: str
+    events: int
+
+
+class ExtAiStats(BaseModel):
+    requested: int
+    succeeded: int
+    failed: int
+    limit_hits: int
+    by_mode: list[ExtCountRow]
+    failures: list[ExtCountRow]
+    # From the AI calls log: what the calls cost Rolesetu (own-key calls cost nothing).
+    paid_calls: int
+    own_key_calls: int
+    input_tokens: int
+    output_tokens: int
+
+
+class ExtSiteRow(BaseModel):
+    host: str
+    users: int
+    offered: int
+    filled: int
+    failed: int
+    suggestions_used: int
+    ai_answers: int
+    fill_rate_pct: int
+
+
+class ExtErrorRow(BaseModel):
+    where: str
+    version: str | None
+    events: int
+    users: int
+    last_seen: datetime
+
+
+class ExtAnalytics(BaseModel):
+    """Everything on the admin panel's extension page, for one period."""
+
+    hours: int
+    overview: ExtOverview
+    versions: list[ExtVersionRow]
+    daily: list[ExtDayRow]
+    funnel: list[ExtFunnelStep]
+    features: list[ExtFeatureRow]
+    ai: ExtAiStats
+    sites: list[ExtSiteRow]
+    errors: list[ExtErrorRow]
+
+
+class ExtEventRead(BaseModel):
+    """One event in a user's timeline."""
+
+    at: datetime
+    name: str
+    host: str | None
+    count: int | None
+    version: str | None
+    props: dict[str, str | int | bool] | None

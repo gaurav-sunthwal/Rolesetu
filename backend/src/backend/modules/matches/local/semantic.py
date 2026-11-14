@@ -83,6 +83,10 @@ class EmbeddingMatcher:
                     self._vectors.popitem(last=False)
         return np.array([self._vectors[text] for text in texts])
 
+    def embed(self, texts: list[str]) -> np.ndarray:
+        """Unit vectors for `texts`, one row each. Vectors already computed are reused."""
+        return self._embed(texts)
+
     def best_support(self, skill: str, lines: list[str]) -> Support | None:
         if not self.ready or not lines:
             return None
@@ -100,12 +104,20 @@ def get_matcher() -> EmbeddingMatcher | None:
     """The shared matcher once its model is loaded, otherwise None. Scoring never
     waits for the model: until it is ready, checks use the dictionary alone.
     """
-    return _matcher if _matcher.ready else None
+    return _matcher if _matcher.ready and get_settings().semantic_matching else None
+
+
+def get_embedder() -> EmbeddingMatcher | None:
+    """The loaded model for comparing saved answers' questions, or None. Shared
+    with job scoring, so turning both features on loads one model, not two.
+    """
+    return _matcher if _matcher.ready and get_settings().semantic_answers else None
 
 
 def warm_up() -> None:
     """Loads the model in the background at startup."""
-    if not get_settings().semantic_matching:
+    settings = get_settings()
+    if not (settings.semantic_matching or settings.semantic_answers):
         return
     try:
         _matcher.load()

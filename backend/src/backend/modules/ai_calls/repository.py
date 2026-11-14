@@ -78,3 +78,21 @@ async def summary(db: AsyncSession, since: datetime) -> dict[str, Any]:
         found["input_tokens"] += input_tokens or 0
         found["output_tokens"] += output_tokens or 0
     return found
+
+
+async def count_paid_for_user(
+    db: AsyncSession, *, user_id: uuid.UUID, purpose: str, since: datetime
+) -> int:
+    """Calls Rolesetu paid for (answered on its own key) for this user and purpose."""
+    result = await db.execute(
+        select(func.count())
+        .select_from(AiCall)
+        .where(
+            AiCall.user_id == user_id,
+            AiCall.purpose == purpose,
+            AiCall.ok,
+            ~AiCall.own_key,
+            AiCall.created_at >= since,
+        )
+    )
+    return result.scalar_one()

@@ -25,6 +25,8 @@ import { applyResume, uploadResume } from '@/features/resume/api';
 import { type ReadResume, ResumeStart } from '@/features/resume-signup/components/resume-start';
 import { errorMessage } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
+import { findExtension } from '@/features/settings/extension-bridge';
+import { installFromPage, rememberInstall, trackSetup } from '@/lib/install-events';
 import { firebaseAuth } from '@/lib/firebase';
 
 const schema = z.object({
@@ -53,6 +55,8 @@ function codeOf(error: unknown): string {
 
 function reportAuthError(error: unknown) {
   const code = codeOf(error);
+  // Why people coming from the extension do not get in, closed windows included.
+  trackSetup('sign_in_failed', { code: code.replace(/^auth\//, '') || 'unknown' });
   if (SILENT_ERRORS.has(code)) return;
   toast.error(ERROR_MESSAGES[code] ?? 'Something went wrong. Please try again.');
 }
@@ -101,6 +105,7 @@ function Login({ initialMode }: { initialMode: Mode }) {
   // While a resume is being saved after sign-in, this page does the redirect
   // itself once the profile is filled, not the moment the account exists.
   const holdRedirect = useRef(false);
+  const reportedSignIn = useRef(false);
 
   const {
     register,
@@ -111,8 +116,27 @@ function Login({ initialMode }: { initialMode: Mode }) {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
+    if (!loading && user && !reportedSignIn.current) {
+      reportedSignIn.current = true;
+      trackSetup('signed_in');
+    }
     if (!loading && user && !holdRedirect.current) router.replace(afterSignIn());
   }, [loading, user, router]);
+
+  useEffect(() => {
+    // People the extension sent here: the setup page reached them. Without an id
+    // in the link, the extension (if it is in this browser) says which install it is.
+    const fromLink = installFromPage();
+    const report = (install: string | null) =>
+      trackSetup('setup_page_seen', { mode: initialMode }, install);
+    if (fromLink) {
+      report(fromLink);
+      return;
+    }
+    void findExtension().then(({ install }) => {
+      if (install) report(rememberInstall(install));
+    });
+  }, [initialMode]);
 
   useEffect(() => {
     // Load where sign-in leads while the person types, so arriving is instant.
@@ -121,6 +145,7 @@ function Login({ initialMode }: { initialMode: Mode }) {
   }, [router]);
 
   function showResume(next: ReadResume) {
+    trackSetup('signup_started', { method: 'resume' });
     setRead(next);
     setExistingEmail(null);
     reset({ email: next.identity.email ?? '', password: '' });
@@ -156,6 +181,9 @@ function Login({ initialMode }: { initialMode: Mode }) {
   }
 
   async function onSubmit({ email, password }: FormValues) {
+    trackSetup('signup_started', {
+      method: mode === 'resume' ? 'resume_password' : mode === 'sign-in' ? 'email_login' : 'email',
+    });
     if (mode === 'resume' && read) {
       holdRedirect.current = true;
       try {
@@ -192,6 +220,7 @@ function Login({ initialMode }: { initialMode: Mode }) {
   }
 
   async function handleGoogle() {
+    trackSetup('signup_started', { method: 'google' });
     setGooglePending(true);
     if (read) holdRedirect.current = true;
     try {

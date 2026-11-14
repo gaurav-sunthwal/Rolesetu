@@ -7,6 +7,9 @@ import type {
   KeywordCheck,
   LearnedAnswerRead,
   Match,
+  AiAnswer,
+  PitchAnswer,
+  ReusedAnswer,
   Request,
   Result,
   Tailored,
@@ -20,8 +23,11 @@ import {
   JOB_FOR_MS,
   KEYWORDS_FOR_MS,
 } from '@/lib/response-cache';
+import { record, enqueue, flush as flushAnalytics, startAnalytics } from '@/lib/analytics-queue';
+import { watchErrors } from '@/lib/analytics';
 import { pendingApply } from '@/lib/session-storage';
-import { accessKey } from '@/lib/storage';
+import { installInfo, ownInstallId } from '@/lib/install';
+import { accessKey, analyticsOff } from '@/lib/storage';
 
 const NOT_CONNECTED: Failure = {
   ok: false,
@@ -35,7 +41,11 @@ const RETRY_AFTER_MS = [0, 1500, 4000];
 const STARTING_UP = new Set([502, 503, 504]);
 
 /** Calls the API as the connected user. Never throws: failures come back as data. */
-async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> {
+/**
+ * `once`: for a request that must not be sent twice (an AI answer is paid for and
+ * counted each time). It waits longer and is never retried after a timeout.
+ */
+async function api<T>(path: string, init: RequestInit = {}, once = false): Promise<Result<T>> {
   const key = await accessKey.getValue();
   if (!key) return NOT_CONNECTED;
 
@@ -45,7 +55,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
   // reuses the result), tracker writes (which carry a retry key) and saving
   // learned answers (saving the same answer twice changes nothing).
   let response: Response | null = null;
-  for (const wait of RETRY_AFTER_MS) {
+  for (const wait of once ? [0] : RETRY_AFTER_MS) {
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     try {
       response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
@@ -55,7 +65,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<Result<T>> 
           Authorization: `Bearer ${key}`,
           ...init.headers,
         },
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(once ? 45_000 : 25_000),
       });
     } catch {
       response = null;
@@ -161,6 +171,15 @@ function settle(result: Result<Match>): Result<Match> {
   return result;
 }
 
+/** A page's hostname without "www.", for analytics. Never the path. */
+function hostOf(url: string | undefined): string | undefined {
+  try {
+    return url ? new URL(url).hostname.replace(/^www\./, '') || undefined : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Loads the score and autofill UI into the frame whose detector found something. */
 async function activate(sender: Browser.runtime.MessageSender): Promise<Result<null>> {
   const tabId = sender.tab?.id;
@@ -178,8 +197,11 @@ async function activate(sender: Browser.runtime.MessageSender): Promise<Result<n
 
 async function handle(request: Request, sender: Browser.runtime.MessageSender): Promise<unknown> {
   switch (request.type) {
-    case 'activate':
-      return activate(sender);
+    case 'activate': {
+      const activated = await activate(sender);
+      if (activated.ok && request.found) record(`${request.found}_detected`, {}, hostOf(sender.tab?.url));
+      return activated;
+    }
 
     case 'autofill-data':
       return cached('autofill', AUTOFILL_FOR_MS, () => api<AutofillData>('/extension/autofill'));
@@ -203,15 +225,23 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return forgotten;
     }
 
-    case 'learn-answers':
-      return api<LearnedAnswerRead[]>('/extension/learned-answers', {
+    case 'answer-matches':
+      return api<ReusedAnswer[]>('/extension/answer-matches', {
         method: 'POST',
-        body: JSON.stringify({ answers: request.answers }),
+        body: JSON.stringify({ questions: request.questions }),
       });
 
-    case 'forget-answer':
-      return api<null>(`/extension/learned-answers/${encodeURIComponent(request.key)}`, {
-        method: 'DELETE',
+    case 'ai-answer':
+      return api<AiAnswer>(
+        '/extension/ai-answers',
+        { method: 'POST', body: JSON.stringify(request.request) },
+        true,
+      );
+
+    case 'pitch-answers':
+      return api<PitchAnswer[]>('/extension/pitch-answers', {
+        method: 'POST',
+        body: JSON.stringify(request.request),
       });
 
     case 'keyword-check':
@@ -264,15 +294,14 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return { ok: true, data: await pendingApply.getValue() };
 
     case 'open-dashboard':
-      await browser.tabs.create({ url: `${DASHBOARD_URL}${request.path}` });
+      if (request.path === SETUP_PATH) record('setup_opened', { props: { why: 'popup', tab: 'new' } });
+      await browser.tabs.create({ url: await dashboardUrl(request.path) });
       return { ok: true, data: null };
 
     case 'track-events':
-      // Fire-and-forget: a 204 is a success, failures are silently dropped.
-      return api<null>('/extension/events', {
-        method: 'POST',
-        body: JSON.stringify({ events: request.events }),
-      });
+      // Kept by the background worker and sent in batches (see analytics-queue.ts).
+      await enqueue(request.events);
+      return { ok: true, data: null };
   }
 }
 
@@ -289,15 +318,58 @@ async function showBadge(badge: Badge, tabId?: number): Promise<void> {
   }
 }
 
+type SetupReason = 'install' | 'browser_start' | 'window_opened';
+
+/**
+ * A dashboard link. Before the browser is connected it carries this install's id,
+ * so the website's setup pages can report how far setting up got.
+ */
+async function dashboardUrl(path: string): Promise<string> {
+  const url = `${DASHBOARD_URL}${path}`;
+  if ((await accessKey.getValue()) !== null || (await analyticsOff.getValue())) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}install=${await ownInstallId()}`;
+}
+
+/** Sends events from before connecting, as this install: no account, no key. */
+async function sendAsInstall(events: unknown[]): Promise<'sent' | 'rejected' | 'later'> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/extension/installs/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ install: await installInfo(), events }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (response.ok) return 'sent';
+    // Invalid, or over the limits: sending the same again cannot help.
+    return response.status === 422 || response.status === 429 ? 'rejected' : 'later';
+  } catch {
+    return 'later';
+  }
+}
+
+/**
+ * The page the browser opens when the extension is removed: it counts the removal
+ * for this install and asks why. Without analytics, only the question.
+ */
+async function setUninstallPage(): Promise<void> {
+  const off = await analyticsOff.getValue();
+  const version = browser.runtime.getManifest().version;
+  const url = off
+    ? `${DASHBOARD_URL}/goodbye`
+    : `${API_BASE_URL}/api/v1/extension/installs/${await ownInstallId()}/uninstalled?v=${version}`;
+  await browser.runtime.setUninstallURL(url).catch(() => undefined);
+}
+
 /**
  * Puts the setup in front of the user. A Rolesetu tab that is already open
  * (the browser may have restored one) is brought forward rather than opened
  * twice.
  */
-async function showSetup(): Promise<void> {
+async function showSetup(why: SetupReason): Promise<void> {
   const [open] = await browser.tabs.query({ url: `${DASHBOARD_URL}/*` });
+  record('setup_opened', { props: { why, tab: open?.id === undefined ? 'new' : 'existing' } });
   if (open?.id === undefined) {
-    await browser.tabs.create({ url: `${DASHBOARD_URL}${SETUP_PATH}` });
+    await browser.tabs.create({ url: await dashboardUrl(SETUP_PATH) });
     return;
   }
   await browser.tabs.update(open.id, { active: true });
@@ -308,10 +380,10 @@ async function showSetup(): Promise<void> {
 let showing: Promise<void> | null = null;
 
 /** Shows the setup if this browser is not connected yet. */
-function showSetupIfNotConnected(): void {
+function showSetupIfNotConnected(why: SetupReason): void {
   showing ??= accessKey
     .getValue()
-    .then((key) => (key === null ? showSetup() : undefined))
+    .then((key) => (key === null ? showSetup(why) : undefined))
     .catch((error: unknown) => console.error('Rolesetu: could not open the setup', error))
     .finally(() => {
       showing = null;
@@ -321,24 +393,50 @@ function showSetupIfNotConnected(): void {
 export default defineBackground(() => {
   // Most people who install never come back to connect, so the setup opens by
   // itself: right after install, and each time the browser is opened until connected.
-  browser.runtime.onInstalled.addListener(({ reason }) => {
-    if (reason === 'install') showSetupIfNotConnected();
+  browser.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
+    if (reason === 'install') {
+      record('extension_installed');
+      showSetupIfNotConnected('install');
+    }
+    if (reason === 'update' && previousVersion !== browser.runtime.getManifest().version) {
+      record('extension_updated', { props: { from: previousVersion ?? 'unknown' } });
+    }
   });
-  browser.runtime.onStartup.addListener(showSetupIfNotConnected);
+  watchErrors('background', self, (name, payload) => record(name, payload));
+  void setUninstallPage();
+  analyticsOff.watch(() => void setUninstallPage());
+  // Sent as the connected user. Before connecting, sent as this install, so the
+  // steps of people who never sign in are seen too.
+  startAnalytics(async (events) => {
+    if ((await accessKey.getValue()) === null) return sendAsInstall(events);
+    const install = await ownInstallId();
+    const sent = await api<null>('/extension/events', {
+      method: 'POST',
+      body: JSON.stringify({ events, install }),
+    });
+    if (sent.ok) return 'sent';
+    // Refused as invalid (an event this server does not know yet): sending again cannot help.
+    return sent.status === 422 ? 'rejected' : 'later';
+  });
+  browser.runtime.onStartup.addListener(() => showSetupIfNotConnected('browser_start'));
   // On a Mac, closing every window leaves the browser running, so opening it
   // again is not a start. A first window after none counts as opening it.
   browser.windows.onCreated.addListener((created) => {
     if (created.type !== 'normal') return;
     void browser.windows.getAll({ windowTypes: ['normal'] }).then((all) => {
-      if (all.length === 1) showSetupIfNotConnected();
+      if (all.length === 1) showSetupIfNotConnected('window_opened');
     });
   });
 
   // A "!" on the icon until the browser is connected, so it is clear setup is needed.
   const resting = (key: string | null) => (key === null ? NOT_CONNECTED_BADGE : NO_BADGE);
   void accessKey.getValue().then((key) => showBadge(resting(key)));
-  accessKey.watch((key) => {
+  accessKey.watch((key, previous) => {
     void showBadge(resting(key));
+    if (key !== null && previous === null) {
+      record('extension_connected');
+      void flushAnalytics();
+    }
     // Another account, or none: nothing kept for the last one may be shown.
     void forget();
   });

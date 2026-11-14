@@ -1,19 +1,34 @@
 import { useEffect, useState } from 'react';
 
+import { type EventName, newEvent } from '@/lib/analytics';
 import { SETUP_PATH } from '@/lib/config';
 import { Mark } from '@/lib/mark';
 import { ask } from '@/lib/messages';
+import { analyticsOff } from '@/lib/storage';
+
+/** Sent at once, not batched: the popup closes itself straight after some of them. */
+async function trackNow(name: EventName, host?: string): Promise<void> {
+  await ask({ type: 'track-events', events: [newEvent(name, {}, host)] }).catch(() => undefined);
+}
 
 export function App() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState(true);
 
   useEffect(() => {
     void ask({ type: 'connection' }).then((result) =>
       setConnected(result.ok ? result.data.connected : false),
     );
+    void analyticsOff.getValue().then((off) => setSharing(!off));
+    void trackNow('popup_opened');
   }, []);
+
+  async function setSharingUsage(on: boolean) {
+    setSharing(on);
+    await analyticsOff.setValue(!on);
+  }
 
   async function checkThisPage() {
     setBusy(true);
@@ -21,6 +36,7 @@ export function App() {
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('no tab');
+      await trackNow('page_checked', tab.url ? new URL(tab.url).hostname.replace(/^www\./, '') : undefined);
       // Tell the page script the user asked for it, then run it on this tab.
       await browser.scripting.executeScript({
         target: { tabId: tab.id },
@@ -80,6 +96,10 @@ export function App() {
         </>
       )}
       {problem ? <p className="error">{problem}</p> : null}
+      <label className="setting">
+        <input type="checkbox" checked={sharing} onChange={(event) => void setSharingUsage(event.target.checked)} />
+        Share how I use Rolesetu (which features, never what I type or the pages I visit)
+      </label>
     </>
   );
 }

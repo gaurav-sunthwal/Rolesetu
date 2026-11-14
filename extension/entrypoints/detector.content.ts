@@ -28,11 +28,11 @@ export default defineContentScript({
     let asked = false;
     const look = () => {
       if (asked || ctx.isInvalid || window.__rolesetuMounted) return;
-      const found =
-        hasApplicationForm(document) || detectJob(document, window.location.href, true) !== null;
+      const form = hasApplicationForm(document);
+      const found = form ? 'form' : detectJob(document, window.location.href, true) !== null ? 'job' : null;
       if (!found) return;
       asked = true;
-      void ask({ type: 'activate' });
+      void ask({ type: 'activate', found });
     };
 
     look();
