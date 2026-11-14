@@ -32,7 +32,7 @@ export function ReferralPanel() {
   return (
     <SectionCard
       title={`Invite friends, pay ${PRICE.currency}${PRICE.referral}`}
-      description={`Each friend who joins with your link and starts using Rolesetu makes one of your Pro months ${PRICE.currency}${PRICE.referral} instead of ${PRICE.currency}${PRICE.pro}.`}
+      description={`When a friend joins with your link and starts using Rolesetu, your first Pro month is ${PRICE.currency}${PRICE.referral} instead of ${PRICE.currency}${PRICE.pro}.`}
     >
       {referrals.isPending ? (
         <div className="flex flex-col gap-3">
@@ -159,7 +159,7 @@ function ReferralDetails({ summary }: { summary: ReferralSummary }) {
           icon={<Users className="size-4" aria-hidden />}
         />
         <Stat
-          label={`${PRICE.currency}${PRICE.referral} months ready`}
+          label={`${PRICE.currency}${PRICE.referral} first month`}
           value={summary.rewards_available}
           icon={<Gift className="size-4" aria-hidden />}
           highlight={summary.rewards_available > 0}
@@ -169,8 +169,8 @@ function ReferralDetails({ summary }: { summary: ReferralSummary }) {
 
       {summary.rewards_available > 0 ? (
         <p className="bg-success/10 text-success rounded-2xl px-4 py-3 text-sm font-medium">
-          Your next Pro month is {PRICE.currency}
-          {PRICE.referral}. It is applied at checkout automatically.
+          Your first Pro month is {PRICE.currency}
+          {PRICE.referral}. It is applied when you start autopay.
         </p>
       ) : null}
 

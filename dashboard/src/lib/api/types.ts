@@ -35,6 +35,10 @@ export type Plan = Schemas['PlanRead'];
 export type CheckoutOrder = Schemas['OrderRead'];
 export type PaymentVerify = Schemas['PaymentVerify'];
 export type Credits = Schemas['CreditsRead'];
+export type SubscriptionCheckout = Schemas['SubscriptionCheckout'];
+export type SubscriptionVerify = Schemas['SubscriptionVerify'];
+export type Autopay = Schemas['AutopayRead'];
+export type FunnelEventWrite = Schemas['FunnelEventWrite'];
 
 export type CareerCompany = Schemas['CareerCompany'];
 export type CareerCompanyList = Schemas['CareerCompanyList'];

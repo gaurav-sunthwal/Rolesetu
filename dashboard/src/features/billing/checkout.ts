@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import type { CheckoutOrder, PaymentVerify } from '@/lib/api/types';
+import type {
+  CheckoutOrder,
+  PaymentVerify,
+  SubscriptionCheckout,
+  SubscriptionVerify,
+} from '@/lib/api/types';
 
 const SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
 
@@ -10,10 +15,6 @@ const successSchema = z.object({
   razorpay_payment_id: z.string().min(1),
   razorpay_order_id: z.string().min(1),
   razorpay_signature: z.string().min(1),
-});
-
-const failureSchema = z.object({
-  error: z.object({ description: z.string().optional(), reason: z.string().optional() }),
 });
 
 interface RazorpayInstance {
@@ -61,14 +62,51 @@ export function preloadCheckout(): void {
   loadRazorpay().catch(() => undefined); // the click tries again and reports it
 }
 
+/** Razorpay's account of one failed try, kept for the payment funnel. Only codes
+ * and words: Razorpay never sends card or account numbers here. */
+export interface CheckoutFailure {
+  code?: string;
+  description?: string;
+  reason?: string;
+  source?: string;
+  step?: string;
+}
+
 export type CheckoutResult =
-  | { kind: 'paid'; payment: PaymentVerify }
+  | { kind: 'paid'; payment: CheckoutProof }
   | { kind: 'cancelled' }
   | { kind: 'failed'; message: string };
 
-/** Opens Razorpay's payment window for an order the server made, and resolves
- * once the person pays, closes it, or the payment fails. */
-export async function openCheckout(order: CheckoutOrder): Promise<CheckoutResult> {
+/** The signed proof the window hands back: for an order, or for an autopay mandate. */
+export type CheckoutProof =
+  { kind: 'order'; proof: PaymentVerify } | { kind: 'autopay'; proof: SubscriptionVerify };
+
+const subscriptionSuccessSchema = z.object({
+  razorpay_payment_id: z.string().min(1),
+  razorpay_subscription_id: z.string().min(1),
+  razorpay_signature: z.string().min(1),
+});
+
+const failureDetailSchema = z.object({
+  error: z.object({
+    code: z.string().optional(),
+    description: z.string().optional(),
+    reason: z.string().optional(),
+    source: z.string().optional(),
+    step: z.string().optional(),
+  }),
+});
+
+export type CheckoutTarget =
+  { kind: 'order'; order: CheckoutOrder } | { kind: 'autopay'; subscription: SubscriptionCheckout };
+
+/** Opens Razorpay's window for an order or an autopay mandate the server made, and
+ * resolves once the person pays or closes it. A failed try is reported through
+ * `onFailure` and the window stays open, so they can try another way to pay. */
+export async function openCheckout(
+  target: CheckoutTarget,
+  onFailure: (failure: CheckoutFailure) => void = () => undefined,
+): Promise<CheckoutResult> {
   let Razorpay: RazorpayConstructor;
   try {
     Razorpay = await loadRazorpay();
@@ -82,47 +120,73 @@ export async function openCheckout(order: CheckoutOrder): Promise<CheckoutResult
 
   return new Promise<CheckoutResult>((resolve) => {
     let settled = false;
+    let lastFailure: string | undefined;
     const finish = (result: CheckoutResult) => {
       if (settled) return;
       settled = true;
       resolve(result);
     };
 
-    const checkout = new Razorpay({
-      key: order.key_id,
-      order_id: order.order_id,
-      amount: order.amount,
-      currency: order.currency,
-      name: order.name,
-      description: order.description,
-      prefill: { email: order.email },
+    const common = {
+      name: target.kind === 'order' ? target.order.name : target.subscription.name,
+      description:
+        target.kind === 'order' ? target.order.description : target.subscription.description,
+      prefill: { email: target.kind === 'order' ? target.order.email : target.subscription.email },
       theme: { color: '#4f46e5' },
-      handler: (response: unknown) => {
-        const parsed = successSchema.safeParse(response);
-        finish(
-          parsed.success
-            ? { kind: 'paid', payment: parsed.data }
-            : {
-                kind: 'failed',
-                message:
-                  'Razorpay did not send back a proof of payment. If you were charged, Pro turns on by itself within a few minutes.',
-              },
-        );
-      },
       modal: {
-        // Closing the window after a failed try also lands here, so a failure
-        // reported first is kept.
-        ondismiss: () => finish({ kind: 'cancelled' }),
+        ondismiss: () =>
+          finish(
+            lastFailure
+              ? {
+                  kind: 'failed',
+                  message: `${lastFailure} Your payment did not go through and nothing was charged. Please try again or use another payment method.`,
+                }
+              : { kind: 'cancelled' },
+          ),
       },
-    });
+    };
+    const notProven = {
+      kind: 'failed' as const,
+      message:
+        'Razorpay did not send back a proof of payment. If you were charged, Pro turns on by itself within a few minutes.',
+    };
+
+    const checkout =
+      target.kind === 'order'
+        ? new Razorpay({
+            ...common,
+            key: target.order.key_id,
+            order_id: target.order.order_id,
+            amount: target.order.amount,
+            currency: target.order.currency,
+            handler: (response: unknown) => {
+              const parsed = successSchema.safeParse(response);
+              finish(
+                parsed.success
+                  ? { kind: 'paid', payment: { kind: 'order', proof: parsed.data } }
+                  : notProven,
+              );
+            },
+          })
+        : new Razorpay({
+            ...common,
+            key: target.subscription.key_id,
+            subscription_id: target.subscription.subscription_id,
+            handler: (response: unknown) => {
+              const parsed = subscriptionSuccessSchema.safeParse(response);
+              finish(
+                parsed.success
+                  ? { kind: 'paid', payment: { kind: 'autopay', proof: parsed.data } }
+                  : notProven,
+              );
+            },
+          });
 
     checkout.on('payment.failed', (response) => {
-      const parsed = failureSchema.safeParse(response);
-      const reason = parsed.success ? parsed.data.error.description : undefined;
-      finish({
-        kind: 'failed',
-        message: `${reason ? `${reason} ` : ''}Your payment did not go through and nothing was charged. Please try again or use another payment method.`,
-      });
+      const parsed = failureDetailSchema.safeParse(response);
+      const failure = parsed.success ? parsed.data.error : {};
+      lastFailure = failure.description;
+      onFailure(failure);
     });
 
     checkout.open();

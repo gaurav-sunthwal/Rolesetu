@@ -67,7 +67,7 @@ export const REFERRAL_STEPS = [
     body: `They sign up with your link, upload a resume and check ${CHECKS_TO_UNLOCK} jobs.`,
   },
   {
-    title: `Your next month is ${PRICE.currency}${PRICE.referral}`,
-    body: `Instead of ${PRICE.currency}${PRICE.pro}. Every friend unlocks one cheaper month, so keep sharing.`,
+    title: `Your first month is ${PRICE.currency}${PRICE.referral}`,
+    body: `Your first Pro month costs ${PRICE.currency}${PRICE.referral} instead of ${PRICE.currency}${PRICE.pro}. It is applied when you start autopay.`,
   },
 ] as const;

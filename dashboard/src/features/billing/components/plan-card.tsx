@@ -36,8 +36,10 @@ export function PlanCard() {
       title="Plan"
       description={
         isPro && data.pro_until
-          ? `Pro until ${formatDate(data.pro_until)}. It does not renew by itself.`
-          : `You're on Free. Pro is ${price} a month, with no autopay.`
+          ? data.autopay?.on
+            ? `Pro renews automatically. Paid until ${formatDate(data.pro_until)}.`
+            : `Pro until ${formatDate(data.pro_until)}. It does not renew by itself.`
+          : `You're on Free. Pro is ${price} a month with autopay; cancel any time.`
       }
       action={
         <Badge variant={isPro ? 'default' : 'secondary'}>

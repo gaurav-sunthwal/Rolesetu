@@ -560,12 +560,12 @@ export const HOME_FAQS: Faq[] = [
   {
     question: 'Is Rolesetu free?',
     answer:
-      'Yes. Checking jobs, the match score, extension autofill, tailored resumes and the application tracker are free and unlimited. Free also includes 30 AI credits a month. Pro is ₹199 a month for 400 AI credits, paid once a month with no autopay.',
+      'Yes. Checking jobs, the match score, extension autofill, tailored resumes and the application tracker are free and unlimited. Free also includes 30 AI credits a month. Pro is ₹199 a month for 400 AI credits, renewed by UPI or card autopay that you can cancel any time.',
   },
   {
     question: 'How does inviting a friend work?',
     answer:
-      'Share your invite link from the Plan page. When a friend signs up with it, uploads a resume and checks 3 jobs, your next Pro month costs ₹149 instead of ₹199. Every friend unlocks one cheaper month. You never see their resume or jobs.',
+      'Share your invite link from the Plan page. When a friend signs up with it, uploads a resume and checks 3 jobs, your first Pro month costs ₹149 instead of ₹199, applied when you start autopay. You never see their resume or jobs.',
   },
 ];
 

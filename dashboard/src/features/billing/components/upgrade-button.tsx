@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckCircle2, Circle, Crown, Loader2, ShieldCheck } from 'lucide-react';
-import { type ComponentProps, useEffect } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { preloadCheckout } from '@/features/billing/checkout';
-import { type UpgradePhase, usePlan, useUpgradeFlow } from '@/features/billing/hooks';
+import { type PayKind, type UpgradePhase, usePlan, useUpgradeFlow } from '@/features/billing/hooks';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -46,10 +46,16 @@ function stepIndex(phase: UpgradePhase): number {
 export function UpgradeButton({
   label,
   className,
+  oneTimeLink = false,
   ...buttonProps
-}: { label?: string } & Omit<ComponentProps<typeof Button>, 'onClick' | 'children'>) {
+}: {
+  label?: string;
+  /** Also offer paying for one month without autopay, for banks that can't do it. */
+  oneTimeLink?: boolean;
+} & Omit<ComponentProps<typeof Button>, 'onClick' | 'children'>) {
   const plan = usePlan(); // also opens the server's connection to Razorpay early
   const { phase, start, reset } = useUpgradeFlow();
+  const [kind, setKind] = useState<PayKind>('autopay');
 
   // Fetch Razorpay's script while the person is still reading the page.
   useEffect(() => {
@@ -63,8 +69,9 @@ export function UpgradeButton({
   // keyboard and pointer away from it.
   const dialogOpen = phase.step !== 'idle' && phase.step !== 'paying';
 
-  async function handleClick() {
-    const outcome = await start();
+  async function handleClick(chosen: PayKind = kind) {
+    setKind(chosen);
+    const outcome = await start(chosen);
     if (outcome === 'cancelled') toast('Payment cancelled. Nothing was charged.');
   }
 
@@ -77,8 +84,18 @@ export function UpgradeButton({
         disabled={busy || buttonProps.disabled || plan.data?.payments_enabled === false}
       >
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Crown aria-hidden />}
-        {label ?? (price ? `Upgrade to Pro · ${price}/month` : 'Upgrade to Pro')}
+        {label ?? (price ? `Start autopay · ${price}/month` : 'Upgrade to Pro')}
       </Button>
+      {oneTimeLink ? (
+        <button
+          type="button"
+          onClick={() => void handleClick('one_time')}
+          disabled={busy || plan.data?.payments_enabled === false}
+          className="text-muted-foreground hover:text-foreground self-start text-xs underline-offset-4 hover:underline disabled:opacity-50"
+        >
+          Bank doesn&rsquo;t support autopay? Pay for one month instead
+        </button>
+      ) : null}
 
       <Dialog
         open={dialogOpen}
@@ -87,7 +104,12 @@ export function UpgradeButton({
         }}
       >
         <DialogContent showCloseButton={!busy} aria-busy={busy}>
-          <UpgradeStatus phase={phase} onRetry={() => void handleClick()} onClose={reset} />
+          <UpgradeStatus
+            phase={phase}
+            kind={kind}
+            onRetry={() => void handleClick()}
+            onClose={reset}
+          />
         </DialogContent>
       </Dialog>
     </>
@@ -96,10 +118,12 @@ export function UpgradeButton({
 
 function UpgradeStatus({
   phase,
+  kind,
   onRetry,
   onClose,
 }: {
   phase: UpgradePhase;
+  kind: PayKind;
   onRetry: () => void;
   onClose: () => void;
 }) {
@@ -136,7 +160,9 @@ function UpgradeStatus({
         <DialogTitle>{done ? "You're on Pro" : 'Upgrading to Pro'}</DialogTitle>
         <DialogDescription>
           {done && phase.plan.pro_until
-            ? `Pro is active until ${formatDate(phase.plan.pro_until)}. It does not renew by itself.`
+            ? phase.plan.autopay?.on
+              ? `Autopay is on: Pro renews every month until you cancel. Paid until ${formatDate(phase.plan.pro_until)}.`
+              : `Pro is active until ${formatDate(phase.plan.pro_until)}. It does not renew by itself.`
             : 'Keep this page open. This takes a few seconds.'}
         </DialogDescription>
       </DialogHeader>
@@ -161,7 +187,11 @@ function UpgradeStatus({
               ) : (
                 <Circle className="size-5 shrink-0" aria-hidden />
               )}
-              <span className={active ? 'font-medium' : undefined}>{step.label}</span>
+              <span className={active ? 'font-medium' : undefined}>
+                {step.key === 'paying' && kind === 'autopay'
+                  ? 'Approve autopay in your UPI app or card'
+                  : step.label}
+              </span>
               <span className="sr-only">
                 {complete ? '(done)' : active ? '(in progress)' : '(waiting)'}
               </span>

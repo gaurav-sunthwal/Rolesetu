@@ -437,10 +437,10 @@ export default function LandingPage() {
                   </span>
                 </Display>
                 <p className="text-muted-foreground mt-6 max-w-md text-lg">
-                  Every friend who joins with your link and starts using Rolesetu makes one of your
-                  Pro months {PRICE.currency}
+                  Invite a friend who joins with your link and starts using Rolesetu, and your first
+                  Pro month is {PRICE.currency}
                   {PRICE.referral} instead of {PRICE.currency}
-                  {PRICE.pro}. Bring one friend a month and every month is cheaper.
+                  {PRICE.pro}. After that, autopay renews at the normal price.
                 </p>
                 <p className="text-muted-foreground mt-4 max-w-md text-sm">
                   Your friend gets Rolesetu free, like everyone. You never see their resume or their

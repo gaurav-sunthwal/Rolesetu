@@ -51,7 +51,7 @@ export function PlanComparison({
           points={PRO_POINTS}
           action={proAction}
           current={currentPlan === 'pro'}
-          footnote={`Pay once a month with UPI, cards or net banking. No autopay. ${PRICE.currency}${PRICE.referral} in a month you bring a friend.`}
+          footnote={`Monthly autopay with UPI or card; cancel any time. Your first month is ${PRICE.currency}${PRICE.referral} when you bring a friend.`}
         />
       </div>
 

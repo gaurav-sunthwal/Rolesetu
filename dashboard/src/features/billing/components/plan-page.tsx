@@ -1,6 +1,10 @@
 'use client';
 
 import { Crown, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { ConfirmDialog } from '@/components/app/confirm-dialog';
 
 import { PlanComparison } from '@/components/pricing/plan-comparison';
 import { SectionCard } from '@/components/app/section-card';
@@ -12,20 +16,26 @@ import { PRICE } from '@/content/pricing';
 import { ReferralPanel } from '@/features/billing/components/referral-panel';
 import { money, UpgradeButton } from '@/features/billing/components/upgrade-button';
 import { CreditsMeter } from '@/features/billing/credits';
-import { usePlan } from '@/features/billing/hooks';
-import type { Plan } from '@/lib/api/types';
+import { useCancelAutopay, usePlan } from '@/features/billing/hooks';
+import { track } from '@/features/billing/api';
+import type { Autopay, Plan } from '@/lib/api/types';
+import { errorMessage } from '@/lib/api/client';
 import { formatDate } from '@/lib/format';
 
 export function PlanPage() {
   const plan = usePlan();
+  // Once per visit: someone reached the plan page.
+  useEffect(() => {
+    track('plan_viewed');
+  }, []);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Plan & invites</h1>
         <p className="text-muted-foreground max-w-2xl text-sm">
-          Rolesetu is free to use. Pro adds far more AI for an active job hunt, and every friend you
-          invite makes a month cheaper.
+          Rolesetu is free to use. Pro adds far more AI for an active job hunt, and inviting a
+          friend makes your first Pro month cheaper.
         </p>
       </header>
 
@@ -45,18 +55,86 @@ export function PlanPage() {
   );
 }
 
+/** Autopay as it stands, with a way to stop it. */
+function AutopayStatus({ autopay, paidUntil }: { autopay: Autopay; paidUntil: string | null }) {
+  const cancel = useCancelAutopay();
+  const [confirming, setConfirming] = useState(false);
+  const amount = money(autopay.amount, autopay.currency);
+
+  const line = autopay.on
+    ? autopay.next_charge_at
+      ? `Autopay is on. Next charge ${amount} on ${formatDate(autopay.next_charge_at)}.`
+      : `Autopay is on: ${amount} every month.`
+    : autopay.status === 'pending'
+      ? 'Your last autopay payment did not go through. Razorpay is trying again.'
+      : autopay.status === 'halted'
+        ? 'Autopay stopped after payments failed. Start it again to keep Pro.'
+        : autopay.cancel_at_cycle_end && paidUntil
+          ? `Autopay is cancelled. Pro runs until ${formatDate(paidUntil)}.`
+          : 'Autopay is off.';
+
+  return (
+    <div className="mt-4 rounded-2xl border px-4 py-3 text-sm">
+      <p
+        className={
+          autopay.status === 'pending' || autopay.status === 'halted'
+            ? 'text-destructive'
+            : undefined
+        }
+      >
+        {line}
+      </p>
+      {autopay.on ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="text-muted-foreground hover:text-foreground mt-2 text-xs underline underline-offset-4"
+          >
+            Cancel autopay
+          </button>
+          <ConfirmDialog
+            open={confirming}
+            onOpenChange={setConfirming}
+            title="Cancel autopay?"
+            description={
+              paidUntil
+                ? `You won't be charged again. Pro keeps running until ${formatDate(paidUntil)}, then you're back on Free.`
+                : "You won't be charged again."
+            }
+            confirmLabel="Cancel autopay"
+            pending={cancel.isPending}
+            onConfirm={() =>
+              cancel.mutate(undefined, {
+                onSuccess: () => {
+                  setConfirming(false);
+                  toast.success('Autopay cancelled. You will not be charged again.');
+                },
+                onError: (error) => toast.error(errorMessage(error)),
+              })
+            }
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function PlanBody({ plan }: { plan: Plan }) {
   const isPro = plan.plan === 'pro';
   const price = money(plan.price.amount, plan.price.currency);
   const wasPrice = plan.referral_price ? `${PRICE.currency}${PRICE.pro}` : undefined;
-  const canBuy = plan.payments_enabled && !plan.renew_from;
+  const autopay = plan.autopay;
+  const autopayOn = Boolean(autopay?.on);
 
   const upgrade = plan.payments_enabled ? (
-    <UpgradeButton
-      size="lg"
-      label={isPro ? `Add a month · ${price}` : `Upgrade to Pro · ${price}`}
-      disabled={!canBuy}
-    />
+    autopayOn ? null : (
+      <UpgradeButton
+        size="lg"
+        oneTimeLink={!plan.renew_from}
+        label={isPro ? `Turn on autopay · ${price}/month` : `Start autopay · ${price}/month`}
+      />
+    )
   ) : (
     <Button size="lg" disabled>
       Payments open soon
@@ -76,7 +154,9 @@ function PlanBody({ plan }: { plan: Plan }) {
               </p>
               <p className="text-muted-foreground mt-1 text-sm">
                 {isPro && plan.pro_until
-                  ? `Active until ${formatDate(plan.pro_until)}. It does not renew by itself.`
+                  ? autopayOn
+                    ? `Renews automatically. Paid until ${formatDate(plan.pro_until)}.`
+                    : `Active until ${formatDate(plan.pro_until)}. It does not renew by itself.`
                   : 'Free forever. Upgrade any time for more AI.'}
               </p>
             </div>
@@ -98,17 +178,20 @@ function PlanBody({ plan }: { plan: Plan }) {
             ) : null}
             <span className="text-muted-foreground text-sm">/ month</span>
           </p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {plan.referral_price
-              ? 'A friend you invited unlocked this price.'
-              : `${PRICE.currency}${PRICE.referral} in any month you bring a friend.`}
-          </p>
-          <div className="mt-5 flex flex-col gap-2 [&>*]:w-full">{upgrade}</div>
+          {isPro ? null : (
+            <p className="text-muted-foreground mt-1 text-sm">
+              {plan.referral_price
+                ? `A friend you invited unlocked ${price} for your first month.`
+                : `Your first month is ${PRICE.currency}${PRICE.referral} when you bring a friend.`}
+            </p>
+          )}
+          {autopay ? <AutopayStatus autopay={autopay} paidUntil={plan.pro_until} /> : null}
+          {upgrade ? (
+            <div className="mt-5 flex flex-col gap-2 [&>button:first-child]:w-full">{upgrade}</div>
+          ) : null}
           <p className="text-muted-foreground mt-3 flex items-center gap-1.5 text-xs">
             <ShieldCheck className="size-3.5" aria-hidden />
-            {plan.renew_from
-              ? `You can add the next month from ${formatDate(plan.renew_from)}.`
-              : 'UPI, cards and net banking by Razorpay. No autopay.'}
+            Autopay with UPI or card, by Razorpay. Cancel any time; your paid month keeps running.
           </p>
         </SectionCard>
       </div>
