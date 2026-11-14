@@ -11,6 +11,7 @@ from backend.core.pagination import Page
 from backend.db.session import get_db
 from backend.modules.admin import service
 from backend.modules.admin.dependencies import Admin, get_admin
+from backend.modules.admin.leaderboard import Leaderboard, leaderboard
 from backend.modules.admin.repository import UserFilter
 from backend.modules.admin.schemas import (
     AccountDeleted,
@@ -59,6 +60,18 @@ Limit = Annotated[int, Query(ge=1, le=100)]
 async def read_admin(admin: Admin = Depends(get_admin)) -> AdminRead:
     """Lets the panel find out whether the signed-in account is an admin."""
     return AdminRead(email=admin.email)
+
+
+@router.get("/leaderboard", response_model=Leaderboard)
+async def read_leaderboard(
+    days: Annotated[int | None, Query(ge=1, le=3650)] = 30,
+    limit: Limit = 50,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> Leaderboard:
+    """The most active users over the last `days` (all time when left out), each
+    with the features they use most."""
+    return await leaderboard(db, days=days, limit=limit)
 
 
 @router.get("/stats", response_model=AdminStats)

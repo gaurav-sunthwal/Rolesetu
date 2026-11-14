@@ -73,3 +73,7 @@ export type ExtEventStats = {
   }[];
   top_sites: { host: string; offered: number; filled: number; fill_rate_pct: number }[];
 };
+
+export type Leaderboard = Schemas['Leaderboard'];
+export type LeaderRow = Schemas['LeaderRow'];
+export type LeaderFeature = Schemas['Feature'];

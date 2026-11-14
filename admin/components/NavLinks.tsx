@@ -7,6 +7,7 @@ import { SOCIAL_ENABLED } from '@/lib/features';
 
 const LINKS = [
   { href: '/', label: 'Dashboard' },
+  { href: '/leaderboard', label: 'Leaderboard' },
   { href: '/activity', label: 'Activity' },
   { href: '/extension-usage', label: 'Extension usage' },
   { href: '/extension-installs', label: 'Installs' },

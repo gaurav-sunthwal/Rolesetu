@@ -388,6 +388,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/referrals/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * My Referrals
+     * @description Your invite code, and how far each friend who joined has got.
+     */
+    get: operations['my_referrals_api_v1_referrals_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referrals/claim': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Claim Referral
+     * @description Records the invite a new account signed up through.
+     */
+    post: operations['claim_referral_api_v1_referrals_claim_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/resume': {
     parameters: {
       query?: never;
@@ -1129,6 +1169,27 @@ export interface paths {
      * @description Lets the panel find out whether the signed-in account is an admin.
      */
     get: operations['read_admin_api_v1_admin_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/leaderboard': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read Leaderboard
+     * @description The most active users over the last `days` (all time when left out), each
+     *     with the features they use most.
+     */
+    get: operations['read_leaderboard_api_v1_admin_leaderboard_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -3583,6 +3644,18 @@ export interface components {
       /** Last Used At */
       last_used_at: string | null;
     };
+    /** Feature */
+    Feature: {
+      /** Key */
+      key: string;
+      /** Label */
+      label: string;
+      /**
+       * Surface
+       * @enum {string}
+       */
+      surface: 'dashboard' | 'extension' | 'ai' | 'inbox';
+    };
     /**
      * FieldFitCheck
      * @description The job's line of work against the ones the candidate has worked in.
@@ -3886,6 +3959,70 @@ export interface components {
       title: components['schemas']['TitleCheck'] | null;
       /** Skills */
       skills: components['schemas']['SkillKeyword'][];
+    };
+    /** LeaderRow */
+    LeaderRow: {
+      /** Rank */
+      rank: number;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Email */
+      email: string;
+      /** Name */
+      name: string | null;
+      /** Headline */
+      headline: string | null;
+      /** Location */
+      location: string | null;
+      /**
+       * Joined At
+       * Format: date-time
+       */
+      joined_at: string;
+      /**
+       * Last Active At
+       * Format: date-time
+       */
+      last_active_at: string;
+      /**
+       * Plan
+       * @enum {string}
+       */
+      plan: 'free' | 'pro';
+      /** Has Resume */
+      has_resume: boolean;
+      /** Extension Connected */
+      extension_connected: boolean;
+      /** Gmail Connected */
+      gmail_connected: boolean;
+      /** Total Actions */
+      total_actions: number;
+      /** Active Days */
+      active_days: number;
+      /** Features */
+      features: {
+        [key: string]: number;
+      };
+      /** Top Features */
+      top_features: string[];
+    };
+    /** Leaderboard */
+    Leaderboard: {
+      /** Period Days */
+      period_days: number | null;
+      /** Features */
+      features: components['schemas']['Feature'][];
+      /** Totals */
+      totals: {
+        [key: string]: number;
+      };
+      /** Active Users */
+      active_users: number;
+      /** Users */
+      users: components['schemas']['LeaderRow'][];
     };
     /** LearnedAnswer */
     LearnedAnswer: {
@@ -4354,7 +4491,14 @@ export interface components {
       renew_from: string | null;
       /** Payments Enabled */
       payments_enabled: boolean;
+      /** @description What this user's next month costs. */
       price: components['schemas']['PriceRead'];
+      /**
+       * Referral Price
+       * @description The price is lowered by a friend's referral reward.
+       * @default false
+       */
+      referral_price: boolean;
       /** Payments */
       payments: components['schemas']['PaymentRead'][];
     };
@@ -4503,6 +4647,52 @@ export interface components {
       key: string;
       /** Text */
       text: string;
+    };
+    /** ReferralClaim */
+    ReferralClaim: {
+      /** Code */
+      code: string;
+    };
+    /** ReferralSummary */
+    ReferralSummary: {
+      /** Code */
+      code: string;
+      /** Friends */
+      friends: components['schemas']['ReferredFriend'][];
+      /**
+       * Rewards Available
+       * @description Months that can be bought at the referral price.
+       */
+      rewards_available: number;
+      /**
+       * Referral Amount
+       * @description The referral price, in paise.
+       */
+      referral_amount: number;
+      /** Currency */
+      currency: string;
+      /**
+       * Checks Needed
+       * @description Job checks a friend makes to unlock a reward.
+       */
+      checks_needed: number;
+    };
+    /**
+     * ReferredFriend
+     * @description A friend who joined. Nothing about them beyond where they are: their own
+     *     data (resume, checks) stays theirs.
+     */
+    ReferredFriend: {
+      /**
+       * Joined At
+       * Format: date-time
+       */
+      joined_at: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'joined' | 'unlocked' | 'used';
     };
     /**
      * Respell
@@ -5838,6 +6028,57 @@ export interface operations {
       };
     };
   };
+  my_referrals_api_v1_referrals_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReferralSummary'];
+        };
+      };
+    };
+  };
+  claim_referral_api_v1_referrals_claim_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReferralClaim'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   upload_resume_api_v1_resume_post: {
     parameters: {
       query?: never;
@@ -6951,6 +7192,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AdminRead'];
+        };
+      };
+    };
+  };
+  read_leaderboard_api_v1_admin_leaderboard_get: {
+    parameters: {
+      query?: {
+        days?: number | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Leaderboard'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
