@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.session import get_db
@@ -31,16 +31,42 @@ async def read_resume_identity(file: UploadFile) -> ResumeIdentity:
 @router.post("", response_model=ResumeRead, status_code=201)
 async def upload_resume(
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_db_user),
     db: AsyncSession = Depends(get_db),
 ) -> ResumeRead:
-    """Reads the PDF and returns what was found. Reading is local and takes
-    milliseconds, so there is no background job to wait for.
+    """Reads the PDF with code and returns what was found at once. The AI's
+    understanding (field, headline, more skills) is added after the answer is
+    sent: `ai_status` says when it is done.
     """
     # One byte over the limit is enough to know it is too big, without
     # reading an arbitrarily large upload into memory.
     data = await file.read(service.MAX_FILE_BYTES + 1)
-    return await service.create_upload(db, user_id=user.id, filename=file.filename, data=data)
+    resume = await service.create_upload(db, user_id=user.id, filename=file.filename, data=data)
+    text = await service.resume_text(data)
+    # Committed before the background work starts, so it finds the row.
+    await db.commit()
+    background_tasks.add_task(service.enrich_in_background, resume.id, user.id, text)
+    return resume
+
+
+@router.post("/fill", response_model=ResumeApplied, status_code=201)
+async def upload_and_fill(
+    file: UploadFile,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_db_user),
+    db: AsyncSession = Depends(get_db),
+) -> ResumeApplied:
+    """Uploads a resume and fills the profile from it (merge) in one request, for
+    onboarding. The AI's understanding is added afterwards, as with an upload."""
+    data = await file.read(service.MAX_FILE_BYTES + 1)
+    resume, profile = await service.create_and_fill(
+        db, user_id=user.id, filename=file.filename, data=data
+    )
+    text = await service.resume_text(data)
+    await db.commit()
+    background_tasks.add_task(service.enrich_in_background, resume.id, user.id, text)
+    return ResumeApplied(resume=resume, profile=profile)
 
 
 @router.get("/latest", response_model=ResumeRead | None)

@@ -19,6 +19,8 @@ class ResumeRead(BaseModel):
     parsed: ProfileWrite | None
     applied_at: datetime | None
     created_at: datetime
+    # The AI pass that runs after the upload answers: "pending", "done" or "failed".
+    ai_status: Literal["pending", "done", "failed"] | None = None
 
 
 class ResumeApply(BaseModel):

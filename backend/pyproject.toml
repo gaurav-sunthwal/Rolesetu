@@ -98,4 +98,5 @@ markers = [
     "records_errors: the test checks error recording, so events are really written",
     "records_ai_calls: the test checks AI call recording, so calls are really written",
     "signup_alerts: the test checks the new sign-up email, so it catches that email itself",
+    "real_resume_ai: the test supplies its own resume AI answer instead of the stub",
 ]

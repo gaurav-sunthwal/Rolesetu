@@ -56,6 +56,21 @@ def _ai_calls_not_recorded(request: pytest.FixtureRequest, monkeypatch: pytest.M
 
 
 @pytest.fixture(autouse=True)
+def _no_real_resume_ai(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Uploading a resume asks the AI to understand it, after the upload answers.
+    In tests that call never goes out (it costs money and seconds): the AI "finds
+    nothing", unless a test about it puts its own answer in place."""
+    if "real_resume_ai" in request.keywords:
+        return
+    from backend.modules.resumes import service as resumes_service
+
+    async def nothing(*_: object, **__: object) -> None:
+        return None
+
+    monkeypatch.setattr(resumes_service, "understand_profile", nothing)
+
+
+@pytest.fixture(autouse=True)
 def _no_signup_alerts(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
     """Every test user is a first sign-in. None of them may email the people
     on SIGNUP_ALERT_EMAILS, except in the tests about that alert, which catch it.

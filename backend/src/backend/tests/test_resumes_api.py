@@ -1,4 +1,3 @@
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -207,12 +206,10 @@ async def test_a_refused_resume_update_is_recorded_for_admins(
     from backend.modules.errors.models import ErrorEvent
     from backend.modules.resumes import repository
 
-    async def count_since(_db, _user_id, since: datetime) -> int:
-        if since > datetime.now(UTC) - timedelta(hours=2):
-            return 0
-        return 2
+    async def upload_counts(*_: object) -> tuple[int, int]:
+        return 0, 2  # none in the last hour, two already today
 
-    monkeypatch.setattr(repository, "count_since", count_since)
+    monkeypatch.setattr(repository, "upload_counts", upload_counts)
     response = await client.post(
         BASE, files={"file": ("resume.pdf", b"%PDF-1.4\n", "application/pdf")}
     )
@@ -235,12 +232,10 @@ async def test_a_third_resume_update_in_a_day_is_refused(
 ) -> None:
     from backend.modules.resumes import repository
 
-    async def count_since(_db, _user_id, since: datetime) -> int:
-        if since > datetime.now(UTC) - timedelta(hours=2):
-            return 0
-        return 2
+    async def upload_counts(*_: object) -> tuple[int, int]:
+        return 0, 2  # none in the last hour, two already today
 
-    monkeypatch.setattr(repository, "count_since", count_since)
+    monkeypatch.setattr(repository, "upload_counts", upload_counts)
     response = await client.post(
         BASE, files={"file": ("resume.pdf", b"%PDF-1.4\n", "application/pdf")}
     )

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from backend.ai.llm_client import generate_structured
 from backend.ai.prompts import load_prompt
+from backend.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,15 @@ class ProfileUnderstanding(BaseModel):
     scope_chunks: list[str] = Field(default_factory=list)
 
 
-async def understand_profile(resume_text: str) -> ProfileUnderstanding | None:
+# The fast models answer a resume in a few seconds; the default one can take over 30
+# (measured 2026-11-15: 34-38s with a 20s timeout on the first model). Enrichment runs
+# after the profile is shown, so it uses the fast ones and gives up sooner.
+FAST_TIMEOUT_SECONDS = 15.0
+
+
+async def understand_profile(
+    resume_text: str, *, fast: bool = False
+) -> ProfileUnderstanding | None:
     """Extracts role, field context, categorized skills, and chunked scope from resume text."""
     if not resume_text.strip():
         return None
@@ -45,7 +54,9 @@ async def understand_profile(resume_text: str) -> ProfileUnderstanding | None:
             ProfileUnderstanding,
             purpose="profile-understanding",
             system_instruction=load_prompt("understand_profile", PROMPT_VERSION),
-            timeout_seconds=20.0,
+            timeout_seconds=FAST_TIMEOUT_SECONDS if fast else 20.0,
+            models=get_settings().fast_llm_models if fast else None,
+            thinking=not fast,
         )
         assert isinstance(result, ProfileUnderstanding)
         return result

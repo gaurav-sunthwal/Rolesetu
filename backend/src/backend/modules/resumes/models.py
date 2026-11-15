@@ -31,3 +31,6 @@ class ResumeFile(IdMixin, TimestampMixin, Base):
     # Which version of the local parser produced `parsed_json`.
     parser_version: Mapped[str | None] = mapped_column(default=None)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The AI's understanding of the resume (field, headline, more skills), added
+    # after the file is read: "pending", then "done" or "failed". None before it existed.
+    ai_status: Mapped[str | None] = mapped_column(default=None)

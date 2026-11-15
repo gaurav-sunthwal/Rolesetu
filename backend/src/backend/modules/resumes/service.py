@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.ai.profile_understanding import understand_profile
+from backend.ai.profile_understanding import ProfileUnderstanding, understand_profile
 from backend.core import storage
 from backend.core.exceptions import (
     ConflictError,
@@ -15,6 +15,7 @@ from backend.core.exceptions import (
     RateLimitedError,
     ValidationFailedError,
 )
+from backend.db.session import get_sessionmaker
 from backend.modules.ai_calls.service import called_by
 from backend.modules.matches.local.semantic import usable_lines, warm_up_chunks
 from backend.modules.profiles import service as profiles_service
@@ -48,6 +49,7 @@ def to_read(resume: ResumeFile) -> ResumeRead:
         parsed=ProfileWrite.model_validate(resume.parsed_json) if resume.parsed_json else None,
         applied_at=resume.applied_at,
         created_at=resume.created_at,
+        ai_status=resume.ai_status,  # type: ignore[arg-type]
     )
 
 
@@ -95,58 +97,11 @@ async def _run_parser[T](read: Callable[[bytes], T], data: bytes) -> T:
 
 
 async def read_pdf(data: bytes) -> ProfileWrite:
-    """Reads a resume into a cleaned profile with AI-assisted understanding."""
+    """Reads a resume into a cleaned profile with code alone: milliseconds, so the
+    person sees their profile at once. The AI's understanding is added afterwards
+    (`enrich_in_background`)."""
     raw = await _run_parser(parser.parse_pdf, data)
     profile = normalize.to_profile(raw)
-
-    # AI-assisted profile understanding: extract domain, scope, and categorized skills
-    try:
-        raw_lines = await _run_parser(extract_lines, data)
-        full_text = "\n".join(line.text for line in raw_lines)
-        ai_profile = await understand_profile(full_text)
-        if ai_profile is not None:
-            existing = {s.name.lower() for s in profile.skills}
-            # Gather all categorized and flat skills
-            all_ai_skills = list(ai_profile.skills)
-            for cat_list in [
-                ai_profile.categorized_skills.hr_administrative,
-                ai_profile.categorized_skills.organisational,
-                ai_profile.categorized_skills.interpersonal,
-                ai_profile.categorized_skills.analytical,
-                ai_profile.categorized_skills.professional,
-                ai_profile.categorized_skills.technical_software,
-            ]:
-                all_ai_skills.extend(cat_list)
-
-            for skill_name in all_ai_skills:
-                clean = skill_name.strip()
-                if (
-                    clean
-                    and clean.lower() not in existing
-                    and len(profile.skills) < MAX_PROFILE_SKILLS
-                ):
-                    profile.skills.append(SkillItem(id=uuid.uuid4().hex, name=clean[:60]))
-                    existing.add(clean.lower())
-
-            if not profile.headline and ai_profile.headline:
-                profile.headline = ai_profile.headline
-
-            field_key, scope_summary, inferred = resolve_field(profile, ai_profile)
-            if field_key and not profile.field_key:
-                profile.field_key = field_key
-            if scope_summary and not profile.scope_summary:
-                profile.scope_summary = scope_summary
-            if inferred and not profile.inferred_field_key:
-                profile.inferred_field_key = inferred
-
-            # Warm up embeddings for semantic matcher
-            chunks = list(ai_profile.scope_chunks)
-            for exp in profile.experience:
-                chunks.extend(usable_lines(exp.description))
-            warm_up_chunks(chunks)
-    except Exception:
-        logger.exception("AI profile enrichment failed; continuing with locally parsed profile")
-
     if not normalize.has_content(profile):
         raise ValidationFailedError(
             "We could not find skills, roles, projects or education in that PDF. "
@@ -154,6 +109,80 @@ async def read_pdf(data: bytes) -> ProfileWrite:
             "such as Experience, Education and Skills."
         )
     return profile
+
+
+async def resume_text(data: bytes) -> str:
+    lines = await _run_parser(extract_lines, data)
+    return "\n".join(line.text for line in lines)
+
+
+def add_understanding(profile: ProfileWrite, ai_profile: ProfileUnderstanding) -> ProfileWrite:
+    """What the AI understood, added to a profile without replacing anything on it:
+    skills it lacks, and a headline and field only where they are empty."""
+    merged = profile.model_copy(deep=True)
+    existing = {skill.name.lower() for skill in merged.skills}
+    found = list(ai_profile.skills)
+    for group in (
+        ai_profile.categorized_skills.hr_administrative,
+        ai_profile.categorized_skills.organisational,
+        ai_profile.categorized_skills.interpersonal,
+        ai_profile.categorized_skills.analytical,
+        ai_profile.categorized_skills.professional,
+        ai_profile.categorized_skills.technical_software,
+    ):
+        found.extend(group)
+    for name in found:
+        clean = name.strip()
+        if clean and clean.lower() not in existing and len(merged.skills) < MAX_PROFILE_SKILLS:
+            merged.skills.append(SkillItem(id=uuid.uuid4().hex, name=clean[:60]))
+            existing.add(clean.lower())
+    if not merged.headline and ai_profile.headline:
+        merged.headline = ai_profile.headline
+    field_key, scope_summary, inferred = resolve_field(merged, ai_profile)
+    if field_key and not merged.field_key:
+        merged.field_key = field_key
+    if scope_summary and not merged.scope_summary:
+        merged.scope_summary = scope_summary
+    if inferred and not merged.inferred_field_key:
+        merged.inferred_field_key = inferred
+    return merged
+
+
+async def enrich_in_background(resume_id: uuid.UUID, user_id: uuid.UUID, text: str) -> None:
+    """Runs after the upload has answered: the AI reads the resume (field, headline,
+    more skills) and that is added to the resume and, if it is on the profile
+    already, to the profile. The model is asked first, outside any lock, so a
+    person applying or editing meanwhile never waits on it."""
+    with called_by(user_id, "resume"):
+        ai_profile = await understand_profile(text, fast=True)
+    try:
+        async with get_sessionmaker()() as db:
+            resume = await repository.get_for_update(db, resume_id)
+            if resume is None or resume.ai_status != "pending":
+                return  # deleted or replaced meanwhile
+            if ai_profile is None:
+                resume.ai_status = "failed"
+                await db.commit()
+                return
+            parsed = ProfileWrite.model_validate(resume.parsed_json)
+            resume.parsed_json = add_understanding(parsed, ai_profile).model_dump(mode="json")
+            if resume.applied_at is not None:
+                current = await profiles_service.get_profile(db, user_id=user_id)
+                current_write = ProfileWrite.model_validate(
+                    current.model_dump(exclude={"version", "completeness", "updated_at"})
+                )
+                await profiles_service.save_profile(
+                    db, user_id=user_id, payload=add_understanding(current_write, ai_profile)
+                )
+            resume.ai_status = "done"
+            await db.commit()
+        # Ready the matcher for this person's evidence, off the request path.
+        chunks = list(ai_profile.scope_chunks)
+        chunks.extend(line for exp in parsed.experience for line in usable_lines(exp.description))
+        # In a thread: embedding is CPU work that would otherwise stall the server.
+        await asyncio.to_thread(warm_up_chunks, chunks)
+    except Exception:
+        logger.exception("Resume %s: adding the AI's understanding failed", resume_id)
 
 
 async def read_identity(data: bytes) -> ResumeIdentity:
@@ -166,49 +195,71 @@ async def read_identity(data: bytes) -> ResumeIdentity:
     return ResumeIdentity(email=identity.email, first_name=first_name)
 
 
-async def create_upload(
+async def _store(
     db: AsyncSession, *, user_id: uuid.UUID, filename: str | None, data: bytes
-) -> ResumeRead:
+) -> ResumeFile:
     """Reads the PDF, then stores it. A file that cannot be read is rejected
-    before anything is saved, so nothing unusable is ever kept.
-    """
+    before anything is saved, so nothing unusable is ever kept. The file goes to
+    storage while the database work runs, so the two waits overlap."""
     validate_pdf(data)
     now = datetime.now(UTC)
-    if await repository.count_since(db, user_id, now - timedelta(hours=1)) >= MAX_UPLOADS_PER_HOUR:
+    in_hour, in_day = await repository.upload_counts(
+        db, user_id, now - timedelta(hours=1), now - timedelta(days=1)
+    )
+    if in_hour >= MAX_UPLOADS_PER_HOUR:
         raise RateLimitedError(
             f"You have uploaded {MAX_UPLOADS_PER_HOUR} resumes in the last hour. "
             "Please wait a little before uploading another."
         )
-    if (
-        await repository.count_since(db, user_id, now - timedelta(days=1))
-        >= MAX_RESUME_READS_PER_DAY
-    ):
+    if in_day >= MAX_RESUME_READS_PER_DAY:
         raise RateLimitedError("You can update your resume twice a day. Try again tomorrow.")
-    with called_by(user_id, "resume"):
-        profile = await read_pdf(data)
+    profile = await read_pdf(data)
 
     resume_id = uuid.uuid4()
     storage_key = f"resumes/{user_id}/{resume_id}.pdf"
-    await storage.put_file(storage_key, data, content_type="application/pdf")
-
-    # One resume per person: the new upload replaces any earlier file.
-    for previous in await repository.list_for_user(db, user_id):
-        await _remove(db, previous)
-
-    resume = ResumeFile(
-        id=resume_id,
-        user_id=user_id,
-        storage_key=storage_key,
-        filename=_safe_filename(filename),
-        size_bytes=len(data),
-        status="parsed",
-        parsed_json=profile.model_dump(mode="json"),
-        parser_version=parser.PARSER_VERSION,
+    stored = asyncio.create_task(
+        storage.put_file(storage_key, data, content_type="application/pdf")
     )
-    db.add(resume)
-    await db.flush()
-    await db.refresh(resume)
-    return to_read(resume)
+    try:
+        # One resume per person: the new upload replaces any earlier file.
+        for previous in await repository.list_for_user(db, user_id):
+            await _remove(db, previous)
+        resume = ResumeFile(
+            id=resume_id,
+            user_id=user_id,
+            storage_key=storage_key,
+            filename=_safe_filename(filename),
+            size_bytes=len(data),
+            status="parsed",
+            parsed_json=profile.model_dump(mode="json"),
+            parser_version=parser.PARSER_VERSION,
+            ai_status="pending",
+            # Set here rather than read back from the database: one round trip fewer.
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(resume)
+        await db.flush()
+    finally:
+        # Never answer before the file is stored; a failed store fails the upload.
+        await stored
+    return resume
+
+
+async def create_upload(
+    db: AsyncSession, *, user_id: uuid.UUID, filename: str | None, data: bytes
+) -> ResumeRead:
+    return to_read(await _store(db, user_id=user_id, filename=filename, data=data))
+
+
+async def create_and_fill(
+    db: AsyncSession, *, user_id: uuid.UUID, filename: str | None, data: bytes
+) -> tuple[ResumeRead, ProfileRead]:
+    """Uploads the resume and fills the profile from it in one request: what a
+    new person needs, without a second round trip. Merge keeps anything already
+    on the profile."""
+    resume = await _store(db, user_id=user_id, filename=filename, data=data)
+    return await _apply(db, user_id=user_id, resume=resume, mode="merge")
 
 
 async def get_latest(db: AsyncSession, *, user_id: uuid.UUID) -> ResumeRead | None:
@@ -231,6 +282,15 @@ async def apply_to_profile(
     db: AsyncSession, *, user_id: uuid.UUID, resume_id: uuid.UUID, mode: ApplyMode
 ) -> tuple[ResumeRead, ProfileRead]:
     resume = await _require(db, user_id, resume_id)
+    # The same row lock the background enrichment takes, so the two run one after
+    # the other and neither loses the other's work.
+    await db.refresh(resume, with_for_update=True)
+    return await _apply(db, user_id=user_id, resume=resume, mode=mode)
+
+
+async def _apply(
+    db: AsyncSession, *, user_id: uuid.UUID, resume: ResumeFile, mode: ApplyMode
+) -> tuple[ResumeRead, ProfileRead]:
     if resume.status != "parsed" or not resume.parsed_json:
         raise ConflictError("This resume has not been read yet, so there is nothing to apply.")
 
@@ -242,12 +302,10 @@ async def apply_to_profile(
     profile = await profiles_service.save_profile(
         db, user_id=user_id, payload=apply_resume(current_write, parsed, mode)
     )
-    chunks = [line for exp in profile.experience for line in usable_lines(exp.description)]
-    if chunks:
-        warm_up_chunks(chunks)
+    # The matcher is readied for this evidence by the background enrichment, off
+    # the request: embedding here would hold up the answer (and the server).
     resume.applied_at = datetime.now(UTC)
     await db.flush()
-    await db.refresh(resume)
     return to_read(resume), profile
 
 
