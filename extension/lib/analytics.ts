@@ -19,6 +19,8 @@ export type EventName =
   | 'extension_connected'
   | 'setup_opened'
   | 'popup_opened'
+  | 'popup_loaded'
+  | 'popup_clicked'
   | 'page_checked'
   | 'job_detected'
   | 'form_detected'
@@ -37,6 +39,8 @@ export type EventName =
   | 'ai_requested'
   | 'ai_succeeded'
   | 'ai_failed'
+  | 'review_asked'
+  | 'review_answered'
   | 'ext_error';
 
 /** Short labels only: a source, a mode, a reason. Never anything the user wrote. */

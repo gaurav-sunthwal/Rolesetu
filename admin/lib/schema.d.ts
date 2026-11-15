@@ -179,7 +179,8 @@ export interface paths {
     /**
      * My Activity
      * @description Your activity per day over the last year, with your streaks. `tz` is your
-     *     time zone (e.g. Asia/Kolkata); unknown names fall back to UTC.
+     *     time zone (e.g. Asia/Kolkata); unknown names fall back to UTC. The extension
+     *     reads it too, for the streak and grid in its popup.
      */
     get: operations['my_activity_api_v1_activity_me_get'];
     put?: never;
@@ -540,8 +541,9 @@ export interface paths {
     put?: never;
     /**
      * Upload Resume
-     * @description Reads the PDF and returns what was found. Reading is local and takes
-     *     milliseconds, so there is no background job to wait for.
+     * @description Reads the PDF with code and returns what was found at once. The AI's
+     *     understanding (field, headline, more skills) is added after the answer is
+     *     sent: `ai_status` says when it is done.
      */
     post: operations['upload_resume_api_v1_resume_post'];
     delete?: never;
@@ -3560,6 +3562,8 @@ export interface components {
       /** Features */
       features: components['schemas']['ExtFeatureRow'][];
       ai: components['schemas']['ExtAiStats'];
+      popup: components['schemas']['ExtPopupStats'];
+      reviews: components['schemas']['ExtReviewStats'];
       /** Sites */
       sites: components['schemas']['ExtSiteRow'][];
       /** Errors */
@@ -3751,6 +3755,8 @@ export interface components {
         | 'connect_failed'
         | 'uninstall_reason'
         | 'popup_opened'
+        | 'popup_loaded'
+        | 'popup_clicked'
         | 'page_checked'
         | 'job_detected'
         | 'form_detected'
@@ -3769,6 +3775,8 @@ export interface components {
         | 'ai_requested'
         | 'ai_succeeded'
         | 'ai_failed'
+        | 'review_asked'
+        | 'review_answered'
         | 'ext_error';
       /** Host */
       host?: string | null;
@@ -3838,6 +3846,39 @@ export interface components {
       connects: number;
       /** Errors */
       errors: number;
+    };
+    /**
+     * ExtPopupStats
+     * @description The toolbar popup: how often it is opened, whether its stats show, and what is pressed.
+     */
+    ExtPopupStats: {
+      /** Opened */
+      opened: number;
+      /** Opened Users */
+      opened_users: number;
+      /** Loads */
+      loads: components['schemas']['ExtCountRow'][];
+      /** Median Load Ms */
+      median_load_ms: number | null;
+      /** Clicks */
+      clicks: components['schemas']['ExtCountRow'][];
+      /**
+       * Clickers
+       * @description People who pressed anything in the popup.
+       */
+      clickers: number;
+    };
+    /**
+     * ExtReviewStats
+     * @description The store-review card in the job panel: shown, and what people chose.
+     */
+    ExtReviewStats: {
+      /** Asked */
+      asked: number;
+      /** Asked Users */
+      asked_users: number;
+      /** Answers */
+      answers: components['schemas']['ExtCountRow'][];
     };
     /** ExtSiteRow */
     ExtSiteRow: {
@@ -5087,6 +5128,8 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+      /** Ai Status */
+      ai_status?: ('pending' | 'done' | 'failed') | null;
     };
     /**
      * ReviewAction

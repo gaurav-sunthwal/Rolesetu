@@ -37,7 +37,7 @@ async def list_applications(
 
 @router.get("/stats", response_model=ApplicationStats)
 async def read_stats(
-    user: User = Depends(get_db_user), db: AsyncSession = Depends(get_db)
+    user: User = Depends(get_db_user_or_extension), db: AsyncSession = Depends(get_db)
 ) -> ApplicationStats:
     return await service.get_stats(db, user_id=user.id)
 

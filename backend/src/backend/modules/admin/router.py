@@ -423,6 +423,8 @@ async def read_ext_analytics(
         funnel=await events_repo.funnel(db, since),
         features=await events_repo.features(db, since),
         ai=await events_repo.ai_stats(db, since, AI_ANSWER_PURPOSE),
+        popup=await events_repo.popup_stats(db, since),
+        reviews=await events_repo.review_stats(db, since),
         sites=await events_repo.sites(db, since),
         errors=await events_repo.errors(db, since),
     )

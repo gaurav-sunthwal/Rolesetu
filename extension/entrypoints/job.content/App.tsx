@@ -37,6 +37,7 @@ import {
 
 import { type PillState, removeApplyPills, setPillText, showApplyPills } from './apply-pill';
 import { applyActionOf, PENDING_FOR_MS, watchForConfirmation } from './apply-tracking';
+import { ReviewAsk } from './ReviewAsk';
 
 type Phase =
   | { name: 'looking' }
@@ -1133,6 +1134,7 @@ function Result({
             reasons below.
           </p>
         ) : null}
+        <ReviewAsk />
         {/* An older server sends no limits. */}
         {(match.limits ?? [])
           .filter((limit) => limit.kind !== 'experience')

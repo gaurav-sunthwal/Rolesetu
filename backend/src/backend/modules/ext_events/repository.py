@@ -22,6 +22,8 @@ from backend.modules.ext_events.schemas import (
     ExtFeatureRow,
     ExtFunnelStep,
     ExtOverview,
+    ExtPopupStats,
+    ExtReviewStats,
     ExtSiteRow,
     ExtVersionRow,
 )
@@ -218,6 +220,42 @@ async def ai_stats(db: AsyncSession, since: datetime, purpose: str) -> ExtAiStat
         own_key_calls=own,
         input_tokens=int(tokens_in or 0),
         output_tokens=int(tokens_out or 0),
+    )
+
+
+async def popup_stats(db: AsyncSession, since: datetime) -> ExtPopupStats:
+    counts = await db.execute(
+        select(
+            _named("popup_opened"),
+            _users_with("popup_opened"),
+            func.count(distinct(ExtEvent.user_id)).filter(ExtEvent.name == "popup_clicked"),
+            func.percentile_cont(0.5)
+            .within_group(ExtEvent.count)
+            .filter(ExtEvent.name == "popup_loaded", ExtEvent.props["state"].astext == "stats"),
+        ).where(ExtEvent.created_at >= since)
+    )
+    opened, opened_users, clickers, median = counts.one()
+    return ExtPopupStats(
+        opened=opened,
+        opened_users=opened_users,
+        loads=await _by_prop(db, since, "popup_loaded", "state"),
+        median_load_ms=None if median is None else round(median),
+        clicks=await _by_prop(db, since, "popup_clicked", "target"),
+        clickers=clickers,
+    )
+
+
+async def review_stats(db: AsyncSession, since: datetime) -> ExtReviewStats:
+    counts = await db.execute(
+        select(_named("review_asked"), _users_with("review_asked")).where(
+            ExtEvent.created_at >= since
+        )
+    )
+    asked, asked_users = counts.one()
+    return ExtReviewStats(
+        asked=asked,
+        asked_users=asked_users,
+        answers=await _by_prop(db, since, "review_answered", "answer"),
     )
 
 

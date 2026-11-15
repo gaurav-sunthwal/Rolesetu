@@ -29,6 +29,8 @@ const EVENT_NAMES: Record<string, string> = {
   connect_failed: 'Connecting failed',
   uninstall_reason: 'Said why they removed it',
   popup_opened: 'Opened the popup',
+  popup_loaded: 'Popup stats loaded',
+  popup_clicked: 'Pressed a popup button',
   page_checked: 'Pressed "Check this page"',
   job_detected: 'Job page found',
   form_detected: 'Application form found',
@@ -47,6 +49,8 @@ const EVENT_NAMES: Record<string, string> = {
   ai_requested: 'AI asked',
   ai_succeeded: 'AI answered',
   ai_failed: 'AI failed',
+  review_asked: 'Asked for a review',
+  review_answered: 'Answered the review ask',
   ext_error: 'Extension error',
 };
 
@@ -227,6 +231,115 @@ function Ai({ ai }: { ai: ExtAnalytics['ai'] }) {
           </dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+// Every popup button, so one nobody presses still shows (with 0).
+const POPUP_TARGETS: [string, string][] = [
+  ['check_page', 'Check this page'],
+  ['tracker', 'Tracker'],
+  ['find_jobs', 'Find jobs'],
+  ['resume', 'Resume'],
+  ['check_link', 'Check a link'],
+  ['dashboard', 'Open dashboard (header)'],
+  ['follow_ups', 'Follow-ups due'],
+  ['get_pro', 'Get Pro'],
+  ['heatmap', 'Looked at the grid (hover)'],
+  ['settings', 'Settings'],
+  ['retry', 'Try again (stats failed)'],
+  ['setup', 'Set up (signed out)'],
+];
+
+const LOAD_STATES: Record<string, string> = {
+  stats: 'Stats shown',
+  no_stats: 'Signed in, no stats',
+  signed_out: 'Signed out',
+};
+
+function Popup({ popup }: { popup: ExtAnalytics['popup'] }) {
+  if (popup.opened === 0) return <Empty>No one opened the popup in this period.</Empty>;
+  const clicks = new Map(popup.clicks.map((row) => [row.label, row.events]));
+  const top = Math.max(1, ...popup.clicks.map((row) => row.events));
+  return (
+    <div className="grid gap-6 px-4 pb-4 md:grid-cols-3">
+      <dl className="space-y-1 text-sm">
+        <div className="flex justify-between">
+          <dt>Opened</dt>
+          <dd className="tabular-nums">
+            {n(popup.opened)} by {n(popup.opened_users)} people
+          </dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Pressed anything</dt>
+          <dd className="tabular-nums">
+            {n(popup.clickers)} people ({pct(popup.clickers, popup.opened_users)})
+          </dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Stats shown in (median)</dt>
+          <dd className="tabular-nums">
+            {popup.median_load_ms === null ? '–' : `${n(popup.median_load_ms)} ms`}
+          </dd>
+        </div>
+        <p className="pt-2 font-semibold">What people saw</p>
+        {popup.loads.map((row) => (
+          <div key={row.label} className="flex justify-between">
+            <dt>{LOAD_STATES[row.label] ?? row.label}</dt>
+            <dd className="tabular-nums">{n(row.events)}</dd>
+          </div>
+        ))}
+      </dl>
+      <ul className="space-y-2 text-sm md:col-span-2">
+        {POPUP_TARGETS.map(([target, label]) => {
+          const count = clicks.get(target) ?? 0;
+          return (
+            <li key={target} className="flex items-center gap-3">
+              <span className={`w-48 shrink-0 ${count === 0 ? 'text-zinc-400' : ''}`}>{label}</span>
+              <Bar value={count} max={top} color="bg-violet-500" />
+              <span className="w-28 shrink-0 text-right tabular-nums">
+                {n(count)} · {pct(count, popup.opened)} of opens
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+const REVIEW_ANSWERS: [string, string][] = [
+  ['review', 'Rate Rolesetu (went to the store)'],
+  ['feedback', 'Could be better'],
+  ['later', 'Not now (×)'],
+  ['never', "Don't ask again"],
+];
+
+function Reviews({ reviews }: { reviews: ExtAnalytics['reviews'] }) {
+  if (reviews.asked === 0) return <Empty>No one was asked for a review in this period.</Empty>;
+  const answers = new Map(reviews.answers.map((row) => [row.label, row.events]));
+  const answered = reviews.answers.reduce((sum, row) => sum + row.events, 0);
+  const rows: [string, number][] = [
+    ...REVIEW_ANSWERS.map(([key, label]): [string, number] => [label, answers.get(key) ?? 0]),
+    ['Closed the panel without choosing', Math.max(0, reviews.asked - answered)],
+  ];
+  return (
+    <div className="px-4 pb-4 text-sm">
+      <p className="mb-3">
+        Shown <b className="tabular-nums">{n(reviews.asked)}</b> times to{' '}
+        <b className="tabular-nums">{n(reviews.asked_users)}</b> people.
+      </p>
+      <ul className="space-y-2">
+        {rows.map(([label, count]) => (
+          <li key={label} className="flex items-center gap-3">
+            <span className="w-64 shrink-0">{label}</span>
+            <Bar value={count} max={reviews.asked} color="bg-amber-500" />
+            <span className="w-24 shrink-0 text-right tabular-nums">
+              {n(count)} · {pct(count, reviews.asked)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -416,6 +529,20 @@ export default function ExtensionUsagePage() {
             note="Write and Improve with AI: how often it is asked, how it ends, and who pays for it."
           >
             <Ai ai={data.ai} />
+          </Section>
+
+          <Section
+            title="Toolbar popup"
+            note="What people see when they open it, and which buttons they press. Grey rows are never pressed."
+          >
+            <Popup popup={data.popup} />
+          </Section>
+
+          <Section
+            title="Store review ask"
+            note="The rating card in the job panel: how often it showed and what people chose."
+          >
+            <Reviews reviews={data.reviews} />
           </Section>
 
           <Section

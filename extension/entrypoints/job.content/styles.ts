@@ -62,6 +62,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .why { margin: 12px 0 0; font-size: 13px; line-height: 1.45; }
+.review { position: relative; margin: 14px 0 0; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--line));
+  background: color-mix(in srgb, var(--brand) 7%, var(--bg)); }
+.review p { margin: 0; }
+.review .review-title { font-weight: 700; margin-bottom: 4px; padding-right: 28px; }
+.review-close { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; }
+.review-actions { display: flex; gap: 8px; margin-top: 10px; }
+.review-actions .btn { height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; color: inherit; font-size: 13px; }
+.review-actions .btn.primary { color: #fff; }
+.review-never { margin-top: 8px; padding: 0; border: 0; background: none; font-size: 12px; color: var(--muted);
+  text-decoration: underline; }
 .note { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--soft); font-size: 13px;
   border-left: 4px solid var(--muted); }
 .note strong { display: block; }

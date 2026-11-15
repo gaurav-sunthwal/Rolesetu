@@ -19,6 +19,9 @@ EventName = Literal[
     "connect_failed",
     "uninstall_reason",
     "popup_opened",
+    # The popup: whether the stats showed, and which button was pressed
+    "popup_loaded",
+    "popup_clicked",
     "page_checked",
     # What the extension found
     "job_detected",
@@ -42,6 +45,9 @@ EventName = Literal[
     "ai_requested",
     "ai_succeeded",
     "ai_failed",
+    # Asking for a store review
+    "review_asked",
+    "review_answered",
     # Health
     "ext_error",
 ]
@@ -190,6 +196,29 @@ class ExtCountRow(BaseModel):
     events: int
 
 
+class ExtPopupStats(BaseModel):
+    """The toolbar popup: how often it is opened, whether its stats show, and what is pressed."""
+
+    opened: int
+    opened_users: int
+    # By `state`: stats (signed in, stats shown), no_stats (they failed), signed_out.
+    loads: list[ExtCountRow]
+    # Milliseconds the stats took to show, median, when they did.
+    median_load_ms: int | None
+    # By `target`: check_page, tracker, find_jobs, ... One row per button.
+    clicks: list[ExtCountRow]
+    clickers: int = Field(description="People who pressed anything in the popup.")
+
+
+class ExtReviewStats(BaseModel):
+    """The store-review card in the job panel: shown, and what people chose."""
+
+    asked: int
+    asked_users: int
+    # By `answer`: review, feedback, later, never. Shown but closed without a choice is the gap.
+    answers: list[ExtCountRow]
+
+
 class ExtAiStats(BaseModel):
     requested: int
     succeeded: int
@@ -233,6 +262,8 @@ class ExtAnalytics(BaseModel):
     funnel: list[ExtFunnelStep]
     features: list[ExtFeatureRow]
     ai: ExtAiStats
+    popup: ExtPopupStats
+    reviews: ExtReviewStats
     sites: list[ExtSiteRow]
     errors: list[ExtErrorRow]
 

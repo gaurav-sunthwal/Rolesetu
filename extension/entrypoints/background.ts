@@ -2,7 +2,10 @@ import { fitJob, fitUrl, type JobRequest, messageFor, UNREACHABLE } from '@/lib/
 import { type Badge, badgeForMatch, NO_BADGE, NOT_CONNECTED_BADGE } from '@/lib/badge';
 import { API_BASE_URL, DASHBOARD_URL, SETUP_PATH } from '@/lib/config';
 import type {
+  ActivityYear,
+  ApplicationStats,
   AutofillData,
+  Credits,
   DetectedJob,
   Failure,
   KeywordCheck,
@@ -13,6 +16,7 @@ import type {
   ReusedAnswer,
   Request,
   Result,
+  Summary,
   Tailored,
   TrackedJob,
 } from '@/lib/messages';
@@ -28,7 +32,17 @@ import { record, enqueue, flush as flushAnalytics, startAnalytics } from '@/lib/
 import { watchErrors } from '@/lib/analytics';
 import { pendingApply } from '@/lib/session-storage';
 import { installInfo, ownInstallId } from '@/lib/install';
-import { accessKey, analyticsOff } from '@/lib/storage';
+import {
+  applications,
+  countEvents,
+  FRESH_REVIEW_STATE as FRESH,
+  markAnswered,
+  markAsked,
+  type ReviewState,
+  shouldAsk,
+} from '@/lib/review-ask';
+import { accessKey, analyticsOff, reviewState, savedSummary } from '@/lib/storage';
+import { needsRefresh } from '@/lib/summary-cache';
 
 const NOT_CONNECTED: Failure = {
   ok: false,
@@ -266,12 +280,16 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
         body: JSON.stringify({ questions: request.questions }),
       });
 
-    case 'ai-answer':
-      return api<AiAnswer>(
+    case 'ai-answer': {
+      const answered = await api<AiAnswer>(
         '/extension/ai-answers',
         { method: 'POST', body: JSON.stringify(request.request) },
         true,
       );
+      // AI answers spend credits, which the popup shows.
+      if (answered.ok) await markSummaryStale();
+      return answered;
+    }
 
     case 'pitch-answers':
       return api<PitchAnswer[]>('/extension/pitch-answers', {
@@ -317,11 +335,16 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
               checkJob(job),
             );
       if (sender.tab?.id !== undefined) await showBadge(badgeForMatch(result), sender.tab.id);
+      // A new check shows in the popup's grid at once.
+      if (result.ok) await markSummaryStale();
       return result;
     }
 
-    case 'record-application':
-      return recordApplication(request.job, request.status);
+    case 'record-application': {
+      const recorded = await recordApplication(request.job, request.status);
+      if (recorded.ok) await markSummaryStale();
+      return recorded;
+    }
 
     case 'pending-apply':
       if (request.action === 'set') await pendingApply.setValue(request.value);
@@ -334,10 +357,99 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return { ok: true, data: null };
 
     case 'track-events':
+      // Counted for the review ask first: that works with usage sharing off too.
+      await updateReview((state) => countEvents(state, request.events, Date.now()));
       // Kept by the background worker and sent in batches (see analytics-queue.ts).
       await enqueue(request.events);
       return { ok: true, data: null };
+
+    case 'summary': {
+      const saved = await savedSummary.getValue();
+      const due = needsRefresh(saved, request.timezone, Date.now());
+      if (!request.refresh || !due) {
+        return { ok: true, data: saved && { summary: saved.summary, savedAt: saved.savedAt, due } };
+      }
+      const fresh = await refreshSummary(request.timezone);
+      if (fresh.ok) return { ok: true, data: { summary: fresh.data, savedAt: Date.now(), due: false } };
+      // Offline or the server is asleep: the saved numbers are better than none.
+      return saved ? { ok: true, data: { summary: saved.summary, savedAt: saved.savedAt, due: true } } : fresh;
+    }
+
+    case 'review-ask': {
+      if (request.action === 'shown') {
+        const state = await updateReview((current) => markAsked(current, Date.now()));
+        record('review_asked', { count: applications(state), props: { ask: state.asks } });
+      } else if (request.action === 'answer') {
+        await updateReview((current) => markAnswered(current, request.answer));
+        record('review_answered', { props: { answer: request.answer } });
+      }
+      const state = await reviewState.getValue();
+      // Only the Chrome Web Store link exists so far: Firefox users are not asked.
+      const ask = !import.meta.env.FIREFOX && shouldAsk(state, Date.now());
+      return { ok: true, data: { ask, applications: applications(state) } };
+    }
   }
+}
+
+// One fetch at a time: a second popup (or a quick reopen) waits for the same one.
+let summaryInFlight: Promise<Result<Summary>> | null = null;
+
+function refreshSummary(timezone: string): Promise<Result<Summary>> {
+  summaryInFlight ??= summary(timezone)
+    .then(async (result) => {
+      if (result.ok) {
+        await savedSummary.setValue({ summary: result.data, savedAt: Date.now(), timezone, stale: false });
+      }
+      return result;
+    })
+    .finally(() => {
+      summaryInFlight = null;
+    });
+  return summaryInFlight;
+}
+
+/** Shown as it is next time, but fetched again: these numbers just changed. */
+async function markSummaryStale(): Promise<void> {
+  const saved = await savedSummary.getValue();
+  if (saved && !saved.stale) await savedSummary.setValue({ ...saved, stale: true });
+}
+
+/**
+ * The popup's overview: the activity grid and streak, application counts and AI
+ * credits, read together. A part that fails is left out rather than failing the
+ * whole popup; only when every part fails (offline, signed out) is it an error.
+ */
+async function summary(timezone: string): Promise<Result<Summary>> {
+  const [activity, stats, credits] = await Promise.all([
+    api<ActivityYear>(`/activity/me?tz=${encodeURIComponent(timezone)}`, {}, true),
+    api<ApplicationStats>('/applications/stats', {}, true),
+    api<Credits>('/credits/me', {}, true),
+  ]);
+  if (!activity.ok && !stats.ok && !credits.ok) return activity;
+  return {
+    ok: true,
+    data: {
+      activity: activity.ok ? activity.data : null,
+      stats: stats.ok ? stats.data : null,
+      credits: credits.ok ? credits.data : null,
+    },
+  };
+}
+
+// Messages arrive together (a page's batch, the popup): changes to the review
+// counts are made one after another so none is lost.
+let reviewChain: Promise<ReviewState> = Promise.resolve(FRESH);
+
+function updateReview(change: (state: ReviewState) => ReviewState): Promise<ReviewState> {
+  reviewChain = reviewChain
+    .catch(() => FRESH)
+    .then(async () => {
+      const before = await reviewState.getValue();
+      const after = change(before);
+      if (after !== before) await reviewState.setValue(after);
+      return after;
+    });
+  return reviewChain;
 }
 
 /** Sets the toolbar badge for one tab, or for every tab without its own when no tab is given. */
@@ -440,6 +552,8 @@ export default defineBackground(() => {
   watchErrors('background', self, (name, payload) => record(name, payload));
   void setUninstallPage();
   analyticsOff.watch(() => void setUninstallPage());
+  // The saved popup numbers belong to the account they were fetched for.
+  accessKey.watch(() => void savedSummary.removeValue());
   // Sent as the connected user. Before connecting, sent as this install, so the
   // steps of people who never sign in are seen too.
   startAnalytics(async (events) => {
