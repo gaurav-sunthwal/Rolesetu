@@ -6,6 +6,7 @@ import {
   type ApplyMode,
   applyResume,
   deleteResume,
+  fillFromResume,
   getLatestResume,
   type Resume,
   uploadResume,
@@ -14,7 +15,12 @@ import {
 const latestKey = ['resume', 'latest'] as const;
 
 export function useLatestResume() {
-  return useQuery({ queryKey: latestKey, queryFn: getLatestResume });
+  return useQuery({
+    queryKey: latestKey,
+    queryFn: getLatestResume,
+    // While the AI is still reading it in the background, look again shortly.
+    refetchInterval: (query) => (query.state.data?.ai_status === 'pending' ? 2000 : false),
+  });
 }
 
 export function useUploadResume() {
@@ -26,6 +32,23 @@ export function useUploadResume() {
       return uploadResume(file, setProgress);
     },
     onSuccess: (resume) => queryClient.setQueryData<Resume | null>(latestKey, resume),
+  });
+  return { ...mutation, progress };
+}
+
+/** Upload and fill the profile in one go: for an empty profile, nothing to ask. */
+export function useFillFromResume() {
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState(0);
+  const mutation = useMutation({
+    mutationFn: (file: File) => {
+      setProgress(0);
+      return fillFromResume(file, setProgress);
+    },
+    onSuccess: ({ resume, profile }) => {
+      queryClient.setQueryData<Resume | null>(latestKey, resume);
+      queryClient.setQueryData(profileKeys.profile, profile);
+    },
   });
   return { ...mutation, progress };
 }

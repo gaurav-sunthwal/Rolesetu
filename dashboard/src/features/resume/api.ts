@@ -50,6 +50,22 @@ export async function uploadResume(
   return data;
 }
 
+/** Uploads the resume and fills the profile from it in one request (onboarding). */
+export async function fillFromResume(
+  file: File,
+  onProgress: (fraction: number) => void,
+): Promise<ResumeApplied> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<ResumeApplied>('/resume/fill', form, {
+    timeout: 90_000,
+    onUploadProgress: (event) => {
+      if (event.total) onProgress(event.loaded / event.total);
+    },
+  });
+  return data;
+}
+
 export async function applyResume(id: string, mode: ApplyMode): Promise<ResumeApplied> {
   const { data } = await api.post<ResumeApplied>(`/resume/${id}/apply`, { mode });
   return data;

@@ -187,6 +187,47 @@
     }
   }
 
+  /* A light sweeping down a page while a resume is read. */
+  @keyframes resume-scan {
+    0% {
+      transform: translateY(-30%);
+      opacity: 0;
+    }
+    15%,
+    85% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(330%);
+      opacity: 0;
+    }
+  }
+  .resume-scan {
+    animation: resume-scan 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+
+  /* Details read from a resume arriving one after another. */
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.96);
+    }
+  }
+  .pop-in {
+    animation: pop-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--pop-delay, 0ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .resume-scan {
+      animation: none;
+      opacity: 0;
+    }
+    .pop-in {
+      animation: none;
+    }
+  }
+
   /* Tied to the scroll position itself, where the browser supports it. */
   @supports (animation-timeline: scroll()) {
     @keyframes header-edge {

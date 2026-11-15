@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { readPendingJob } from '@/features/preview/pending-job';
-import { applyResume, uploadResume } from '@/features/resume/api';
+import { fillFromResume } from '@/features/resume/api';
+import { type ReadingStep, ResumeReading } from '@/features/resume/components/resume-reading';
 import { type ReadResume, ResumeStart } from '@/features/resume-signup/components/resume-start';
 import { errorMessage } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
@@ -102,6 +103,8 @@ function Login({ initialMode }: { initialMode: Mode }) {
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [googlePending, setGooglePending] = useState(false);
   const [savingResume, setSavingResume] = useState(false);
+  const [savingStep, setSavingStep] = useState<ReadingStep>('uploading');
+  const [uploadProgress, setUploadProgress] = useState(0);
   // While a resume is being saved after sign-in, this page does the redirect
   // itself once the profile is filled, not the moment the account exists.
   const holdRedirect = useRef(false);
@@ -161,10 +164,15 @@ function Login({ initialMode }: { initialMode: Mode }) {
   /** Signed in: save the resume, fill the profile from it, then move on. */
   async function saveResume(file: File, isNewUser: boolean) {
     setSavingResume(true);
+    setSavingStep('uploading');
     try {
-      const resume = await uploadResume(file, () => undefined);
-      // Merge fills an empty profile completely and keeps a returning user's edits.
-      await applyResume(resume.id, 'merge');
+      // One request: the resume is stored and the profile filled from it. Merge
+      // fills an empty profile completely and keeps a returning user's edits.
+      await fillFromResume(file, (progress) => {
+        setUploadProgress(progress);
+        if (progress >= 1) setSavingStep('reading');
+      });
+      setSavingStep('building');
       toast.success(
         isNewUser
           ? 'Your profile is ready. We filled it in from your resume.'
@@ -241,13 +249,7 @@ function Login({ initialMode }: { initialMode: Mode }) {
   if (savingResume) {
     return (
       <Shell>
-        <div className="flex flex-col items-center gap-3 py-8 text-center" role="status">
-          <span className="border-muted-foreground/30 border-t-primary size-6 animate-spin rounded-full border-2 motion-reduce:animate-none" />
-          <p className="font-medium">Building your profile…</p>
-          <p className="text-muted-foreground text-sm">
-            Adding your skills, roles, projects and education from your resume.
-          </p>
-        </div>
+        <ResumeReading step={savingStep} progress={uploadProgress} className="border-0 p-0" />
       </Shell>
     );
   }

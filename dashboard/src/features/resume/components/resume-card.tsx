@@ -17,8 +17,10 @@ import {
   useApplyResume,
   useDeleteResume,
   useLatestResume,
+  useFillFromResume,
   useUploadResume,
 } from '@/features/resume/hooks';
+import { ResumeReading } from '@/features/resume/components/resume-reading';
 import { errorMessage } from '@/lib/api/client';
 import { isProfileEmpty } from '@/features/welcome/state';
 import type { Profile } from '@/lib/api/types';
@@ -45,6 +47,7 @@ function summaryOf(parsed: NonNullable<Resume['parsed']>): string {
 export function ResumeCard({ profile, onApplied }: { profile: Profile; onApplied: () => void }) {
   const resume = useLatestResume();
   const upload = useUploadResume();
+  const fill = useFillFromResume();
   const apply = useApplyResume();
   const remove = useDeleteResume();
 
@@ -99,6 +102,19 @@ export function ResumeCard({ profile, onApplied }: { profile: Profile; onApplied
     const issue = fileProblem(file);
     setProblem(issue);
     if (issue) return;
+    // Nothing on the profile yet: upload and fill it in one request.
+    if (isProfileEmpty(profile)) {
+      fill.mutate(file, {
+        onSuccess: ({ resume: filled }) => {
+          autoApplied.current = filled.id;
+          if (filled.parsed)
+            toast.success(`Profile filled from your resume: ${summaryOf(filled.parsed)}`);
+          onApplied();
+        },
+        onError: (error) => setProblem(errorMessage(error)),
+      });
+      return;
+    }
     upload.mutate(file, { onError: (error) => setProblem(errorMessage(error)) });
   }
 
@@ -131,31 +147,14 @@ export function ResumeCard({ profile, onApplied }: { profile: Profile; onApplied
 
   if (resume.isPending) return <Skeleton className="h-36 rounded-3xl" />;
 
-  const busy = upload.isPending || apply.isPending;
+  const busy = upload.isPending || apply.isPending || fill.isPending;
   if (busy) {
-    const label = !upload.isPending
-      ? 'Filling in your profile…'
-      : upload.progress < 1
-        ? `Uploading… ${Math.round(upload.progress * 100)}%`
-        : 'Reading your resume…';
+    const sending = upload.isPending ? upload : fill.isPending ? fill : null;
     return (
-      <section aria-live="polite" className="bg-card rounded-3xl border p-6">
-        <div className="flex items-center gap-4">
-          <div className="border-secondary border-t-primary size-9 shrink-0 animate-spin rounded-full border-4 motion-reduce:animate-none" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">{label}</p>
-            <p className="text-muted-foreground text-sm">This takes a few seconds.</p>
-          </div>
-        </div>
-        {upload.isPending ? (
-          <div className="bg-secondary mt-4 h-1.5 overflow-hidden rounded-full">
-            <div
-              className="bg-primary h-full rounded-full transition-[width] motion-reduce:transition-none"
-              style={{ width: `${Math.round(upload.progress * 100)}%` }}
-            />
-          </div>
-        ) : null}
-      </section>
+      <ResumeReading
+        step={!sending ? 'building' : sending.progress < 1 ? 'uploading' : 'reading'}
+        progress={sending?.progress ?? 1}
+      />
     );
   }
 
