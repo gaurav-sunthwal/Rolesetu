@@ -308,6 +308,14 @@ function sameTitle(first: string, second: string): boolean {
   return plain(first) === plain(second);
 }
 
+/** Whether a job title is this page's own: its main heading, or the start of its tab title. */
+export function namesThisPage(title: string, mainHeading: string, tabTitle: string): boolean {
+  const plain = (value: string) => value.replace(TITLE_EXTRA, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const wanted = plain(title);
+  if (wanted.length < 3) return false;
+  return plain(mainHeading) === wanted || plain(tabTitle).startsWith(wanted);
+}
+
 /** Whether these words can be read somewhere on the page. */
 function appearsOnPage(doc: Document, words: string): boolean {
   const page = (doc.body?.innerText ?? '').replace(/\s+/g, ' ').toLowerCase();
@@ -485,7 +493,11 @@ export function detectJob(doc: Document, url: string, strict = false): DetectedJ
   let structured = fromStructuredData(doc);
   if (structured?.title) {
     const stale = seen ? !sameTitle(structured.title, seen.title) : !appearsOnPage(doc, structured.title);
-    if (stale) structured = null;
+    // A heading near the Apply button is not always the job's (Kula puts "Life at
+    // slice:" there). Data whose title is the page's own main heading, or opens
+    // its tab title, is about this page whatever sits beside the button.
+    const mainHeading = doc.querySelector('h1')?.textContent ?? '';
+    if (stale && !namesThisPage(structured.title, mainHeading, doc.title)) structured = null;
   }
 
   const pane = fromPane(seen?.pane ?? null, strict);

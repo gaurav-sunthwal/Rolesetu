@@ -36,7 +36,8 @@ export type PendingApply = TrackedJob & { startedAt: number };
 /** Requests a page or the popup can make of the background worker. */
 export type Request =
   | { type: 'connection' }
-  | { type: 'activate'; found?: 'job' | 'form' }
+  | { type: 'activate'; found?: 'job' | 'form'; frame?: 'top' }
+  | { type: 'frame-job'; strict: boolean }
   | { type: 'autofill-data' }
   | { type: 'learn-answers'; answers: LearnedAnswer[] }
   | { type: 'forget-answer'; key: string }
@@ -60,6 +61,7 @@ export type Result<T> = { ok: true; data: T } | Failure;
 export type Responses = {
   connection: Result<{ connected: boolean }>;
   activate: Result<null>;
+  'frame-job': Result<DetectedJob | null>;
   'autofill-data': Result<AutofillData>;
   'learn-answers': Result<LearnedAnswerRead[]>;
   'forget-answer': Result<null>;

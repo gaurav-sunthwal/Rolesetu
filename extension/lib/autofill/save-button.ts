@@ -15,6 +15,7 @@
  * The bar lives in a shadow root, so the host page's styles cannot reach it and
  * its own cannot leak into the page.
  */
+import { followModalDialogs } from '@/lib/top-layer';
 
 import { type Field, findFields, hasApplicationForm, isSearchLike, keyForQuestion } from './fields';
 import { type JobNames, markDraft, setText, type Suggestion, templateParts } from './fill';
@@ -294,6 +295,8 @@ export function attachSaveButtons(
   jobNames: () => JobNames,
 ): () => void {
   const { host, bar, suggest: pill, ai, save, note } = makeBar();
+  // Inside a modal application form, the bar must live in the dialog to be seen.
+  const stopFollowing = followModalDialogs(host, document.documentElement);
 
   // `ai`: whether the box has a reason for AI, worked out once per focus.
   let active: { el: TextField; info: FieldInfo; ai: boolean } | null = null;
@@ -544,6 +547,7 @@ export function attachSaveButtons(
     document.removeEventListener('input', onInput, true);
     window.removeEventListener('scroll', reposition, true);
     window.removeEventListener('resize', reposition);
+    stopFollowing();
     host.remove();
   };
 }

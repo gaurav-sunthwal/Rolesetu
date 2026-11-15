@@ -139,9 +139,20 @@ async function findJob(strict: boolean): Promise<DetectedJob | null> {
   for (let attempt = 0; attempt < DETECT_ATTEMPTS; attempt += 1) {
     const job = detectJob(document, window.location.href, strict);
     if (job) return job;
+    // Career pages often embed their job board in a frame (slice uses Kula): the
+    // job is there, not on this page, so the frames are asked for it.
+    const framed = await jobInFrames(strict);
+    if (framed) return framed;
     await wait(DETECT_EVERY_MS);
   }
   return null;
+}
+
+/** The job shown in an embedded frame on this page, if there is one. */
+async function jobInFrames(strict: boolean): Promise<DetectedJob | null> {
+  if (!document.querySelector('iframe')) return null;
+  const answer = await ask({ type: 'frame-job', strict });
+  return answer.ok ? answer.data : null;
 }
 
 function trackedJobOf(job: DetectedJob, match: Match): TrackedJob {
@@ -670,6 +681,11 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       lastLook = Date.now();
       const job = detectJob(document, window.location.href, !manual);
       if (sameJob(shown.current, job)) return;
+      // The job on show came from an embedded job board's frame, and this page
+      // itself still has none: nothing changed that this page can see.
+      if (job === null && shown.current !== null && shown.current.url !== window.location.href) {
+        return;
+      }
       // An updated resume was for the previous job: it does not carry over,
       // and neither does one still being made for it.
       shown.current = job;

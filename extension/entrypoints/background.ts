@@ -3,6 +3,7 @@ import { type Badge, badgeForMatch, NO_BADGE, NOT_CONNECTED_BADGE } from '@/lib/
 import { API_BASE_URL, DASHBOARD_URL, SETUP_PATH } from '@/lib/config';
 import type {
   AutofillData,
+  DetectedJob,
   Failure,
   KeywordCheck,
   LearnedAnswerRead,
@@ -181,12 +182,30 @@ function hostOf(url: string | undefined): string | undefined {
 }
 
 /** Loads the score and autofill UI into the frame whose detector found something. */
-async function activate(sender: Browser.runtime.MessageSender): Promise<Result<null>> {
+function isDetectedJob(value: unknown): value is DetectedJob {
+  if (typeof value !== 'object' || value === null) return false;
+  const job = value as Record<string, unknown>;
+  return (
+    typeof job.description === 'string' &&
+    job.description.length > 0 &&
+    typeof job.url === 'string' &&
+    (job.title === null || typeof job.title === 'string') &&
+    (job.company === null || typeof job.company === 'string')
+  );
+}
+
+async function activate(
+  sender: Browser.runtime.MessageSender,
+  frame?: 'top',
+): Promise<Result<null>> {
   const tabId = sender.tab?.id;
   if (tabId === undefined) return { ok: false, status: null, message: 'No page to show this on.' };
   try {
     await browser.scripting.executeScript({
-      target: { tabId, frameIds: [sender.frameId ?? 0] },
+      // A job inside an embedded job board is shown on the page around it: a
+      // frame is often as tall as its content, so a panel pinned inside it could
+      // sit far below the screen. The panel reads the job from the frame.
+      target: { tabId, frameIds: [frame === 'top' ? 0 : (sender.frameId ?? 0)] },
       files: ['/content-scripts/job.js'],
     });
     return { ok: true, data: null };
@@ -198,9 +217,25 @@ async function activate(sender: Browser.runtime.MessageSender): Promise<Result<n
 async function handle(request: Request, sender: Browser.runtime.MessageSender): Promise<unknown> {
   switch (request.type) {
     case 'activate': {
-      const activated = await activate(sender);
+      const activated = await activate(sender, request.frame);
       if (activated.ok && request.found) record(`${request.found}_detected`, {}, hostOf(sender.tab?.url));
       return activated;
+    }
+
+    case 'frame-job': {
+      // Asks the frames of the sender's tab (embedded job boards) for a job. Only
+      // a frame that finds one answers; with none, nothing comes back.
+      const tabId = sender.tab?.id;
+      if (tabId === undefined) return { ok: true, data: null };
+      try {
+        const found: unknown = await browser.tabs.sendMessage(tabId, {
+          type: 'read-job',
+          strict: request.strict,
+        });
+        return { ok: true, data: isDetectedJob(found) ? found : null };
+      } catch {
+        return { ok: true, data: null };
+      }
     }
 
     case 'autofill-data':

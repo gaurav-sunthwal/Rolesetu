@@ -2,6 +2,7 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { ALL_SITES } from '@/lib/config';
 
+import { followModalDialogs } from '@/lib/top-layer';
 import { watchErrors } from '@/lib/analytics';
 
 import { App } from './App';
@@ -48,10 +49,14 @@ export default defineContentScript({
         return root;
       },
       onRemove(root) {
+        stopFollowing?.();
         root?.unmount();
         window.__rolesetuMounted = false;
       },
     });
     ui.mount();
+    // A modal application form (a <dialog>) would hide the panel and its buttons:
+    // while one is open, the panel lives inside it.
+    const stopFollowing = followModalDialogs(ui.shadowHost, document.body);
   },
 });

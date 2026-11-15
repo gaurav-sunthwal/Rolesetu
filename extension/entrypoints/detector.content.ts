@@ -32,8 +32,21 @@ export default defineContentScript({
       const found = form ? 'form' : detectJob(document, window.location.href, true) !== null ? 'job' : null;
       if (!found) return;
       asked = true;
-      void ask({ type: 'activate', found });
+      // A form is filled where it is, so the UI goes into its frame. A job inside an
+      // embedded job board is shown on the page around it, which reads it from here.
+      void ask({ type: 'activate', found, frame: found === 'job' && inFrame ? 'top' : undefined });
     };
+
+    // The page around an embedded job board asks its frames for the job on show.
+    if (inFrame) {
+      browser.runtime.onMessage.addListener((message: unknown) => {
+        const asking = message as { type?: unknown; strict?: unknown } | null;
+        if (asking?.type !== 'read-job') return undefined;
+        const job = detectJob(document, window.location.href, asking.strict === true);
+        // Only a frame with a job answers, so the first answer is the job.
+        return job ? Promise.resolve(job) : undefined;
+      });
+    }
 
     look();
     // Many pages draw the listing after they load.
