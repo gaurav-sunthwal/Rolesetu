@@ -67,7 +67,7 @@ export type Request =
   | { type: 'pending-apply'; action: 'set'; value: PendingApply }
   | { type: 'pending-apply'; action: 'clear' }
   /** `from` says where setup was opened from, for the install funnel (the popup if unset). */
-  | { type: 'open-dashboard'; path: string; from?: 'job_preview' | 'job_panel' }
+  | { type: 'open-dashboard'; path: string; from?: 'job_preview' | 'job_panel' | 'sign_in_ask' }
   | { type: 'track-events'; events: TrackedEvent[] }
   /** `refresh: false` answers from the saved copy only; `true` fetches when it is due. */
   | { type: 'summary'; timezone: string; refresh: boolean }

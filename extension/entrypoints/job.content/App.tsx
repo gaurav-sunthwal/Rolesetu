@@ -21,6 +21,7 @@ import { projectedScore } from '@/lib/projected-score';
 import { sameJob } from '@/lib/same-job';
 import { whenSettled } from '@/lib/settled';
 import { SETUP_PATH } from '@/lib/config';
+import { accessKey } from '@/lib/storage';
 import { Mark } from '@/lib/mark';
 import {
   ask,
@@ -590,6 +591,12 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // Kept here, above the panel, so closing and reopening the panel does not lose
   // an updated resume the user has not downloaded or saved yet.
   const [tailoring, setTailoring] = useState<Tailoring>({ name: 'idle' });
+  // The sign-in prompt, shown when someone not yet connected asks for their score.
+  const [asking, setAsking] = useState(false);
+  const askToSignIn = useCallback(() => {
+    track('panel_opened', { props: { view: 'sign_in_ask' } });
+    setAsking(true);
+  }, []);
 
   // Not connected yet: show what the job asks for, free, so the first job page
   // already gives something. If even that fails, fall back to asking to connect.
@@ -642,6 +649,18 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       else setPhase({ name: 'error', message: result.message });
     },
     [ctx, manual, showPreview],
+  );
+
+  // Signed in from the prompt in another tab: score the job on this one, so the
+  // score is waiting when they come back.
+  useEffect(
+    () =>
+      accessKey.watch((key, before) => {
+        if (key === null || before !== null) return;
+        setAsking(false);
+        void check();
+      }),
+    [check],
   );
 
   // The page text failed. A pasted link is read by the server through Context.dev,
@@ -751,7 +770,8 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       setPills(0);
       return;
     }
-    const place = () => setPills(showApplyPills(state, () => setOpen(true)));
+    const onPill = phase.name === 'preview' ? askToSignIn : () => setOpen(true);
+    const place = () => setPills(showApplyPills(state, onPill));
     place();
 
     // While scoring, the pill counts the seconds without being rebuilt.
@@ -783,7 +803,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       replace.cancel();
       removeApplyPills();
     };
-  }, [phase]);
+  }, [phase, askToSignIn]);
 
   const autofill = useAutofill(ctx);
 
@@ -850,8 +870,21 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
         />
       ) : pills > 0 ? null : (
         // No Apply button to attach to (or nothing to show there): float instead.
-        <Badge phase={phase} onOpen={() => setOpen(true)} />
+        <Badge
+          phase={phase}
+          onOpen={phase.name === 'preview' ? askToSignIn : () => setOpen(true)}
+        />
       )}
+      {asking && phase.name === 'preview' ? (
+        <SignInAsk
+          preview={phase.preview}
+          onClose={() => setAsking(false)}
+          onSkills={() => {
+            setAsking(false);
+            setOpen(true);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -937,6 +970,80 @@ function Preview({ preview }: { preview: JobPreview }) {
       >
         See my match score
       </button>
+    </div>
+  );
+}
+
+/**
+ * Asked for a score without an account: the one step between this person and
+ * their score, said plainly, with the way back to just the skills.
+ */
+function SignInAsk({
+  preview,
+  onClose,
+  onSkills,
+}: {
+  preview: JobPreview;
+  onClose: () => void;
+  onSkills: () => void;
+}) {
+  const primary = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    primary.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const asked = preview.required_skills.length;
+  const job = [preview.title, preview.company].filter(Boolean).join(' · ');
+  return (
+    <div className="ask-backdrop" onClick={onClose}>
+      <section
+        className="ask"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rolesetu-ask-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button type="button" className="icon ask-close" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
+        <div className="ask-lock" aria-hidden>
+          ?%
+        </div>
+        <h2 id="rolesetu-ask-title">See how well you fit this job</h2>
+        {job ? <p className="muted small ask-job">{job}</p> : null}
+        <p className="ask-lead">
+          {asked > 0
+            ? `This job asks for ${asked} skill${asked === 1 ? '' : 's'}. Sign in to see which ones you already have.`
+            : 'Sign in to see your match score for this job.'}
+        </p>
+        <ul className="ask-points">
+          <li>Your match score on every job page</li>
+          <li>The skills you are missing, and how to add them</li>
+          <li>Application forms filled in for you</li>
+        </ul>
+        <button
+          ref={primary}
+          type="button"
+          className="btn primary wide"
+          onClick={() => {
+            onClose();
+            void ask({ type: 'open-dashboard', path: SETUP_PATH, from: 'sign_in_ask' });
+          }}
+        >
+          Sign in free
+        </button>
+        <p className="muted small ask-note">
+          Takes about a minute. Come back to this tab and your score will be waiting.
+        </p>
+        <button type="button" className="ask-skip" onClick={onSkills}>
+          Just show me the skills
+        </button>
+      </section>
     </div>
   );
 }

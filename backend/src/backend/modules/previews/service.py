@@ -141,4 +141,5 @@ async def _preview_text(
             url_hash=_url_hash(url), client_hash=client_hash, host=_host(url), reader=PAGE_TEXT
         )
     )
+    await repository.delete_older_than(db, now - FRESH_FOR)
     return _to_read(url, page)

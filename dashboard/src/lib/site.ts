@@ -55,7 +55,7 @@ export const SITE = {
     'experience requirement checker',
   ],
   // The day the public pages last changed. Bump it when their content does.
-  updated: '2026-11-14',
+  updated: '2026-11-21',
 } as const;
 
 export function absoluteUrl(path: string): string {
