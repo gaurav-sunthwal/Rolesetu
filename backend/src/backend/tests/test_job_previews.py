@@ -98,3 +98,70 @@ async def test_signing_in_after_a_preview_does_not_fetch_the_page_again(
 
 async def test_a_link_is_required(visitor: AsyncClient) -> None:
     assert (await visitor.post(PREVIEWS, json={"url": "  "})).status_code == 422
+
+
+JOB_TEXT = (
+    "We are hiring a Backend Engineer to build APIs in Python with FastAPI and PostgreSQL. "
+    "You will deploy services on AWS with Docker and write tests with pytest. "
+    "Nice to have: experience with React and Kubernetes. "
+    "At least 2 years of professional experience building web services is required."
+)
+
+
+async def test_the_extension_sends_the_job_text_and_the_link_is_not_fetched(
+    visitor: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    readers = use_readers(monkeypatch, page_with(POSTING))
+    response = await visitor.post(
+        PREVIEWS,
+        json={
+            "url": job_url(),
+            "description": JOB_TEXT,
+            "title": "Backend Engineer",
+            "company": "Acme",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "Backend Engineer"
+    assert body["company"] == "Acme"
+    assert {"Python", "FastAPI", "PostgreSQL"} <= set(
+        body["required_skills"] + body["nice_to_have_skills"]
+    )
+    assert readers.direct_calls == 0
+
+
+async def test_text_from_one_visitor_is_never_shown_for_that_link_to_another(
+    visitor: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    readers = use_readers(monkeypatch, page_with(POSTING))
+    url = job_url()
+    await visitor.post(PREVIEWS, json={"url": url, "description": JOB_TEXT, "title": "Fake title"})
+    other = await visitor.post(
+        PREVIEWS, json={"url": url}, headers={"x-forwarded-for": "198.51.100.9"}
+    )
+    assert other.json()["title"] == "Full Stack AI Developer - Fresher (WFH)"
+    assert readers.direct_calls == 1
+
+
+async def test_text_previews_have_their_own_limit_and_spare_the_link_limit(
+    visitor: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_readers(monkeypatch, page_with(POSTING))
+    monkeypatch.setattr(previews_service, "MAX_TEXT_PREVIEWS_PER_HOUR", 2)
+    monkeypatch.setattr(previews_service, "MAX_PREVIEWS_PER_HOUR", 1)
+    sent = {"description": JOB_TEXT}
+    assert (await visitor.post(PREVIEWS, json={"url": job_url(), **sent})).status_code == 200
+    assert (await visitor.post(PREVIEWS, json={"url": job_url(), **sent})).status_code == 200
+    assert (await visitor.post(PREVIEWS, json={"url": job_url(), **sent})).status_code == 429
+    # Links are still allowed: the text previews did not use them up.
+    assert (await visitor.post(PREVIEWS, json={"url": job_url()})).status_code == 200
+
+
+async def test_too_little_text_falls_back_to_reading_the_link(
+    visitor: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    readers = use_readers(monkeypatch, page_with(POSTING))
+    response = await visitor.post(PREVIEWS, json={"url": job_url(), "description": "See more"})
+    assert response.status_code == 200
+    assert readers.direct_calls == 1

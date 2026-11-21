@@ -20,11 +20,13 @@ import { detectJob } from '@/lib/job-detect';
 import { projectedScore } from '@/lib/projected-score';
 import { sameJob } from '@/lib/same-job';
 import { whenSettled } from '@/lib/settled';
+import { SETUP_PATH } from '@/lib/config';
 import { Mark } from '@/lib/mark';
 import {
   ask,
   type AutofillData,
   type DetectedJob,
+  type JobPreview,
   type KeywordCheck,
   type LearnedAnswerRead,
   type Match,
@@ -43,6 +45,8 @@ type Phase =
   | { name: 'looking' }
   | { name: 'no-job' }
   | { name: 'disconnected' }
+  | { name: 'previewing'; job: DetectedJob }
+  | { name: 'preview'; job: DetectedJob; preview: JobPreview }
   | { name: 'scoring'; job: DetectedJob; startedAt: number }
   | { name: 'ready'; job: DetectedJob; match: Match }
   | { name: 'error'; message: string };
@@ -87,6 +91,7 @@ function CheckingFit({ startedAt }: { startedAt: number }) {
 
 function pillFor(phase: Phase): PillState {
   if (phase.name === 'scoring') return { text: checkingLabel(phase.startedAt), color: '#9aa0ac' };
+  if (phase.name === 'preview') return { text: 'See your match score', color: '#2f5fe0' };
   if (phase.name !== 'ready') return null;
   const score = phase.match.score ?? 0;
   // Falling short on experience is said on the button itself: it matters more
@@ -586,6 +591,17 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // an updated resume the user has not downloaded or saved yet.
   const [tailoring, setTailoring] = useState<Tailoring>({ name: 'idle' });
 
+  // Not connected yet: show what the job asks for, free, so the first job page
+  // already gives something. If even that fails, fall back to asking to connect.
+  const showPreview = useCallback(async (job: DetectedJob, stale: () => boolean) => {
+    setPhase({ name: 'previewing', job });
+    const result = await ask({ type: 'preview-job', job });
+    if (stale()) return;
+    if (!result.ok) return setPhase({ name: 'disconnected' });
+    track('job_previewed', { count: result.data.required_skills.length });
+    setPhase({ name: 'preview', job, preview: result.data });
+  }, []);
+
   const check = useCallback(
     async (forceUrl = false) => {
       const id = (run.current += 1);
@@ -614,7 +630,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
 
       const connection = await ask({ type: 'connection' });
       if (stale()) return;
-      if (!connection.ok || !connection.data.connected) return setPhase({ name: 'disconnected' });
+      if (!connection.ok || !connection.data.connected) return showPreview(job, stale);
 
       setPhase({ name: 'scoring', job, startedAt: Date.now() });
       const result = await ask({ type: 'check-job', job });
@@ -625,7 +641,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       } else if (result.status === 401) setPhase({ name: 'disconnected' });
       else setPhase({ name: 'error', message: result.message });
     },
-    [ctx, manual],
+    [ctx, manual, showPreview],
   );
 
   // The page text failed. A pasted link is read by the server through Context.dev,
@@ -638,7 +654,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       shown.current = job;
       const connection = await ask({ type: 'connection' });
       if (stale()) return;
-      if (!connection.ok || !connection.data.connected) return setPhase({ name: 'disconnected' });
+      if (!connection.ok || !connection.data.connected) return showPreview(job, stale);
       setPhase({ name: 'scoring', job, startedAt: Date.now() });
       const result = await ask({ type: 'check-job', job });
       if (stale()) return;
@@ -646,7 +662,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
       else if (result.status === 401) setPhase({ name: 'disconnected' });
       else setPhase({ name: 'error', message: result.message });
     },
-    [ctx],
+    [ctx, showPreview],
   );
 
   // The profile changed (skills were added), so the same job is scored again
@@ -864,6 +880,67 @@ function Ring({ score, big }: { score: number; big?: boolean }) {
   );
 }
 
+/**
+ * Before the browser is connected: what the job asks for, read from the page,
+ * and the one step that turns it into a score for this person.
+ */
+function Preview({ preview }: { preview: JobPreview }) {
+  const required = preview.required_skills;
+  const nice = preview.nice_to_have_skills;
+  const years = preview.min_years_experience;
+  return (
+    <div className="body">
+      {preview.title ? <h2 className="preview-title">{preview.title}</h2> : null}
+      {preview.company ? <p className="muted small preview-company">{preview.company}</p> : null}
+      {years !== null && years !== undefined && years > 0 ? (
+        <p className="small">
+          Asks for {years}+ year{years === 1 ? '' : 's'} of experience
+        </p>
+      ) : null}
+      {required.length > 0 ? (
+        <>
+          <p className="group">Skills this job asks for</p>
+          <ul className="gaps">
+            {required.map((skill) => (
+              <li key={skill} className="chip static">
+                {skill}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="muted small">No specific skills listed on this page.</p>
+      )}
+      {nice.length > 0 ? (
+        <>
+          <p className="group">Nice to have</p>
+          <ul className="gaps">
+            {nice.map((skill) => (
+              <li key={skill} className="chip static">
+                {skill}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <div className="note preview-cta">
+        <strong>Which of these do you already have?</strong>
+        <p>
+          Add your resume once (free) and Rolesetu shows your match score, the skills you are
+          missing, and fills in application forms for you, on every job page.
+        </p>
+      </div>
+      <button
+        type="button"
+        className="btn primary wide"
+        onClick={() => void ask({ type: 'open-dashboard', path: SETUP_PATH, from: 'job_preview' })}
+      >
+        See my match score
+      </button>
+    </div>
+  );
+}
+
 function Badge({ phase, onOpen }: { phase: Phase; onOpen: () => void }) {
   if (phase.name === 'ready') {
     const score = phase.match.score ?? 0;
@@ -878,15 +955,34 @@ function Badge({ phase, onOpen }: { phase: Phase; onOpen: () => void }) {
       </button>
     );
   }
+  if (phase.name === 'preview') {
+    const asked = phase.preview.required_skills.length;
+    return (
+      <button type="button" className="badge" onClick={onOpen}>
+        <Mark />
+        <span>
+          <span className="label">
+            {asked > 0 ? `${asked} skill${asked === 1 ? '' : 's'} asked` : 'What this job asks'}
+          </span>
+          <br />
+          <span className="sub">See your match</span>
+        </span>
+      </button>
+    );
+  }
   const label =
     phase.name === 'scoring' ? (
       <CheckingFit startedAt={phase.startedAt} />
-    ) : phase.name === 'disconnected'
-        ? 'Connect Rolesetu'
-        : 'Could not score this job';
+    ) : phase.name === 'previewing' ? (
+      'Reading this job…'
+    ) : phase.name === 'disconnected' ? (
+      'Connect Rolesetu'
+    ) : (
+      'Could not score this job'
+    );
   return (
     <button type="button" className="badge" onClick={onOpen}>
-      {phase.name === 'scoring' ? <span className="spin" /> : <Mark />}
+      {phase.name === 'scoring' || phase.name === 'previewing' ? <span className="spin" /> : <Mark />}
       <span className="label">{label}</span>
     </button>
   );
@@ -919,7 +1015,9 @@ function Panel({
         </button>
       </header>
 
-      {phase.name === 'ready' ? (
+      {phase.name === 'preview' ? (
+        <Preview preview={phase.preview} />
+      ) : phase.name === 'ready' ? (
         <Result
           job={phase.job}
           match={phase.match}
@@ -930,11 +1028,13 @@ function Panel({
       ) : (
         <div className="body">
           <div className="center">
-            {phase.name === 'looking' || phase.name === 'scoring' ? (
+            {phase.name === 'looking' ||
+            phase.name === 'scoring' ||
+            phase.name === 'previewing' ? (
               <>
                 <span className="spin" />
                 <strong>
-                  {phase.name === 'looking' ? (
+                  {phase.name === 'looking' || phase.name === 'previewing' ? (
                     'Reading this page…'
                   ) : (
                     <CheckingFit startedAt={phase.startedAt} />
@@ -943,18 +1043,20 @@ function Panel({
               </>
             ) : phase.name === 'disconnected' ? (
               <>
-                <strong>Connect to your account</strong>
+                <strong>See how well you fit this job</strong>
                 <span className="muted">
-                  Open Rolesetu, go to Settings and press “Connect extension”. Then come back to
-                  this page.
+                  Sign in to Rolesetu (free) and add your resume once. Every job page then shows
+                  your match score.
                 </span>
                 <button
                   type="button"
                   className="btn primary"
                   style={{ flex: 'none', padding: '0 20px' }}
-                  onClick={() => void ask({ type: 'open-dashboard', path: '/app/settings' })}
+                  onClick={() =>
+                    void ask({ type: 'open-dashboard', path: SETUP_PATH, from: 'job_panel' })
+                  }
                 >
-                  Open Settings
+                  Set up Rolesetu
                 </button>
               </>
             ) : phase.name === 'no-job' ? (

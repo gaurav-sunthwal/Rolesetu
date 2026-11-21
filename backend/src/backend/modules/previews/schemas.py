@@ -5,6 +5,13 @@ from pydantic import BaseModel, StringConstraints
 
 class JobPreviewCreate(BaseModel):
     url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+    # Sent by the extension, which already has the job open: the skills are read
+    # from this text and the link is not fetched.
+    description: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=20000)] | None
+    ) = None
+    title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+    company: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
 
 
 class JobPreviewRead(BaseModel):

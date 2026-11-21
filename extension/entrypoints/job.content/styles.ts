@@ -109,6 +109,11 @@ ul { list-style: none; margin: 0; padding: 0; }
   font-size: 13px; font-weight: 500; }
 .chip:hover { border-color: var(--line); }
 .chip.on { background: var(--brand); color: #fff; }
+.chip.static { cursor: default; }
+.chip.static:hover { border-color: transparent; }
+.preview-title { margin: 0; font-size: 16px; line-height: 1.3; }
+.preview-company { margin: 2px 0 8px; }
+.preview-cta { margin-top: 16px; }
 .btn.wide { display: block; width: 100%; flex: none; margin-top: 12px; }
 .problem { margin: 10px 0 0; color: var(--bad); font-size: 13px; }
 .tailored { position: relative; margin-top: 14px; padding: 14px; border: 1px solid var(--line);

@@ -26,6 +26,8 @@ EventName = Literal[
     # What the extension found
     "job_detected",
     "form_detected",
+    # Before connecting: the skills a job asks for, shown without an account
+    "job_previewed",
     # The job panel
     "panel_opened",
     "job_scored",

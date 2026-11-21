@@ -15,5 +15,12 @@ async def preview_job(
     ip: str = Depends(client_ip),
     db: AsyncSession = Depends(get_db),
 ) -> JobPreviewRead:
-    """No sign-in needed: this is what the landing page calls."""
-    return await service.preview_job(db, url=payload.url, client_ip=ip)
+    """No sign-in needed: the landing page sends a link, the extension the job's text."""
+    return await service.preview_job(
+        db,
+        url=payload.url,
+        client_ip=ip,
+        description=payload.description,
+        title=payload.title,
+        company=payload.company,
+    )

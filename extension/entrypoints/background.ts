@@ -8,6 +8,7 @@ import type {
   Credits,
   DetectedJob,
   Failure,
+  JobPreview,
   KeywordCheck,
   LearnedAnswerRead,
   Match,
@@ -107,6 +108,37 @@ async function api<T>(path: string, init: RequestInit = {}, once = false): Promi
     return { ok: false, status: response.status, message: messageFor(502, null) };
   }
   return { ok: true, data: body as T };
+}
+
+/**
+ * What a job asks for, before the browser is connected: no account, no key. The
+ * page's own text is sent, so the server reads the skills from it without
+ * fetching the link (which sign-in walls often block).
+ */
+async function previewJob(job: DetectedJob): Promise<Result<JobPreview>> {
+  const fitted = fitJob(job);
+  if ('problem' in fitted) return { ok: false, status: 422, message: fitted.problem };
+  if (fitted.url === null) return { ok: false, status: 422, message: messageFor(422, null) };
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/public/job-previews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: fitted.url,
+        description: fitted.jd_text,
+        title: fitted.role,
+        company: fitted.company,
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok || body === null) {
+      return { ok: false, status: response.status, message: messageFor(response.status, body) };
+    }
+    return { ok: true, data: body as JobPreview };
+  } catch {
+    return { ok: false, status: null, message: UNREACHABLE };
+  }
 }
 
 type Application = { id: string; status: string };
@@ -340,6 +372,11 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return result;
     }
 
+    case 'preview-job': {
+      const key = await digest(request.job.description || request.job.url);
+      return cached(`preview:${key}`, JOB_FOR_MS, () => previewJob(request.job));
+    }
+
     case 'record-application': {
       const recorded = await recordApplication(request.job, request.status);
       if (recorded.ok) await markSummaryStale();
@@ -352,7 +389,9 @@ async function handle(request: Request, sender: Browser.runtime.MessageSender): 
       return { ok: true, data: await pendingApply.getValue() };
 
     case 'open-dashboard':
-      if (request.path === SETUP_PATH) record('setup_opened', { props: { why: 'popup', tab: 'new' } });
+      if (request.path === SETUP_PATH) {
+        record('setup_opened', { props: { why: request.from ?? 'popup', tab: 'new' } });
+      }
       await browser.tabs.create({ url: await dashboardUrl(request.path) });
       return { ok: true, data: null };
 

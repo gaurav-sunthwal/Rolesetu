@@ -28,7 +28,8 @@ class JobPreview(IdMixin, TimestampMixin, Base):
     host: Mapped[str | None] = mapped_column(default=None)
     # sha256 of the visitor's IP address; the address itself is never stored.
     client_hash: Mapped[str]
-    # "direct" or "rendered" (the paid reader was called). None if the link was never fetched.
+    # "direct" or "rendered" (the paid reader was called), "page text" when the
+    # extension sent the job's text. None if the link was never fetched.
     reader: Mapped[str | None] = mapped_column(default=None)
     # The job that was read, or None when the link could not be read.
     page: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)

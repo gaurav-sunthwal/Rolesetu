@@ -26,6 +26,7 @@ export type EventName =
   | 'form_detected'
   | 'panel_opened'
   | 'job_scored'
+  | 'job_previewed'
   | 'apply_clicked'
   | 'application_tracked'
   | 'autofill_offered'

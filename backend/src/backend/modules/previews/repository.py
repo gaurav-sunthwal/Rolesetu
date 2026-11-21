@@ -5,6 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.modules.previews.models import JobPreview
 
+# The reader recorded when the extension sent the job's text and no link was fetched.
+PAGE_TEXT = "page text"
+
 
 async def find_fresh(db: AsyncSession, url_hash: str, read_after: datetime) -> JobPreview | None:
     """The newest successful read of this link, if it is recent enough to reuse."""
@@ -21,11 +24,19 @@ async def find_fresh(db: AsyncSession, url_hash: str, read_after: datetime) -> J
     return result.scalar_one_or_none()
 
 
-async def count_by_client(db: AsyncSession, client_hash: str, since: datetime) -> int:
+async def count_by_client(
+    db: AsyncSession, client_hash: str, since: datetime, *, page_text: bool
+) -> int:
+    """This visitor's previews: those read from text they sent, or those that fetched a link."""
+    from_text = JobPreview.reader == PAGE_TEXT
     result = await db.execute(
         select(func.count())
         .select_from(JobPreview)
-        .where(JobPreview.client_hash == client_hash, JobPreview.created_at > since)
+        .where(
+            JobPreview.client_hash == client_hash,
+            JobPreview.created_at > since,
+            from_text if page_text else JobPreview.reader.is_distinct_from(PAGE_TEXT),
+        )
     )
     return result.scalar_one()
 

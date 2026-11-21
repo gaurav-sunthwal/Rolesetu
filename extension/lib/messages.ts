@@ -4,6 +4,8 @@ import type { TrackedEvent } from './analytics';
 import type { ReviewAnswer } from './review-ask';
 
 export type Match = components['schemas']['MatchRead'];
+/** What a job asks for, shown before the browser is connected: no score. */
+export type JobPreview = components['schemas']['JobPreviewRead'];
 export type SkillResult = components['schemas']['SkillResult'];
 export type AutofillData = components['schemas']['AutofillData'];
 export type Tailored = components['schemas']['TailoredRead'];
@@ -59,11 +61,13 @@ export type Request =
   | { type: 'tailor-resume'; changes: TailorRequest }
   | { type: 'keep-resume'; changes: TailorRequest }
   | { type: 'check-job'; job: DetectedJob }
+  | { type: 'preview-job'; job: DetectedJob }
   | { type: 'record-application'; job: TrackedJob; status: 'saved' | 'applied' }
   | { type: 'pending-apply'; action: 'get' }
   | { type: 'pending-apply'; action: 'set'; value: PendingApply }
   | { type: 'pending-apply'; action: 'clear' }
-  | { type: 'open-dashboard'; path: string }
+  /** `from` says where setup was opened from, for the install funnel (the popup if unset). */
+  | { type: 'open-dashboard'; path: string; from?: 'job_preview' | 'job_panel' }
   | { type: 'track-events'; events: TrackedEvent[] }
   /** `refresh: false` answers from the saved copy only; `true` fetches when it is due. */
   | { type: 'summary'; timezone: string; refresh: boolean }
@@ -88,6 +92,7 @@ export type Responses = {
   'tailor-resume': Result<Tailored>;
   'keep-resume': Result<{ filename: string; skills_added: string[] }>;
   'check-job': Result<Match>;
+  'preview-job': Result<JobPreview>;
   'record-application': Result<{ id: string; status: string }>;
   'pending-apply': Result<PendingApply | null>;
   'open-dashboard': Result<null>;

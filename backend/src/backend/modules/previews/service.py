@@ -1,8 +1,9 @@
-"""Job previews for the landing page: what a job asks for, before signing in.
+"""Job previews: what a job asks for, before signing in.
 
-A visitor pastes a link and sees the job and the skills it wants. There is no
-score, because there is no profile to score against yet. Nothing here calls a
-model: the page is fetched and its skills are read with the local dictionary.
+A visitor pastes a link on the landing page, or opens a job with the extension
+installed but not yet connected, and sees the job and the skills it wants. There
+is no score, because there is no profile to score against yet. Nothing here
+calls a model: the skills are read with the local dictionary.
 """
 
 import dataclasses
@@ -21,10 +22,16 @@ from backend.modules.matches.fetching.safe_fetch import PageFetchError
 from backend.modules.matches.local.jd import parse_job
 from backend.modules.previews import repository
 from backend.modules.previews.models import JobPreview
+from backend.modules.previews.repository import PAGE_TEXT
 from backend.modules.previews.schemas import JobPreviewRead
 
 # New links one visitor can have read in an hour. A link already read is free.
 MAX_PREVIEWS_PER_HOUR = 10
+# Jobs the extension can send as text in an hour. Nothing is fetched, so this is
+# set for someone browsing a job board, far above the links limit.
+MAX_TEXT_PREVIEWS_PER_HOUR = 60
+# Shorter than this, the page showed only part of the job: the link is read instead.
+MIN_DESCRIPTION = 200
 # How long a job read from a link is reused, for any visitor and for the check
 # that follows once they sign in.
 FRESH_FOR = timedelta(hours=24)
@@ -64,14 +71,28 @@ async def fresh_page(db: AsyncSession, url: str, now: datetime) -> JobPage | Non
     return JobPage(**row.page) if row is not None and row.page is not None else None
 
 
-async def preview_job(db: AsyncSession, *, url: str, client_ip: str) -> JobPreviewRead:
+async def preview_job(
+    db: AsyncSession,
+    *,
+    url: str,
+    client_ip: str,
+    description: str | None = None,
+    title: str | None = None,
+    company: str | None = None,
+) -> JobPreviewRead:
     now = datetime.now(UTC)
+    client_hash = hash_ip(client_ip)
+    if description is not None and len(description) >= MIN_DESCRIPTION:
+        page = JobPage(title=title, company=company, description=description, source="page text")
+        return await _preview_text(db, url, page, client_hash, now)
+
     known = await fresh_page(db, url, now)
     if known is not None:
         return _to_read(url, known)
 
-    client_hash = hash_ip(client_ip)
-    recent = await repository.count_by_client(db, client_hash, now - timedelta(hours=1))
+    recent = await repository.count_by_client(
+        db, client_hash, now - timedelta(hours=1), page_text=False
+    )
     if recent >= MAX_PREVIEWS_PER_HOUR:
         raise RateLimitedError(
             "You have looked up a lot of jobs in the last hour. "
@@ -99,4 +120,25 @@ async def preview_job(db: AsyncSession, *, url: str, client_ip: str) -> JobPrevi
     attempt.page = dataclasses.asdict(page)
     db.add(attempt)
     await repository.delete_older_than(db, now - FRESH_FOR)
+    return _to_read(url, page)
+
+
+async def _preview_text(
+    db: AsyncSession, url: str, page: JobPage, client_hash: str, now: datetime
+) -> JobPreviewRead:
+    """The job as the visitor's own page shows it. It is not kept for anyone else:
+    text sent by a visitor must never stand in for what the link really says."""
+    recent = await repository.count_by_client(
+        db, client_hash, now - timedelta(hours=1), page_text=True
+    )
+    if recent >= MAX_TEXT_PREVIEWS_PER_HOUR:
+        raise RateLimitedError(
+            "You have looked at a lot of jobs in the last hour. "
+            "Connect your account to keep going, or try again a little later."
+        )
+    db.add(
+        JobPreview(
+            url_hash=_url_hash(url), client_hash=client_hash, host=_host(url), reader=PAGE_TEXT
+        )
+    )
     return _to_read(url, page)
