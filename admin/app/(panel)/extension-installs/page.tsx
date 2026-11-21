@@ -403,13 +403,14 @@ function Versions({ rows }: { rows: InstallStats['versions_in_use'] }) {
   );
 }
 
-function VersionsSection({ rows }: { rows: InstallStats['versions_in_use'] }) {
+function VersionsSection({ rows }: { rows: InstallStats['versions_in_use'] | undefined }) {
+  // Missing while an API from before this chart is still running (deploys overlap).
   return (
     <Section
       title="Versions in use"
       note="Every browser that reported anything in this period, signed in or not, counted once at the version of its latest report. Chrome updates the extension by itself, usually within a day or two of a release."
     >
-      <Versions rows={rows} />
+      <Versions rows={rows ?? []} />
     </Section>
   );
 }
