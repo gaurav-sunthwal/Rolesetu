@@ -6,8 +6,10 @@ from typing import Any
 
 from sqlalchemy import (
     ColumnElement,
+    String,
     and_,
     case,
+    cast,
     delete,
     distinct,
     exists,
@@ -15,6 +17,7 @@ from sqlalchemy import (
     or_,
     select,
     true,
+    union_all,
     update,
 )
 from sqlalchemy.dialects.postgresql import insert
@@ -28,6 +31,7 @@ from backend.modules.ext_installs.schemas import (
     InstallRow,
     InstallStats,
     InstallStep,
+    VersionInUse,
     WithoutAccount,
     WithoutAccountRow,
 )
@@ -277,6 +281,64 @@ async def _without_account(db: AsyncSession, since: datetime, limit: int = 50) -
     )
 
 
+async def _versions_in_use(db: AsyncSession, since: datetime) -> list[VersionInUse]:
+    """Each browser once, at the version of its latest report in the period. A
+    browser is its account once connected, else its install, so the reports from
+    before and after connecting are not counted as two."""
+    before_connecting = (
+        select(
+            func.coalesce(cast(ExtInstall.user_id, String), ExtInstallEvent.install_id).label(
+                "who"
+            ),
+            ExtInstallEvent.version.label("version"),
+            ExtInstallEvent.name.label("name"),
+            ExtInstallEvent.created_at.label("at"),
+        )
+        .join(ExtInstall, ExtInstall.install_id == ExtInstallEvent.install_id)
+        .where(
+            ExtInstallEvent.created_at >= since,
+            ExtInstallEvent.version.is_not(None),
+            ExtInstall.automated.is_not(True),
+        )
+    )
+    connected = select(
+        cast(ExtEvent.user_id, String).label("who"),
+        ExtEvent.version.label("version"),
+        ExtEvent.name.label("name"),
+        ExtEvent.created_at.label("at"),
+    ).where(ExtEvent.created_at >= since, ExtEvent.version.is_not(None))
+    reports = union_all(before_connecting, connected).subquery()
+
+    newest = func.row_number().over(partition_by=reports.c.who, order_by=reports.c.at.desc())
+    ranked = select(reports.c.who, reports.c.version, newest.label("n")).subquery()
+    current: dict[str, int] = {}
+    for version, count in await db.execute(
+        select(ranked.c.version, func.count()).where(ranked.c.n == 1).group_by(ranked.c.version)
+    ):
+        current[str(version)] = int(count)
+    updated: dict[str, int] = {}
+    for version, count in await db.execute(
+        select(reports.c.version, func.count(distinct(reports.c.who)))
+        .where(reports.c.name == "extension_updated")
+        .group_by(reports.c.version)
+    ):
+        updated[str(version)] = int(count)
+    versions = sorted(set(current) | set(updated), key=_version_key, reverse=True)
+    return [
+        VersionInUse(
+            version=version,
+            browsers=current.get(version, 0),
+            updated_into=updated.get(version, 0),
+        )
+        for version in versions
+    ]
+
+
+def _version_key(version: str) -> tuple[int, ...]:
+    """1.10.0 after 1.9.2: compared as numbers, not as text."""
+    return tuple(int(part) if part.isdigit() else 0 for part in version.split("."))
+
+
 async def stats(db: AsyncSession, since: datetime, hours: int, limit: int = 100) -> InstallStats:
     in_period = ExtInstall.created_at >= since
     # How many installs in the period came from each install's address (itself included).
@@ -394,6 +456,7 @@ async def stats(db: AsyncSession, since: datetime, hours: int, limit: int = 100)
             for install, same in recent_rows
         ],
         without_account=await _without_account(db, since),
+        versions_in_use=await _versions_in_use(db, since),
     )
 
 

@@ -3,6 +3,7 @@ limits on it, linking to the account on connect, and the admin view."""
 
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -221,6 +222,24 @@ async def test_people_using_it_without_an_account_are_counted_apart(
     assert row["timezone"] == "Asia/Kolkata" and row["days_active"] == 1
     assert stats["active"] >= 1 and stats["saw_preview"] >= 1 and stats["opened_setup"] >= 1
     assert stats["active_with_account"] >= 1
+
+
+async def test_each_browser_counts_once_at_its_newest_version(
+    anonymous: AsyncClient, admin: AsyncClient, new_install: str
+) -> None:
+    # A version no real install has, so the counts are this test's alone.
+    old, new = f"0.{uuid.uuid4().int % 10**6}.1", f"0.{uuid.uuid4().int % 10**6}.2"
+    sent = batch(
+        new_install,
+        event("popup_opened", version=old, at=(datetime.now(UTC) - timedelta(hours=2)).isoformat()),
+        event("extension_updated", version=new, props={"from": old}),
+    )
+    assert (await anonymous.post(f"{INSTALLS}/events", json=sent)).status_code == 204
+
+    stats = (await admin.get(f"{ADMIN}/ext-installs?hours=1")).json()
+    versions = {row["version"]: row for row in stats["versions_in_use"]}
+    assert versions[new]["browsers"] == 1 and versions[new]["updated_into"] == 1
+    assert old not in versions  # its report is older than the period
 
 
 @pytest.mark.parametrize("path", ["/ext-installs", f"/ext-installs/{uuid.uuid4()}/events"])

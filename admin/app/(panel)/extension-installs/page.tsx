@@ -299,6 +299,121 @@ function WithoutAccount({
   );
 }
 
+// Newest version first; enough distinct colours for the versions anyone still runs.
+const VERSION_COLORS = [
+  '#2563eb',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ef4444',
+  '#06b6d4',
+  '#a1a1aa',
+];
+
+/**
+ * How many browsers run each version (a donut, newest first), and how many
+ * Chrome updated into each one by itself in the period.
+ */
+function Versions({ rows }: { rows: InstallStats['versions_in_use'] }) {
+  const total = rows.reduce((sum, row) => sum + row.browsers, 0);
+  const newest = rows[0];
+  if (total === 0 || !newest) {
+    return <Empty>No browser reported its version in this period.</Empty>;
+  }
+  const radius = 15.915; // circumference of 100, so each share is its own length
+  const shown = rows.filter((row) => row.browsers > 0);
+  // Each arc starts where the ones before it end, from the top of the circle.
+  const arcs = shown.map((row, index) => {
+    const before = shown.slice(0, index).reduce((sum, earlier) => sum + earlier.browsers, 0);
+    return {
+      ...row,
+      share: (row.browsers * 100) / total,
+      offset: 25 - (before * 100) / total,
+      color: VERSION_COLORS[Math.min(index, VERSION_COLORS.length - 1)],
+    };
+  });
+  const colorOf = new Map(arcs.map((arc) => [arc.version, arc.color]));
+  return (
+    <div className="flex flex-col items-center gap-6 px-4 pb-4 sm:flex-row sm:items-start">
+      <div className="relative h-48 w-48 shrink-0">
+        <svg
+          viewBox="0 0 42 42"
+          className="h-full w-full"
+          role="img"
+          aria-label="Browsers by extension version"
+        >
+          <circle cx="21" cy="21" r={radius} fill="none" stroke="#f4f4f5" strokeWidth="6" />
+          {arcs.map((arc) => (
+            <circle
+              key={arc.version}
+              cx="21"
+              cy="21"
+              r={radius}
+              fill="none"
+              stroke={arc.color}
+              strokeWidth="6"
+              strokeDasharray={`${arc.share} ${100 - arc.share}`}
+              strokeDashoffset={arc.offset}
+            >
+              <title>{`v${arc.version}: ${n(arc.browsers)} (${pct(arc.browsers, total)})`}</title>
+            </circle>
+          ))}
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <div>
+            <p className="text-2xl font-bold tabular-nums">{n(total)}</p>
+            <p className="text-xs text-zinc-500">browsers</p>
+          </div>
+        </div>
+      </div>
+      <div className="w-full">
+        <p className="mb-3 text-sm">
+          <span className="font-semibold">{pct(newest.browsers, total)}</span> are on the newest
+          version (v{newest.version}). {n(newest.updated_into)} updated into it by themselves.
+        </p>
+        <table className="w-full text-sm">
+          <thead className="border-y border-zinc-200">
+            <tr>
+              <th className={th}>Version</th>
+              <th className={th}>Browsers on it</th>
+              <th className={th}>Auto-updated into it</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {rows.map((row) => (
+              <tr key={row.version}>
+                <td className={`${td} font-medium`}>
+                  <span
+                    className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                    style={{ background: colorOf.get(row.version) ?? '#e4e4e7' }}
+                    aria-hidden
+                  />
+                  v{row.version}
+                </td>
+                <td className={`${td} tabular-nums`}>
+                  {n(row.browsers)} ({pct(row.browsers, total)})
+                </td>
+                <td className={`${td} tabular-nums`}>{n(row.updated_into)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function VersionsSection({ rows }: { rows: InstallStats['versions_in_use'] }) {
+  return (
+    <Section
+      title="Versions in use"
+      note="Every browser that reported anything in this period, signed in or not, counted once at the version of its latest report. Chrome updates the extension by itself, usually within a day or two of a release."
+    >
+      <Versions rows={rows} />
+    </Section>
+  );
+}
+
 function Journey({ installId, onClose }: { installId: string; onClose: () => void }) {
   return (
     <div>
@@ -358,6 +473,7 @@ export default function ExtensionInstallsPage() {
         <div className="space-y-6">
           <WithoutAccount data={data.without_account} selected={selected} onSelect={setSelected} />
           {selected && <Journey installId={selected} onClose={() => setSelected(null)} />}
+          <VersionsSection rows={data.versions_in_use} />
           <Card>
             <Empty>
               No new installs reported in this period. Installs are followed from the extension
@@ -401,6 +517,8 @@ export default function ExtensionInstallsPage() {
           <WithoutAccount data={data.without_account} selected={selected} onSelect={setSelected} />
 
           {selected && <Journey installId={selected} onClose={() => setSelected(null)} />}
+
+          <VersionsSection rows={data.versions_in_use} />
 
           <Section
             title="Latest installs"

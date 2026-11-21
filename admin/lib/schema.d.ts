@@ -4223,6 +4223,8 @@ export interface components {
       /** Recent */
       recent: components['schemas']['InstallRow'][];
       without_account: components['schemas']['WithoutAccount'];
+      /** Versions In Use */
+      versions_in_use: components['schemas']['VersionInUse'][];
     };
     /** InstallStep */
     InstallStep: {
@@ -5598,6 +5600,18 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
+    };
+    /**
+     * VersionInUse
+     * @description Browsers on one extension version in the period.
+     */
+    VersionInUse: {
+      /** Version */
+      version: string;
+      /** Browsers */
+      browsers: number;
+      /** Updated Into */
+      updated_into: number;
     };
     /** WaitlistJoin */
     WaitlistJoin: {

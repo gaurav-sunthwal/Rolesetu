@@ -101,6 +101,17 @@ class WithoutAccount(BaseModel):
     rows: list[WithoutAccountRow]
 
 
+class VersionInUse(BaseModel):
+    """Browsers on one extension version in the period."""
+
+    version: str
+    # Browsers whose latest report in the period came from this version.
+    browsers: int
+    # Browsers that reported updating into this version in the period (Chrome
+    # updates extensions by itself, so this shows how far a release has spread).
+    updated_into: int
+
+
 class InstallStats(BaseModel):
     """GET /admin/ext-installs: what happens to new installs in the period."""
 
@@ -122,3 +133,4 @@ class InstallStats(BaseModel):
     uninstall_reasons: list[InstallGroupRow]
     recent: list[InstallRow]
     without_account: WithoutAccount
+    versions_in_use: list[VersionInUse]
