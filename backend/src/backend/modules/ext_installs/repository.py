@@ -9,6 +9,7 @@ from sqlalchemy import (
     and_,
     case,
     delete,
+    distinct,
     exists,
     func,
     or_,
@@ -27,12 +28,22 @@ from backend.modules.ext_installs.schemas import (
     InstallRow,
     InstallStats,
     InstallStep,
+    WithoutAccount,
+    WithoutAccountRow,
 )
 
 KEEP_FOR = timedelta(days=90)
 # An address that made this many installs in the period is likely one machine.
 CROWDED_FROM = 3
 _USE = ("job_detected", "form_detected")
+# Events that say nothing about someone using the extension.
+_NOT_USE = (
+    "extension_installed",
+    "extension_updated",
+    "extension_uninstalled",
+    "uninstall_reason",
+    "ext_error",
+)
 
 
 # ── Writing ───────────────────────────────────────────────────────────────────
@@ -187,6 +198,85 @@ def _reached(names: set[str], connected: bool) -> str:
     return furthest
 
 
+async def _without_account(db: AsyncSession, since: datetime, limit: int = 50) -> WithoutAccount:
+    """Browsers that did something in the period while not connected to an account."""
+    event = ExtInstallEvent
+    activity = (
+        select(
+            event.install_id,
+            func.max(event.created_at).label("last_active"),
+            func.count(distinct(func.date(event.created_at))).label("days"),
+            func.count().filter(event.name.in_(_USE)).label("job_pages"),
+            func.count().filter(event.name == "job_previewed").label("previews"),
+            func.count().filter(event.name == "setup_opened").label("setup_opens"),
+        )
+        .where(event.created_at >= since, event.name.not_in(_NOT_USE))
+        .group_by(event.install_id)
+        .subquery()
+    )
+    anonymous = and_(ExtInstall.user_id.is_(None), ~_CONNECTED, ExtInstall.automated.is_not(True))
+    joined = select(ExtInstall, activity).join(
+        activity, activity.c.install_id == ExtInstall.install_id
+    )
+
+    totals = (
+        await db.execute(
+            select(
+                func.count(),
+                func.count().filter(ExtInstall.uninstalled_at.is_(None)),
+                func.count().filter(activity.c.job_pages > 0),
+                func.count().filter(activity.c.previews > 0),
+                func.coalesce(func.sum(activity.c.previews), 0),
+                func.count().filter(activity.c.days >= 2),
+                func.count().filter(activity.c.setup_opens > 0),
+            )
+            .select_from(ExtInstall)
+            .join(activity, activity.c.install_id == ExtInstall.install_id)
+            .where(anonymous)
+        )
+    ).one()
+    active, still_installed, on_job_pages, saw_preview, previews, came_back, opened_setup = totals
+
+    with_account = (
+        await db.execute(
+            select(func.count(distinct(ExtEvent.user_id))).where(ExtEvent.created_at >= since)
+        )
+    ).scalar_one()
+
+    rows = (
+        await db.execute(
+            joined.where(anonymous).order_by(activity.c.last_active.desc()).limit(limit)
+        )
+    ).all()
+    return WithoutAccount(
+        active=active,
+        still_installed=still_installed,
+        on_job_pages=on_job_pages,
+        saw_preview=saw_preview,
+        previews=int(previews),
+        came_back=came_back,
+        opened_setup=opened_setup,
+        active_with_account=with_account,
+        rows=[
+            WithoutAccountRow(
+                install_id=row.ExtInstall.install_id,
+                installed_at=row.ExtInstall.created_at,
+                last_active_at=row.last_active,
+                days_active=row.days,
+                job_pages=row.job_pages,
+                previews=row.previews,
+                setup_opens=row.setup_opens,
+                version=row.ExtInstall.version,
+                os=row.ExtInstall.os,
+                timezone=row.ExtInstall.timezone,
+                language=row.ExtInstall.language,
+                uninstalled_at=row.ExtInstall.uninstalled_at,
+            )
+            for row in rows
+        ],
+    )
+
+
 async def stats(db: AsyncSession, since: datetime, hours: int, limit: int = 100) -> InstallStats:
     in_period = ExtInstall.created_at >= since
     # How many installs in the period came from each install's address (itself included).
@@ -303,6 +393,7 @@ async def stats(db: AsyncSession, since: datetime, hours: int, limit: int = 100)
             )
             for install, same in recent_rows
         ],
+        without_account=await _without_account(db, since),
     )
 
 

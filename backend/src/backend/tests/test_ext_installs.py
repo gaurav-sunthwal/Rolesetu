@@ -191,6 +191,38 @@ async def test_an_install_linked_to_one_account_is_not_taken_by_another(
     assert row["user_id"] == first_user
 
 
+async def test_people_using_it_without_an_account_are_counted_apart(
+    anonymous: AsyncClient, client: AsyncClient, admin: AsyncClient, install_ids: list[str]
+) -> None:
+    using, bot, connected = (str(uuid.uuid4()) for _ in range(3))
+    install_ids.extend([using, bot, connected])
+    sent = batch(
+        using,
+        event("extension_installed"),
+        event("job_detected", host="linkedin.com"),
+        event("job_previewed", count=6),
+        event("setup_opened", props={"why": "job_preview"}),
+        timezone="Asia/Kolkata",
+    )
+    assert (await anonymous.post(f"{INSTALLS}/events", json=sent)).status_code == 204
+    automated = batch(bot, event("job_detected"), automated=True)
+    assert (await anonymous.post(f"{INSTALLS}/events", json=automated)).status_code == 204
+    before = batch(connected, event("job_detected"))
+    assert (await anonymous.post(f"{INSTALLS}/events", json=before)).status_code == 204
+    client.headers["x-test-extension"] = "1"
+    linked = {"events": [event("popup_opened")], "install": connected}
+    assert (await client.post(EVENTS, json=linked)).status_code == 204
+
+    stats = (await admin.get(f"{ADMIN}/ext-installs?hours=1")).json()["without_account"]
+    rows = {row["install_id"]: row for row in stats["rows"]}
+    assert set(rows) & {using, bot, connected} == {using}
+    row = rows[using]
+    assert (row["job_pages"], row["previews"], row["setup_opens"]) == (1, 1, 1)
+    assert row["timezone"] == "Asia/Kolkata" and row["days_active"] == 1
+    assert stats["active"] >= 1 and stats["saw_preview"] >= 1 and stats["opened_setup"] >= 1
+    assert stats["active_with_account"] >= 1
+
+
 @pytest.mark.parametrize("path", ["/ext-installs", f"/ext-installs/{uuid.uuid4()}/events"])
 async def test_an_ordinary_user_cannot_read_installs(client: AsyncClient, path: str) -> None:
     assert (await client.get(f"{ADMIN}{path}")).status_code == 403

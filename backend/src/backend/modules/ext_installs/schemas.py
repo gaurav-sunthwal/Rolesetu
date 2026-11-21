@@ -63,6 +63,44 @@ class InstallRow(BaseModel):
     uninstalled_at: datetime | None
 
 
+class WithoutAccountRow(BaseModel):
+    """One browser that used the extension in the period without an account."""
+
+    install_id: str
+    installed_at: datetime
+    last_active_at: datetime
+    # Different days it did something in the period: 2 or more means it came back.
+    days_active: int
+    job_pages: int
+    previews: int
+    setup_opens: int
+    version: str | None
+    os: str | None
+    timezone: str | None
+    language: str | None
+    uninstalled_at: datetime | None
+
+
+class WithoutAccount(BaseModel):
+    """People who use the extension in the period but have not signed in.
+
+    Counted by what they did in the period, whenever they installed, so the
+    people who installed long ago and still use it without an account show too.
+    Automated browsers are left out."""
+
+    active: int
+    # Of those, the ones that still have the extension.
+    still_installed: int
+    on_job_pages: int
+    saw_preview: int
+    previews: int
+    came_back: int
+    opened_setup: int
+    # For comparison: signed-in people the extension reported anything for.
+    active_with_account: int
+    rows: list[WithoutAccountRow]
+
+
 class InstallStats(BaseModel):
     """GET /admin/ext-installs: what happens to new installs in the period."""
 
@@ -83,3 +121,4 @@ class InstallStats(BaseModel):
     by_version: list[InstallGroupRow]
     uninstall_reasons: list[InstallGroupRow]
     recent: list[InstallRow]
+    without_account: WithoutAccount

@@ -198,6 +198,120 @@ function Recent({
   );
 }
 
+/**
+ * People who use the extension but never signed in: counted by what they did in
+ * the period, whenever they installed. These are the people to win over.
+ */
+function WithoutAccount({
+  data,
+  selected,
+  onSelect,
+}: {
+  data: InstallStats['without_account'];
+  selected: string | null;
+  onSelect: (installId: string) => void;
+}) {
+  return (
+    <Section
+      title="Using it without an account"
+      note="Browsers that did something in this period (opened the popup, a job page, the setup page) but have not signed in, whenever they installed. Automated browsers are left out. Click a time to see that browser's journey."
+    >
+      <div className="grid gap-4 px-4 pb-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric
+          label="Active, no account"
+          value={data.active}
+          note={`${n(data.still_installed)} still have it · ${n(data.active_with_account)} signed-in people active`}
+        />
+        <Metric
+          label="Used it on job pages"
+          value={data.on_job_pages}
+          note={`${pct(data.on_job_pages, data.active)} of them`}
+        />
+        <Metric
+          label="Saw a job's skills"
+          value={data.saw_preview}
+          note={`${n(data.previews)} previews shown · ${n(data.opened_setup)} opened setup`}
+        />
+        <Metric
+          label="Came back another day"
+          value={data.came_back}
+          note={`${pct(data.came_back, data.active)}: active on 2 or more days`}
+        />
+      </div>
+      {data.rows.length === 0 ? (
+        <Empty>
+          Nobody used the extension without an account in this period. Only versions from 1.3.0
+          report this.
+        </Empty>
+      ) : (
+        <div className="max-h-[32rem] overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 border-y border-zinc-200 bg-white">
+              <tr>
+                <th className={th}>Last active</th>
+                <th className={th}>Installed</th>
+                <th className={th}>Days active</th>
+                <th className={th}>Job pages</th>
+                <th className={th}>Skill previews</th>
+                <th className={th}>Opened setup</th>
+                <th className={th}>Time zone · language</th>
+                <th className={th}>System</th>
+                <th className={th}>Removed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {data.rows.map((row) => (
+                <tr
+                  key={row.install_id}
+                  className={selected === row.install_id ? 'bg-blue-50' : 'hover:bg-zinc-50'}
+                >
+                  <td className={`${td} whitespace-nowrap`}>
+                    <button
+                      type="button"
+                      className="text-left font-medium text-blue-700 hover:underline"
+                      onClick={() => onSelect(row.install_id)}
+                      aria-pressed={selected === row.install_id}
+                    >
+                      {formatDateTime(row.last_active_at)}
+                    </button>
+                  </td>
+                  <td className={`${td} whitespace-nowrap`}>{formatDateTime(row.installed_at)}</td>
+                  <td className={`${td} tabular-nums`}>{n(row.days_active)}</td>
+                  <td className={`${td} tabular-nums`}>{n(row.job_pages)}</td>
+                  <td className={`${td} tabular-nums`}>{n(row.previews)}</td>
+                  <td className={`${td} tabular-nums`}>{n(row.setup_opens)}</td>
+                  <td className={td}>
+                    {row.timezone ?? '–'} · {row.language ?? '–'}
+                  </td>
+                  <td className={td}>
+                    {[row.os, row.version && `v${row.version}`].filter(Boolean).join(' · ') || '–'}
+                  </td>
+                  <td className={`${td} whitespace-nowrap`}>
+                    {row.uninstalled_at ? formatDateTime(row.uninstalled_at) : '–'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function Journey({ installId, onClose }: { installId: string; onClose: () => void }) {
+  return (
+    <div>
+      <div className="mb-2 flex justify-end">
+        <button type="button" className="text-sm text-zinc-500 hover:underline" onClick={onClose}>
+          Close journey
+        </button>
+      </div>
+      <ExtensionTimeline installId={installId} title="This install's journey" />
+    </div>
+  );
+}
+
 export default function ExtensionInstallsPage() {
   const [hours, setHours] = useState<number>(720);
   const [selected, setSelected] = useState<string | null>(null);
@@ -241,12 +355,17 @@ export default function ExtensionInstallsPage() {
           <ErrorNote message={errorMessage(stats.error)} onRetry={() => void stats.refetch()} />
         </Card>
       ) : data.installs === 0 ? (
-        <Card>
-          <Empty>
-            No installs reported in this period. Installs are followed from the extension version
-            that sends them; earlier installs only appear in the Chrome Web Store&apos;s figures.
-          </Empty>
-        </Card>
+        <div className="space-y-6">
+          <WithoutAccount data={data.without_account} selected={selected} onSelect={setSelected} />
+          {selected && <Journey installId={selected} onClose={() => setSelected(null)} />}
+          <Card>
+            <Empty>
+              No new installs reported in this period. Installs are followed from the extension
+              version that sends them; earlier installs only appear in the Chrome Web Store&apos;s
+              figures.
+            </Empty>
+          </Card>
+        </div>
       ) : (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -279,20 +398,9 @@ export default function ExtensionInstallsPage() {
             <Funnel steps={data.funnel} />
           </Section>
 
-          {selected && (
-            <div>
-              <div className="mb-2 flex justify-end">
-                <button
-                  type="button"
-                  className="text-sm text-zinc-500 hover:underline"
-                  onClick={() => setSelected(null)}
-                >
-                  Close journey
-                </button>
-              </div>
-              <ExtensionTimeline installId={selected} title="This install's journey" />
-            </div>
-          )}
+          <WithoutAccount data={data.without_account} selected={selected} onSelect={setSelected} />
+
+          {selected && <Journey installId={selected} onClose={() => setSelected(null)} />}
 
           <Section
             title="Latest installs"

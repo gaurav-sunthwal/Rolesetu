@@ -552,6 +552,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/resume/fill': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Upload And Fill
+     * @description Uploads a resume and fills the profile from it (merge) in one request, for
+     *     onboarding. The AI's understanding is added afterwards, as with an upload.
+     */
+    post: operations['upload_and_fill_api_v1_resume_fill_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/resume/latest': {
     parameters: {
       query?: never;
@@ -1231,7 +1252,7 @@ export interface paths {
     put?: never;
     /**
      * Preview Job
-     * @description No sign-in needed: this is what the landing page calls.
+     * @description No sign-in needed: the landing page sends a link, the extension the job's text.
      */
     post: operations['preview_job_api_v1_public_job_previews_post'];
     delete?: never;
@@ -2910,6 +2931,11 @@ export interface components {
       /** File */
       file: string;
     };
+    /** Body_upload_and_fill_api_v1_resume_fill_post */
+    Body_upload_and_fill_api_v1_resume_fill_post: {
+      /** File */
+      file: string;
+    };
     /** Body_upload_image_api_v1_admin_social_images_post */
     Body_upload_image_api_v1_admin_social_images_post: {
       /** File */
@@ -3760,6 +3786,7 @@ export interface components {
         | 'page_checked'
         | 'job_detected'
         | 'form_detected'
+        | 'job_previewed'
         | 'panel_opened'
         | 'job_scored'
         | 'apply_clicked'
@@ -4195,6 +4222,7 @@ export interface components {
       uninstall_reasons: components['schemas']['InstallGroupRow'][];
       /** Recent */
       recent: components['schemas']['InstallRow'][];
+      without_account: components['schemas']['WithoutAccount'];
     };
     /** InstallStep */
     InstallStep: {
@@ -4255,6 +4283,12 @@ export interface components {
     JobPreviewCreate: {
       /** Url */
       url: string;
+      /** Description */
+      description?: string | null;
+      /** Title */
+      title?: string | null;
+      /** Company */
+      company?: string | null;
     };
     /**
      * JobPreviewRead
@@ -5600,6 +5634,70 @@ export interface components {
        */
       created_at: string;
     };
+    /**
+     * WithoutAccount
+     * @description People who use the extension in the period but have not signed in.
+     *
+     *     Counted by what they did in the period, whenever they installed, so the
+     *     people who installed long ago and still use it without an account show too.
+     *     Automated browsers are left out.
+     */
+    WithoutAccount: {
+      /** Active */
+      active: number;
+      /** Still Installed */
+      still_installed: number;
+      /** On Job Pages */
+      on_job_pages: number;
+      /** Saw Preview */
+      saw_preview: number;
+      /** Previews */
+      previews: number;
+      /** Came Back */
+      came_back: number;
+      /** Opened Setup */
+      opened_setup: number;
+      /** Active With Account */
+      active_with_account: number;
+      /** Rows */
+      rows: components['schemas']['WithoutAccountRow'][];
+    };
+    /**
+     * WithoutAccountRow
+     * @description One browser that used the extension in the period without an account.
+     */
+    WithoutAccountRow: {
+      /** Install Id */
+      install_id: string;
+      /**
+       * Installed At
+       * Format: date-time
+       */
+      installed_at: string;
+      /**
+       * Last Active At
+       * Format: date-time
+       */
+      last_active_at: string;
+      /** Days Active */
+      days_active: number;
+      /** Job Pages */
+      job_pages: number;
+      /** Previews */
+      previews: number;
+      /** Setup Opens */
+      setup_opens: number;
+      /** Version */
+      version: string | null;
+      /** Os */
+      os: string | null;
+      /** Timezone */
+      timezone: string | null;
+      /** Language */
+      language: string | null;
+      /** Uninstalled At */
+      uninstalled_at: string | null;
+    };
     /** WorkModeCount */
     WorkModeCount: {
       /**
@@ -6658,6 +6756,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ResumeRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  upload_and_fill_api_v1_resume_fill_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_and_fill_api_v1_resume_fill_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeApplied'];
         };
       };
       /** @description Validation Error */
