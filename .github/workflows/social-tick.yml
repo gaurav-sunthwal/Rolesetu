@@ -10,10 +10,16 @@
 #   variable API_URL      optional; defaults to https://rolesetu.vercel.app
 name: social-tick
 
+# GitHub's schedules are best-effort: runs at busy minutes (on the hour and half
+# hour UTC) start late or are dropped. So the hourly run is at :03 India time,
+# and the hours reels usually go out (14:00, 17:00, 20:00) get a second run at
+# :13. Either run posts everything overdue, so one getting through is enough.
 on:
   schedule:
-    # Every hour on the hour from 08:00 to 23:00 India time (UTC+5:30 → :30 UTC).
-    - cron: "30 2-17 * * *"
+    # Every hour at :03 from 08:03 to 23:03 India time (UTC+5:30 → :33 UTC).
+    - cron: "33 2-17 * * *"
+    # A second chance at 14:13, 17:13 and 20:13 India time.
+    - cron: "43 8,11,14 * * *"
   workflow_dispatch: {}
 
 permissions: {}
