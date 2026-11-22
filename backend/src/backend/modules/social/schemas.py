@@ -106,6 +106,14 @@ class SocialPostWrite(BaseModel):
     youtube_description: (
         Annotated[str, StringConstraints(strip_whitespace=True, max_length=5000)] | None
     ) = None
+    thumbnail_url: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, max_length=2000),
+            AfterValidator(_public_https),
+        ]
+        | None
+    ) = None
     account_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
 
 
@@ -142,6 +150,7 @@ class SocialPostRead(BaseModel):
     video_url: str | None
     youtube_title: str | None
     youtube_description: str | None
+    thumbnail_url: str | None
     status: PostStatus
     scheduled_at: datetime | None
     created_by: str
@@ -173,3 +182,56 @@ class SocialStats(BaseModel):
 
 class RefreshStarted(BaseModel):
     started: bool
+
+
+class PlatformViews(BaseModel):
+    platform: Platform
+    views: int
+    # Views gained in the last 24 hours, from the readings kept for each post.
+    views_24h: int
+
+
+class NextPost(BaseModel):
+    id: uuid.UUID
+    title: str
+    scheduled_at: datetime
+
+
+class SocialDashboard(BaseModel):
+    """The tiles at the top of the Social page. All time, unless it says 24h."""
+
+    total_views: int
+    views_24h: int
+    platforms: list[PlatformViews]
+    likes: int
+    comments: int
+    posted_24h: int
+    posted_total: int
+    queued: int
+    next_post: NextPost | None
+    refreshed_at: datetime | None
+
+
+class PlatformLink(BaseModel):
+    platform: Platform
+    url: str | None
+
+
+class ReelStats(BaseModel):
+    """One posted reel or post in the stats table, its platforms added up."""
+
+    id: uuid.UUID
+    title: str
+    thumbnail_url: str | None
+    image_url: str | None
+    views: int
+    views_by_platform: dict[str, int | None]
+    likes: int
+    comments: int
+    shares: int
+    # Instagram's average watch time per view, in milliseconds.
+    avg_watch_ms: int | None
+    # Views gained since the reading before the latest one.
+    views_since_refresh: int | None
+    posted_at: datetime | None
+    links: list[PlatformLink]

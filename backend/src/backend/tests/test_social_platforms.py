@@ -432,3 +432,26 @@ def test_only_mp4_files_are_taken_as_reels() -> None:
     assert videos.is_mp4(b"\x00\x00\x00\x20ftypisom")
     assert not videos.is_mp4(b"\x89PNG\r\n\x1a\n....")
     assert not videos.is_mp4(b"")
+
+
+def test_views_gained_in_the_last_day() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from backend.modules.social.models import SocialMetricSnapshot
+
+    now = datetime(2026, 11, 22, 12, tzinfo=UTC)
+    cutoff = now - timedelta(hours=24)
+
+    def reading(hours_ago: int, views: int) -> SocialMetricSnapshot:
+        return SocialMetricSnapshot(taken_at=now - timedelta(hours=hours_ago), views=views)
+
+    history = [reading(30, 100), reading(18, 150), reading(6, 180)]
+    # From the last reading at or before the cutoff (30h ago: 100).
+    assert service.views_gained(200, now - timedelta(days=3), history, cutoff) == 100
+    # Posted within the day: every view is new.
+    assert service.views_gained(50, now - timedelta(hours=3), [], cutoff) == 50
+    # Old post first measured within the day: counted from the first reading.
+    assert service.views_gained(200, now - timedelta(days=5), history[1:], cutoff) == 50
+    assert service.views_gained(None, None, history, cutoff) == 0
+    assert service.since_last_reading(history) == 30
+    assert service.since_last_reading(history[:1]) is None

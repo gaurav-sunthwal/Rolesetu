@@ -267,6 +267,9 @@ def no_storage(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 async def test_new_social_routes_are_admin_only(client: AsyncClient) -> None:
+    assert (await client.get(f"{API}/admin/social/dashboard")).status_code == 403
+    assert (await client.get(f"{API}/admin/social/reels")).status_code == 403
+    assert (await client.post(f"{API}/admin/social/check-now")).status_code == 403
     assert (await client.get(f"{API}/admin/social/stats")).status_code == 403
     assert (await client.post(f"{API}/admin/social/stats/refresh")).status_code == 403
     files = {"file": ("r.mp4", b"\x00\x00\x00\x20ftypisom", "video/mp4")}
@@ -403,6 +406,23 @@ async def test_a_reel_goes_to_instagram_and_youtube_and_is_measured(
 
     # Numbers are not read again within six hours.
     assert await publisher.refresh_numbers(now + timedelta(hours=4)) == 0
+
+    # A later reading: the table shows what changed since the previous one.
+    async def more(account: SocialAccount, target: object) -> Stats:
+        return Stats(views=160 if account.platform == "instagram" else 70, likes=4)
+
+    monkeypatch.setattr(publisher, "_read_numbers", more)
+    await publisher.refresh_numbers(now + timedelta(hours=10))
+    reels = (await admin.get(f"{API}/admin/social/reels")).json()
+    reel = next(item for item in reels if item["id"] == draft["id"])
+    assert reel["views"] == 230
+    assert reel["views_by_platform"] == {"instagram": 160, "youtube": 70}
+    assert reel["views_since_refresh"] == 80
+    assert reel["title"] == "POV #shorts"
+
+    board = (await admin.get(f"{API}/admin/social/dashboard")).json()
+    assert board["total_views"] >= 230
+    assert board["posted_total"] >= 1
 
 
 async def test_post_now_publishes_straight_away(

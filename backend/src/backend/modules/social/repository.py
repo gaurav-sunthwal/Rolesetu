@@ -6,7 +6,12 @@ from sqlalchemy import and_, case, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.modules.social.models import SocialAccount, SocialPost, SocialPostTarget
+from backend.modules.social.models import (
+    SocialAccount,
+    SocialMetricSnapshot,
+    SocialPost,
+    SocialPostTarget,
+)
 from backend.modules.social.platforms.base import Stats
 
 TargetRow = tuple[SocialPostTarget, SocialAccount]
@@ -201,6 +206,17 @@ async def save_numbers(db: AsyncSession, target_id: uuid.UUID, stats: Stats, at:
             metrics_at=at,
         )
     )
+    db.add(
+        SocialMetricSnapshot(
+            id=uuid.uuid4(),
+            target_id=target_id,
+            taken_at=at,
+            views=stats.views,
+            likes=stats.likes,
+            comments=stats.comments,
+            shares=stats.shares,
+        )
+    )
 
 
 async def set_followers(db: AsyncSession, account_id: uuid.UUID, followers: int | None) -> None:
@@ -252,3 +268,52 @@ async def totals_by_platform(db: AsyncSession, since: datetime) -> list[dict[str
 async def last_measured(db: AsyncSession) -> datetime | None:
     result = await db.execute(select(func.max(SocialPostTarget.metrics_at)))
     return result.scalar_one_or_none()
+
+
+PostedRow = tuple[SocialPost, SocialPostTarget, SocialAccount]
+
+
+async def posted_targets(db: AsyncSession, limit: int) -> list[PostedRow]:
+    """Every target that went up, with its post and account, for the newest `limit` posts."""
+    newest = (
+        select(SocialPost.id)
+        .where(SocialPost.status.in_(POSTED_STATUSES))
+        .order_by(SocialPost.created_at.desc())
+        .limit(limit)
+        .subquery()
+    )
+    result = await db.execute(
+        select(SocialPost, SocialPostTarget, SocialAccount)
+        .join(SocialPostTarget, SocialPostTarget.post_id == SocialPost.id)
+        .join(SocialAccount, SocialAccount.id == SocialPostTarget.account_id)
+        .where(SocialPost.id.in_(select(newest.c.id)), SocialPostTarget.status == "posted")
+    )
+    return list(result.tuples())
+
+
+async def snapshots_since(
+    db: AsyncSession, target_ids: list[uuid.UUID], since: datetime
+) -> dict[uuid.UUID, list[SocialMetricSnapshot]]:
+    """Each target's readings taken after `since`, oldest first."""
+    if not target_ids:
+        return {}
+    result = await db.execute(
+        select(SocialMetricSnapshot)
+        .where(
+            SocialMetricSnapshot.target_id.in_(target_ids),
+            SocialMetricSnapshot.taken_at >= since,
+        )
+        .order_by(SocialMetricSnapshot.taken_at)
+    )
+    grouped: dict[uuid.UUID, list[SocialMetricSnapshot]] = defaultdict(list)
+    for snapshot in result.scalars():
+        grouped[snapshot.target_id].append(snapshot)
+    return grouped
+
+
+async def queued(db: AsyncSession) -> list[SocialPost]:
+    """Scheduled posts, soonest first."""
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.status == "scheduled").order_by(SocialPost.scheduled_at)
+    )
+    return list(result.scalars())

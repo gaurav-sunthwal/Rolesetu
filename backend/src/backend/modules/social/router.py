@@ -19,8 +19,10 @@ from backend.modules.social.schemas import (
     ImageUploaded,
     PostView,
     Provider,
+    ReelStats,
     RefreshStarted,
     ScheduleRequest,
+    SocialDashboard,
     SocialOverview,
     SocialPostRead,
     SocialPostWrite,
@@ -134,6 +136,33 @@ async def read_stats(
 ) -> SocialStats:
     """Each platform's totals for posts that went up in the last `days` days."""
     return await service.stats(db, days=days)
+
+
+@admin_router.get("/dashboard", response_model=SocialDashboard)
+async def read_dashboard(
+    _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> SocialDashboard:
+    """The totals at the top of the Social page: views (and the last 24 hours'), likes,
+    what was posted, and what is next."""
+    return await service.dashboard(db)
+
+
+@admin_router.get("/reels", response_model=list[ReelStats])
+async def read_reel_stats(
+    limit: Limit = 50, _: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> list[ReelStats]:
+    """The newest `limit` posted reels and posts with their numbers, most viewed first.
+    A ranking, so it is a bounded list rather than pages."""
+    return await service.reel_stats(db, limit=limit)
+
+
+@admin_router.post("/check-now", response_model=RefreshStarted, status_code=202)
+async def check_now(
+    background_tasks: BackgroundTasks, _: Admin = Depends(get_admin)
+) -> RefreshStarted:
+    """Posts anything due and reads stale numbers now, instead of at the next hourly check."""
+    background_tasks.add_task(publisher.tick)
+    return RefreshStarted(started=True)
 
 
 @admin_router.post("/stats/refresh", response_model=RefreshStarted, status_code=202)

@@ -11,6 +11,7 @@ import logging
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,14 +22,19 @@ from backend.core.exceptions import ConflictError, NotFoundError, ValidationFail
 from backend.core.pagination import Page, decode_cursor, encode_cursor
 from backend.modules.admin.dependencies import Admin
 from backend.modules.social import images, repository, videos
-from backend.modules.social.models import SocialAccount, SocialPost
+from backend.modules.social.models import SocialAccount, SocialMetricSnapshot, SocialPost
 from backend.modules.social.platforms import linkedin, meta, youtube
 from backend.modules.social.schemas import (
+    NextPost,
+    PlatformLink,
     PlatformTotals,
+    PlatformViews,
     PostView,
     Provider,
     ProviderStatus,
+    ReelStats,
     SocialAccountRead,
+    SocialDashboard,
     SocialOverview,
     SocialPostRead,
     SocialPostWrite,
@@ -167,6 +173,7 @@ def _post_read(
         video_url=video_url,
         youtube_title=post.youtube_title,
         youtube_description=post.youtube_description,
+        thumbnail_url=post.thumbnail_url,
         status=post.status,  # type: ignore[arg-type]
         scheduled_at=post.scheduled_at,
         created_by=post.created_by,
@@ -309,6 +316,7 @@ async def create_post(
         video_key=payload.video_key,
         youtube_title=payload.youtube_title,
         youtube_description=payload.youtube_description,
+        thumbnail_url=payload.thumbnail_url,
         status="draft",
         created_by=admin.email,
     )
@@ -333,6 +341,7 @@ async def update_post(
         payload.youtube_title,
         payload.youtube_description,
     )
+    post.thumbnail_url = payload.thumbnail_url
     if old_video and old_video != post.video_key:
         await _forget_video(old_video)
     await repository.replace_targets(db, post.id, [account.id for account in accounts])
@@ -415,3 +424,134 @@ async def stats(db: AsyncSession, *, days: int) -> SocialStats:
         accounts=[_account_read(account) for account in await repository.list_accounts(db)],
         refreshed_at=await repository.last_measured(db),
     )
+
+
+# --- the dashboard and the stats table ----------------------------------------------
+
+DAY = timedelta(hours=24)
+# Readings are taken every 6 hours, so two days back always holds the one from 24h ago.
+_HISTORY = timedelta(hours=48)
+# Posts the dashboard adds up: far more than will exist for a long time.
+_ALL_POSTS = 2000
+
+
+def title_of(post: SocialPost) -> str:
+    return post.youtube_title or (post.text.strip().splitlines() or [""])[0][:120]
+
+
+def views_gained(
+    current: int | None,
+    posted_at: datetime | None,
+    readings: list[SocialMetricSnapshot],
+    cutoff: datetime,
+) -> int:
+    """Views gained since `cutoff`: now, minus the last reading at or before it. A post
+    that went up after `cutoff` gained all of its views since then."""
+    if current is None:
+        return 0
+    before = [r for r in readings if r.taken_at <= cutoff and r.views is not None]
+    if before:
+        return max(0, current - (before[-1].views or 0))
+    if posted_at is not None and posted_at >= cutoff:
+        return current
+    # Measured only after the cutoff: count from the first reading we have.
+    after = [r for r in readings if r.views is not None]
+    return max(0, current - (after[0].views or 0)) if after else 0
+
+
+def since_last_reading(readings: list[SocialMetricSnapshot]) -> int | None:
+    measured = [r for r in readings if r.views is not None]
+    if len(measured) < 2:
+        return None
+    return (measured[-1].views or 0) - (measured[-2].views or 0)
+
+
+async def dashboard(db: AsyncSession) -> SocialDashboard:
+    now = datetime.now(UTC)
+    cutoff = now - DAY
+    rows = await repository.posted_targets(db, _ALL_POSTS)
+    history = await repository.snapshots_since(db, [t.id for _, t, _ in rows], now - _HISTORY)
+
+    views: dict[str, int] = {}
+    gained: dict[str, int] = {}
+    likes = comments = 0
+    first_posted: dict[uuid.UUID, datetime] = {}
+    for post, target, account in rows:
+        platform = account.platform
+        views[platform] = views.get(platform, 0) + (target.views or 0)
+        gained[platform] = gained.get(platform, 0) + views_gained(
+            target.views, target.posted_at, history.get(target.id, []), cutoff
+        )
+        likes += target.likes or 0
+        comments += target.comments or 0
+        if target.posted_at and (
+            post.id not in first_posted or target.posted_at < first_posted[post.id]
+        ):
+            first_posted[post.id] = target.posted_at
+
+    queue = await repository.queued(db)
+    upcoming = queue[0] if queue else None
+    return SocialDashboard(
+        total_views=sum(views.values()),
+        views_24h=sum(gained.values()),
+        platforms=[
+            PlatformViews(platform=p, views=views[p], views_24h=gained[p])  # type: ignore[arg-type]
+            for p in sorted(views)
+        ],
+        likes=likes,
+        comments=comments,
+        posted_24h=sum(1 for at in first_posted.values() if at >= cutoff),
+        posted_total=len({post.id for post, _, _ in rows}),
+        queued=len(queue),
+        next_post=(
+            NextPost(id=upcoming.id, title=title_of(upcoming), scheduled_at=upcoming.scheduled_at)
+            if upcoming and upcoming.scheduled_at
+            else None
+        ),
+        refreshed_at=await repository.last_measured(db),
+    )
+
+
+async def reel_stats(db: AsyncSession, *, limit: int) -> list[ReelStats]:
+    """The newest `limit` posted reels and posts, most viewed first."""
+    rows = await repository.posted_targets(db, limit)
+    history = await repository.snapshots_since(
+        db, [t.id for _, t, _ in rows], datetime.now(UTC) - _HISTORY
+    )
+    grouped: dict[uuid.UUID, list[tuple[SocialPost, Any, SocialAccount]]] = {}
+    for row in rows:
+        grouped.setdefault(row[0].id, []).append(row)
+
+    reels: list[ReelStats] = []
+    for entries in grouped.values():
+        post = entries[0][0]
+        targets = [target for _, target, _ in entries]
+        since = [since_last_reading(history.get(t.id, [])) for t in targets]
+        watched = [t.avg_watch_ms for t in targets if t.avg_watch_ms is not None]
+        posted = [t.posted_at for t in targets if t.posted_at]
+        reels.append(
+            ReelStats(
+                id=post.id,
+                title=title_of(post),
+                thumbnail_url=post.thumbnail_url,
+                image_url=post.image_url,
+                views=sum(t.views or 0 for t in targets),
+                views_by_platform={account.platform: t.views for _, t, account in entries},
+                likes=sum(t.likes or 0 for t in targets),
+                comments=sum(t.comments or 0 for t in targets),
+                shares=sum(t.shares or 0 for t in targets),
+                avg_watch_ms=watched[0] if watched else None,
+                views_since_refresh=(
+                    sum(n for n in since if n is not None)
+                    if any(n is not None for n in since)
+                    else None
+                ),
+                posted_at=min(posted) if posted else None,
+                links=[
+                    PlatformLink(platform=account.platform, url=t.external_url)  # type: ignore[arg-type]
+                    for _, t, account in entries
+                ],
+            )
+        )
+    reels.sort(key=lambda reel: reel.views, reverse=True)
+    return reels

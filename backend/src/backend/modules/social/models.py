@@ -59,6 +59,8 @@ class SocialPost(IdMixin, TimestampMixin, Base):
     # YouTube has its own title (100 characters) and description.
     youtube_title: Mapped[str | None] = mapped_column(String(100), default=None)
     youtube_description: Mapped[str | None] = mapped_column(Text, default=None)
+    # A frame of the reel, made in the browser at upload, for lists and the stats table.
+    thumbnail_url: Mapped[str | None] = mapped_column(String(2000), default=None)
     # "draft" | "scheduled" | "publishing" | "posted" | "partly_posted" | "failed"
     status: Mapped[str] = mapped_column(String(20), default="draft")
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -100,3 +102,20 @@ class SocialPostTarget(IdMixin, TimestampMixin, Base):
     # Instagram's average watch time per view, in milliseconds.
     avg_watch_ms: Mapped[int | None] = mapped_column(Integer, default=None)
     metrics_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class SocialMetricSnapshot(IdMixin, TimestampMixin, Base):
+    """One reading of a posted target's numbers. Kept so the admin panel can show
+    what changed in the last 24 hours, and since the previous reading."""
+
+    __tablename__ = "social_metric_snapshots"
+    __table_args__ = (Index("ix_social_metric_snapshots_target_taken", "target_id", "taken_at"),)
+
+    target_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("social_post_targets.id", ondelete="CASCADE")
+    )
+    taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    views: Mapped[int | None] = mapped_column(Integer, default=None)
+    likes: Mapped[int | None] = mapped_column(Integer, default=None)
+    comments: Mapped[int | None] = mapped_column(Integer, default=None)
+    shares: Mapped[int | None] = mapped_column(Integer, default=None)
