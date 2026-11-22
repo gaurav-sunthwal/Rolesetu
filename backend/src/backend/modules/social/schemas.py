@@ -235,3 +235,9 @@ class ReelStats(BaseModel):
     views_since_refresh: int | None
     posted_at: datetime | None
     links: list[PlatformLink]
+
+
+class QueueOrder(BaseModel):
+    # Scheduled posts in the order they should go out. They swap times among
+    # themselves: the times stay, the posts move.
+    post_ids: list[uuid.UUID] = Field(min_length=2, max_length=50)

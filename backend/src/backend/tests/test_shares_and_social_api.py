@@ -478,3 +478,48 @@ async def test_the_wake_up_route_needs_the_shared_secret(
         assert (await visitor.post(url, headers={"x-cron-secret": "wrong"})).status_code == 404
         assert (await visitor.post(url, headers={"x-cron-secret": "s3cret"})).status_code == 202
     assert ticks == [True]
+
+
+async def test_dragging_the_queue_swaps_times_not_posts(admin: AsyncClient) -> None:
+    instagram_id = await add_account(admin, "instagram")
+    now = datetime.now(UTC)
+    ids: list[str] = []
+    for hours in (1, 2, 3):
+        draft = (
+            await admin.post(
+                f"{API}/admin/social/posts",
+                json={
+                    "text": f"reel {hours}",
+                    "image_url": "https://x.example.com/a.jpg",
+                    "account_ids": [str(instagram_id)],
+                },
+            )
+        ).json()
+        at = (now + timedelta(hours=hours)).isoformat()
+        await admin.post(f"{API}/admin/social/posts/{draft['id']}/schedule", json={"at": at})
+        ids.append(draft["id"])
+
+    before = {
+        item["id"]: item["scheduled_at"]
+        for item in (await admin.get(f"{API}/admin/social/posts?view=queue")).json()["items"]
+    }
+    moved = await admin.post(
+        f"{API}/admin/social/queue/order", json={"post_ids": [ids[2], ids[0], ids[1]]}
+    )
+    assert moved.status_code == 200
+    after = {item["id"]: item["scheduled_at"] for item in moved.json()}
+    times = sorted(before[i] for i in ids)
+    assert [after[ids[2]], after[ids[0]], after[ids[1]]] == times
+
+    twice = await admin.post(f"{API}/admin/social/queue/order", json={"post_ids": [ids[0], ids[0]]})
+    assert twice.status_code == 422
+    await admin.post(f"{API}/admin/social/posts/{ids[0]}/unschedule")
+    draft_in = await admin.post(
+        f"{API}/admin/social/queue/order", json={"post_ids": [ids[0], ids[1]]}
+    )
+    assert draft_in.status_code == 409
+
+
+async def test_reordering_is_admin_only(client: AsyncClient) -> None:
+    body = {"post_ids": [str(uuid.uuid4()), str(uuid.uuid4())]}
+    assert (await client.post(f"{API}/admin/social/queue/order", json=body)).status_code == 403

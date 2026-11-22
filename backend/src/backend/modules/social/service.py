@@ -555,3 +555,22 @@ async def reel_stats(db: AsyncSession, *, limit: int) -> list[ReelStats]:
         )
     reels.sort(key=lambda reel: reel.views, reverse=True)
     return reels
+
+
+async def reorder_queue(
+    db: AsyncSession, *, admin: Admin, post_ids: list[uuid.UUID]
+) -> list[SocialPostRead]:
+    """Gives the scheduled posts' times to the posts in the order given: the earliest
+    time to the first post, and so on. No time is added or removed."""
+    if len(set(post_ids)) != len(post_ids):
+        raise ValidationFailedError("A post is listed twice.")
+    posts = {post.id: post for post in await repository.get_posts(db, post_ids)}
+    if len(posts) != len(post_ids):
+        raise NotFoundError("One of those posts was not found.")
+    if any(post.status != "scheduled" or post.scheduled_at is None for post in posts.values()):
+        raise ConflictError("Only scheduled posts can be reordered. Reload the queue.")
+    times = sorted(post.scheduled_at for post in posts.values() if post.scheduled_at)
+    for post_id, at in zip(post_ids, times, strict=True):
+        post = posts[post_id]
+        post.scheduled_at, post.approved_by = at, admin.email
+    return [await _read(db, posts[post_id]) for post_id in post_ids]

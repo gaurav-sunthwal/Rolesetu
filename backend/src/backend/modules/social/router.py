@@ -19,6 +19,7 @@ from backend.modules.social.schemas import (
     ImageUploaded,
     PostView,
     Provider,
+    QueueOrder,
     ReelStats,
     RefreshStarted,
     ScheduleRequest,
@@ -154,6 +155,14 @@ async def read_reel_stats(
     """The newest `limit` posted reels and posts with their numbers, most viewed first.
     A ranking, so it is a bounded list rather than pages."""
     return await service.reel_stats(db, limit=limit)
+
+
+@admin_router.post("/queue/order", response_model=list[SocialPostRead])
+async def reorder_queue(
+    payload: QueueOrder, admin: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
+) -> list[SocialPostRead]:
+    """Reorders scheduled posts: the times stay, the posts move into them."""
+    return await service.reorder_queue(db, admin=admin, post_ids=payload.post_ids)
 
 
 @admin_router.post("/check-now", response_model=RefreshStarted, status_code=202)

@@ -317,3 +317,8 @@ async def queued(db: AsyncSession) -> list[SocialPost]:
         select(SocialPost).where(SocialPost.status == "scheduled").order_by(SocialPost.scheduled_at)
     )
     return list(result.scalars())
+
+
+async def get_posts(db: AsyncSession, ids: list[uuid.UUID]) -> list[SocialPost]:
+    result = await db.execute(select(SocialPost).where(SocialPost.id.in_(ids)))
+    return list(result.scalars())
