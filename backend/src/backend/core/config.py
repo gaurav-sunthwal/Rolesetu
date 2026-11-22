@@ -143,6 +143,18 @@ class Settings(BaseSettings):
     meta_redirect_uri: str = "http://localhost:8000/api/v1/admin/social/meta/callback"
     meta_graph_version: str = "v23.0"
     social_timeout_seconds: float = 20.0
+    # Sending a reel's file to YouTube takes longer than an ordinary request.
+    social_upload_timeout_seconds: float = 180.0
+    # Reels uploaded in the admin panel; Instagram allows up to 300 MB, Render has 512 MB.
+    social_video_max_mb: int = 100
+    # YouTube Shorts: a Google Cloud "Web application" OAuth client with the
+    # YouTube Data API v3 enabled.
+    youtube_client_id: str | None = None
+    youtube_client_secret: str | None = None
+    youtube_redirect_uri: str = "http://localhost:8000/api/v1/admin/social/youtube/callback"
+    # Shared with the outside scheduler (GitHub Actions) that wakes the API to post
+    # what is due. Unset: the wake-up route is off.
+    cron_secret: str | None = None
     # Publish scheduled posts from inside the API. Unset: on in production only,
     # so a laptop pointed at a shared database does not publish as well.
     social_auto_publish: bool | None = None

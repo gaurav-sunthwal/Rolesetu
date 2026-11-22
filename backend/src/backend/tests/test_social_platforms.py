@@ -12,8 +12,8 @@ import pytest
 from backend.core.config import get_settings
 from backend.core.exceptions import ValidationFailedError
 from backend.modules.shares.service import matched_skills
-from backend.modules.social import images, publisher, service
-from backend.modules.social.platforms import base, linkedin, meta
+from backend.modules.social import images, publisher, service, videos
+from backend.modules.social.platforms import base, linkedin, meta, youtube
 from backend.modules.social.platforms.base import (
     OutcomeUnknownError,
     PlatformBusyError,
@@ -40,6 +40,7 @@ def fake_platform(monkeypatch: pytest.MonkeyPatch) -> Callable[[Handler], list[h
 
         monkeypatch.setattr(linkedin, "make_client", client)
         monkeypatch.setattr(meta, "make_client", client)
+        monkeypatch.setattr(youtube, "make_client", lambda seconds=None: client())
         return seen
 
     return install
@@ -52,6 +53,8 @@ def configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "linkedin_client_secret", "li-secret")
     monkeypatch.setattr(settings, "meta_app_id", "meta-id")
     monkeypatch.setattr(settings, "meta_app_secret", "meta-secret")
+    monkeypatch.setattr(settings, "youtube_client_id", "yt-id")
+    monkeypatch.setattr(settings, "youtube_client_secret", "yt-secret")
 
 
 def test_linkedin_text_is_literal_except_hashtags() -> None:
@@ -272,3 +275,160 @@ def test_share_cards_list_required_strong_skills_first() -> None:
         {"name": "Rust", "required": True, "verdict": "missing"},
     ]
     assert matched_skills(results) == ["Go", "SQL", "Docker"]
+
+
+# --- reels, YouTube and numbers --------------------------------------------------
+
+
+async def test_instagram_reel_is_fetched_by_instagram_then_published(
+    fake_platform: Callable[[Handler], list[httpx.Request]],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/ig1/media"):
+            return httpx.Response(200, json={"id": "container"})
+        if path.endswith("/container"):
+            return httpx.Response(200, json={"status_code": "FINISHED"})
+        if path.endswith("/media_publish"):
+            return httpx.Response(200, json={"id": "m9"})
+        return httpx.Response(200, json={"permalink": "https://www.instagram.com/reel/abc/"})
+
+    seen = fake_platform(handler)
+    published = await meta.publish_instagram_reel(
+        access_token="t", account_id="ig1", text="POV", video_url="https://r2.example.com/v.mp4"
+    )
+    assert published.url == "https://www.instagram.com/reel/abc/"
+    assert published.external_id == "m9"
+    form = dict(httpx.QueryParams(seen[0].content.decode()))
+    assert form["media_type"] == "REELS"
+    assert form["video_url"] == "https://r2.example.com/v.mp4"
+
+
+async def test_a_reel_instagram_cannot_use_is_explained(
+    fake_platform: Callable[[Handler], list[httpx.Request]],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "container"})
+        return httpx.Response(200, json={"status_code": "ERROR"})
+
+    fake_platform(handler)
+    with pytest.raises(PostRejectedError, match="MP4"):
+        await meta.publish_instagram_reel(
+            access_token="t", account_id="ig1", text="x", video_url="https://r2.example.com/v.mp4"
+        )
+
+
+async def test_instagram_numbers_include_watch_time(
+    fake_platform: Callable[[Handler], list[httpx.Request]],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/insights"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"name": "views", "values": [{"value": 133}]},
+                        {"name": "reach", "values": [{"value": 93}]},
+                        {"name": "shares", "values": [{"value": 1}]},
+                        {"name": "saved", "values": [{"value": 2}]},
+                        {"name": "ig_reels_avg_watch_time", "values": [{"value": 3085}]},
+                    ]
+                },
+            )
+        return httpx.Response(200, json={"like_count": 3, "comments_count": 0})
+
+    fake_platform(handler)
+    found = await meta.instagram_stats(access_token="t", media_id="m9")
+    assert found == base.Stats(
+        views=133, reach=93, likes=3, comments=0, shares=1, saves=2, avg_watch_ms=3085
+    )
+
+
+async def test_instagram_numbers_without_insights_permission_keep_likes(
+    fake_platform: Callable[[Handler], list[httpx.Request]],
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/insights"):
+            return httpx.Response(400, json={"error": {"message": "permission", "code": 10}})
+        return httpx.Response(200, json={"like_count": 5, "comments_count": 1})
+
+    fake_platform(handler)
+    found = await meta.instagram_stats(access_token="t", media_id="m9")
+    assert (found.likes, found.comments, found.views) == (5, 1, None)
+
+
+async def test_youtube_uploads_a_short_without_tokens_in_urls(
+    configured: None, fake_platform: Callable[[Handler], list[httpx.Request]]
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "access-1"})
+        if request.method == "POST":
+            return httpx.Response(200, headers={"location": "https://upload.example.com/s1"})
+        return httpx.Response(200, json={"id": "vid42"})
+
+    seen = fake_platform(handler)
+    published = await youtube.publish(
+        refresh_token="refresh-1", title="POV #shorts", description="d", video=b"mp4bytes"
+    )
+    assert published.url == "https://www.youtube.com/shorts/vid42"
+    assert published.external_id == "vid42"
+    started = json.loads(seen[1].content)
+    assert started["snippet"]["title"] == "POV #shorts"
+    assert started["status"]["privacyStatus"] == "public"
+    assert seen[2].content == b"mp4bytes"
+    assert seen[2].headers["authorization"] == "Bearer access-1"
+    assert all("refresh-1" not in str(r.url) and "access-1" not in str(r.url) for r in seen)
+
+
+async def test_a_revoked_youtube_sign_in_asks_to_reconnect(
+    configured: None, fake_platform: Callable[[Handler], list[httpx.Request]]
+) -> None:
+    fake_platform(lambda request: httpx.Response(400, json={"error": "invalid_grant"}))
+    with pytest.raises(TokenRejectedError):
+        await youtube.stats(refresh_token="old", video_id="vid42")
+
+
+async def test_youtube_connect_needs_a_lasting_sign_in(
+    configured: None, fake_platform: Callable[[Handler], list[httpx.Request]]
+) -> None:
+    fake_platform(lambda request: httpx.Response(200, json={"access_token": "a"}))
+    with pytest.raises(PostRejectedError, match="lasting sign-in"):
+        await youtube.exchange_code("code")
+
+
+async def test_youtube_connect_finds_the_channel(
+    configured: None, fake_platform: Callable[[Handler], list[httpx.Request]]
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "a", "refresh_token": "r"})
+        return httpx.Response(
+            200, json={"items": [{"id": "UC1", "snippet": {"title": "Rolesetu"}}]}
+        )
+
+    fake_platform(handler)
+    [account] = await youtube.exchange_code("code")
+    assert (account.platform, account.external_id, account.name) == ("youtube", "UC1", "Rolesetu")
+    assert account.access_token == "r"
+
+
+def test_reel_posts_that_a_platform_would_refuse_are_stopped_early() -> None:
+    reel = "social/videos/" + "a" * 32 + ".mp4"
+    service.check_fits("Hi", None, {"instagram", "facebook"}, video_key=reel)
+    service.check_fits("Hi", None, {"youtube"}, video_key=reel, youtube_title="POV")
+    with pytest.raises(ValidationFailedError, match="YouTube needs a video"):
+        service.check_fits("Hi", "https://x.example.com/a.jpg", {"youtube"}, youtube_title="t")
+    with pytest.raises(ValidationFailedError, match="title"):
+        service.check_fits("Hi", None, {"youtube"}, video_key=reel)
+    with pytest.raises(ValidationFailedError, match="LinkedIn"):
+        service.check_fits("Hi", None, {"linkedin"}, video_key=reel)
+    with pytest.raises(ValidationFailedError, match="not both"):
+        service.check_fits("Hi", "https://x.example.com/a.jpg", {"facebook"}, video_key=reel)
+
+
+def test_only_mp4_files_are_taken_as_reels() -> None:
+    assert videos.is_mp4(b"\x00\x00\x00\x20ftypisom")
+    assert not videos.is_mp4(b"\x89PNG\r\n\x1a\n....")
+    assert not videos.is_mp4(b"")

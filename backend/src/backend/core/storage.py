@@ -6,7 +6,7 @@ signed URLs. boto3 is blocking, so every call runs in a worker thread.
 
 import asyncio
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 import boto3
 from botocore.config import Config
@@ -60,6 +60,20 @@ async def put_file(key: str, data: bytes, *, content_type: str) -> None:
         raise StorageUnavailableError() from exc
 
 
+async def put_stream(key: str, stream: BinaryIO, *, content_type: str) -> None:
+    """Uploads a file-like object in parts, without reading it all into memory."""
+    try:
+        await asyncio.to_thread(
+            _client().upload_fileobj,
+            stream,
+            _bucket(),
+            key,
+            ExtraArgs={"ContentType": content_type},
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageUnavailableError() from exc
+
+
 async def get_file(key: str) -> bytes:
     def read() -> bytes:
         return _client().get_object(Bucket=_bucket(), Key=key)["Body"].read()
@@ -73,6 +87,60 @@ async def get_file(key: str) -> bytes:
 async def delete_file(key: str) -> None:
     try:
         await asyncio.to_thread(_client().delete_object, Bucket=_bucket(), Key=key)
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageUnavailableError() from exc
+
+
+async def signed_url(key: str, *, content_type: str, expires_in: int) -> str:
+    """A link to read one file for `expires_in` seconds, for a player or a platform
+    that downloads the file itself (Instagram fetches reels from a link)."""
+    try:
+        return await asyncio.to_thread(
+            _client().generate_presigned_url,
+            "get_object",
+            Params={"Bucket": _bucket(), "Key": key, "ResponseContentType": content_type},
+            ExpiresIn=expires_in,
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageUnavailableError() from exc
+
+
+async def signed_upload_url(key: str, *, content_type: str, expires_in: int) -> str:
+    """A link a browser can PUT one file to, straight into the bucket. The upload
+    must send the same Content-Type. Needs a CORS rule for the uploading site."""
+    try:
+        return await asyncio.to_thread(
+            _client().generate_presigned_url,
+            "put_object",
+            Params={"Bucket": _bucket(), "Key": key, "ContentType": content_type},
+            ExpiresIn=expires_in,
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageUnavailableError() from exc
+
+
+async def file_size(key: str) -> int | None:
+    """The stored file's size in bytes, or None when there is no such file."""
+    try:
+        head = await asyncio.to_thread(_client().head_object, Bucket=_bucket(), Key=key)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            return None
+        raise StorageUnavailableError() from exc
+    except BotoCoreError as exc:
+        raise StorageUnavailableError() from exc
+    return int(head["ContentLength"])
+
+
+async def read_start(key: str, length: int) -> bytes:
+    """The first `length` bytes of a stored file."""
+
+    def read() -> bytes:
+        response = _client().get_object(Bucket=_bucket(), Key=key, Range=f"bytes=0-{length - 1}")
+        return response["Body"].read()
+
+    try:
+        return await asyncio.to_thread(read)
     except (BotoCoreError, ClientError) as exc:
         raise StorageUnavailableError() from exc
 

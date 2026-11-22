@@ -158,7 +158,7 @@ async def test_a_draft_is_only_posted_once_approved(
     refused = await admin.post(
         f"{API}/admin/social/posts", json={"text": "Hi", "account_ids": [str(instagram_id)]}
     )
-    assert refused.status_code == 422  # Instagram needs an image
+    assert refused.status_code == 422  # Instagram needs an image or a video
 
     draft = (
         await admin.post(
@@ -170,8 +170,8 @@ async def test_a_draft_is_only_posted_once_approved(
 
     sent: list[str] = []
 
-    async def fake_send(account: SocialAccount, text: str, image_url: str | None) -> Published:
-        sent.append(text)
+    async def fake_send(account: SocialAccount, post: SocialPost) -> Published:
+        sent.append(post.text)
         return Published(url="https://www.linkedin.com/feed/update/urn:li:share:1/")
 
     monkeypatch.setattr(publisher, "send_to_platform", fake_send)
@@ -207,7 +207,7 @@ async def test_a_refused_post_is_reported_and_can_be_retried(
         )
     ).json()
 
-    async def refuse(account: SocialAccount, text: str, image_url: str | None) -> Published:
+    async def refuse(account: SocialAccount, post: SocialPost) -> Published:
         raise PostRejectedError("Meta refused the post: duplicate")
 
     monkeypatch.setattr(publisher, "send_to_platform", refuse)
@@ -224,3 +224,237 @@ async def test_a_refused_post_is_reported_and_can_be_retried(
     retried = await admin.post(f"{API}/admin/social/posts/{draft['id']}/retry")
     assert retried.json()["status"] == "scheduled"
     assert retried.json()["targets"][0]["status"] == "pending"
+
+
+# --- reels, the queue and the numbers ---------------------------------------------
+
+REEL = "social/videos/" + "b" * 32 + ".mp4"
+
+
+@pytest.fixture
+def no_storage(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Keeps reel files away from the real bucket; records what was stored or removed."""
+    from backend.core import storage
+
+    touched: list[str] = []
+
+    async def put_stream(key: str, stream: object, *, content_type: str) -> None:
+        touched.append(f"put {key}")
+
+    async def signed_url(key: str, *, content_type: str, expires_in: int) -> str:
+        return f"https://r2.example.com/{key}?sig=1"
+
+    async def delete_file(key: str) -> None:
+        touched.append(f"delete {key}")
+
+    async def signed_upload_url(key: str, *, content_type: str, expires_in: int) -> str:
+        return f"https://r2.example.com/{key}?upload=1"
+
+    async def file_size(key: str) -> int | None:
+        return None if key.endswith("0" * 32 + ".mp4") else 2048
+
+    async def read_start(key: str, length: int) -> bytes:
+        # A key with "c" in it stands for a file that is not an MP4.
+        return b"\x89PNG\r\n\x1a\n...." if "c" * 32 in key else b"\x00\x00\x00\x20ftypisom"
+
+    monkeypatch.setattr(storage, "put_stream", put_stream)
+    monkeypatch.setattr(storage, "signed_url", signed_url)
+    monkeypatch.setattr(storage, "delete_file", delete_file)
+    monkeypatch.setattr(storage, "signed_upload_url", signed_upload_url)
+    monkeypatch.setattr(storage, "file_size", file_size)
+    monkeypatch.setattr(storage, "read_start", read_start)
+    return touched
+
+
+async def test_new_social_routes_are_admin_only(client: AsyncClient) -> None:
+    assert (await client.get(f"{API}/admin/social/stats")).status_code == 403
+    assert (await client.post(f"{API}/admin/social/stats/refresh")).status_code == 403
+    files = {"file": ("r.mp4", b"\x00\x00\x00\x20ftypisom", "video/mp4")}
+    assert (await client.post(f"{API}/admin/social/videos", files=files)).status_code == 403
+    upload_url = f"{API}/admin/social/videos/upload-url"
+    assert (await client.post(upload_url, json={"size_bytes": 10})).status_code == 403
+
+
+async def test_a_reel_upload_must_be_an_mp4(admin: AsyncClient, no_storage: list[str]) -> None:
+    png = {"file": ("r.mp4", b"\x89PNG\r\n\x1a\n" + b"0" * 20, "video/mp4")}
+    assert (await admin.post(f"{API}/admin/social/videos", files=png)).status_code == 422
+
+    mp4 = {"file": ("r.mp4", b"\x00\x00\x00\x20ftypisom" + b"0" * 100, "video/mp4")}
+    stored = (await admin.post(f"{API}/admin/social/videos", files=mp4)).json()
+    assert stored["key"].startswith("social/videos/")
+    assert stored["url"].startswith("https://r2.example.com/")
+    assert no_storage == [f"put {stored['key']}"]
+
+
+async def test_a_reel_can_be_uploaded_straight_to_storage(
+    admin: AsyncClient, no_storage: list[str]
+) -> None:
+    too_big = await admin.post(f"{API}/admin/social/videos/upload-url", json={"size_bytes": 10**12})
+    assert too_big.status_code == 422
+
+    started = (
+        await admin.post(f"{API}/admin/social/videos/upload-url", json={"size_bytes": 2048})
+    ).json()
+    assert started["key"].startswith("social/videos/")
+    assert started["upload_url"].startswith("https://r2.example.com/")
+
+    confirmed = await admin.post(f"{API}/admin/social/videos/confirm", json={"key": started["key"]})
+    assert confirmed.json()["size_bytes"] == 2048
+
+    missing = "social/videos/" + "0" * 32 + ".mp4"
+    assert (
+        await admin.post(f"{API}/admin/social/videos/confirm", json={"key": missing})
+    ).status_code == 422
+
+    not_mp4 = "social/videos/" + "c" * 32 + ".mp4"
+    refused = await admin.post(f"{API}/admin/social/videos/confirm", json={"key": not_mp4})
+    assert refused.status_code == 422
+    assert f"delete {not_mp4}" in no_storage
+
+    forged = await admin.post(f"{API}/admin/social/videos/confirm", json={"key": "../secrets"})
+    assert forged.status_code == 422
+
+
+async def test_a_reel_goes_to_instagram_and_youtube_and_is_measured(
+    admin: AsyncClient, no_storage: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend.modules.social.platforms.base import Stats
+
+    instagram_id = await add_account(admin, "instagram")
+    youtube_id = await add_account(admin, "youtube")
+    accounts = [str(instagram_id), str(youtube_id)]
+
+    untitled = await admin.post(
+        f"{API}/admin/social/posts",
+        json={"text": "POV", "video_key": REEL, "account_ids": accounts},
+    )
+    assert untitled.status_code == 422  # YouTube needs a title
+
+    draft = (
+        await admin.post(
+            f"{API}/admin/social/posts",
+            json={
+                "text": "POV: subah ka pehla email",
+                "video_key": REEL,
+                "youtube_title": "POV #shorts",
+                "account_ids": accounts,
+            },
+        )
+    ).json()
+    assert draft["video_url"].startswith("https://r2.example.com/")
+
+    # Scheduled, then moved to a new time without going back to a draft.
+    now = datetime.now(UTC)
+    ours = [uuid.UUID(draft["id"])]
+    first = (now + timedelta(hours=5)).isoformat()
+    await admin.post(f"{API}/admin/social/posts/{draft['id']}/schedule", json={"at": first})
+    moved = (now + timedelta(hours=1)).isoformat()
+    rescheduled = await admin.post(
+        f"{API}/admin/social/posts/{draft['id']}/schedule", json={"at": moved}
+    )
+    assert rescheduled.json()["status"] == "scheduled"
+    assert rescheduled.json()["scheduled_at"].startswith(moved[:16])
+
+    queue = (await admin.get(f"{API}/admin/social/posts?view=queue")).json()
+    assert draft["id"] in [item["id"] for item in queue["items"]]
+
+    sent: list[tuple[str, str | None]] = []
+
+    async def fake_send(account: SocialAccount, post: SocialPost) -> Published:
+        sent.append((account.platform, post.video_key))
+        return Published(url=f"https://{account.platform}.example.com/1", external_id="ext1")
+
+    monkeypatch.setattr(publisher, "send_to_platform", fake_send)
+    await publisher.publish_due(now + timedelta(hours=2), only=ours)
+    assert sorted(sent) == [("instagram", REEL), ("youtube", REEL)]
+
+    posted = (await admin.get(f"{API}/admin/social/posts?view=posted")).json()
+    assert draft["id"] in [item["id"] for item in posted["items"]]
+    queue = (await admin.get(f"{API}/admin/social/posts?view=queue")).json()
+    assert draft["id"] not in [item["id"] for item in queue["items"]]
+
+    async def numbers(account: SocialAccount, target: object) -> Stats:
+        if account.platform == "instagram":
+            return Stats(views=100, reach=90, likes=3, shares=1, saves=2, avg_watch_ms=3000)
+        return Stats(views=50, likes=1, comments=0)
+
+    async def followers(account: SocialAccount) -> int:
+        return 4
+
+    monkeypatch.setattr(publisher, "_read_numbers", numbers)
+    monkeypatch.setattr(publisher, "_read_followers", followers)
+    assert await publisher.refresh_numbers(now + timedelta(hours=3)) >= 2
+
+    post = next(
+        item
+        for item in (await admin.get(f"{API}/admin/social/posts?view=posted")).json()["items"]
+        if item["id"] == draft["id"]
+    )
+    by_platform = {target["platform"]: target for target in post["targets"]}
+    assert by_platform["instagram"]["avg_watch_ms"] == 3000
+    assert by_platform["youtube"]["views"] == 50
+
+    stats = (await admin.get(f"{API}/admin/social/stats?days=7")).json()
+    totals = {row["platform"]: row for row in stats["platforms"]}
+    assert totals["instagram"]["views"] >= 100
+    assert totals["instagram"]["avg_watch_seconds"] is not None
+    assert stats["refreshed_at"] is not None
+    assert 4 in [account["followers"] for account in stats["accounts"]]
+
+    # Numbers are not read again within six hours.
+    assert await publisher.refresh_numbers(now + timedelta(hours=4)) == 0
+
+
+async def test_post_now_publishes_straight_away(
+    admin: AsyncClient, no_storage: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    instagram_id = await add_account(admin, "instagram")
+    draft = (
+        await admin.post(
+            f"{API}/admin/social/posts",
+            json={"text": "Now", "video_key": REEL, "account_ids": [str(instagram_id)]},
+        )
+    ).json()
+    sent: list[str] = []
+
+    async def fake_send(account: SocialAccount, post: SocialPost) -> Published:
+        sent.append(post.text)
+        return Published(url="https://instagram.example.com/2", external_id="m2")
+
+    monkeypatch.setattr(publisher, "send_to_platform", fake_send)
+    await admin.post(f"{API}/admin/social/posts/{draft['id']}/schedule", json={})
+    assert sent == ["Now"]
+
+
+async def test_deleting_a_reel_post_removes_its_video(
+    admin: AsyncClient, no_storage: list[str]
+) -> None:
+    instagram_id = await add_account(admin, "instagram")
+    draft = (
+        await admin.post(
+            f"{API}/admin/social/posts",
+            json={"text": "x", "video_key": REEL, "account_ids": [str(instagram_id)]},
+        )
+    ).json()
+    assert (await admin.delete(f"{API}/admin/social/posts/{draft['id']}")).status_code == 204
+    assert f"delete {REEL}" in no_storage
+
+
+async def test_the_wake_up_route_needs_the_shared_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ticks: list[bool] = []
+
+    async def fake_tick() -> None:
+        ticks.append(True)
+
+    monkeypatch.setattr(publisher, "tick", fake_tick)
+    url = f"{API}/internal/social/tick"
+    async with anonymous() as visitor:
+        monkeypatch.setattr(get_settings(), "cron_secret", None)
+        assert (await visitor.post(url, headers={"x-cron-secret": "x"})).status_code == 404
+        monkeypatch.setattr(get_settings(), "cron_secret", "s3cret")
+        assert (await visitor.post(url)).status_code == 404
+        assert (await visitor.post(url, headers={"x-cron-secret": "wrong"})).status_code == 404
+        assert (await visitor.post(url, headers={"x-cron-secret": "s3cret"})).status_code == 202
+    assert ticks == [True]

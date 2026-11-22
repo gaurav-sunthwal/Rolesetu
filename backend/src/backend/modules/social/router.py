@@ -1,25 +1,34 @@
+import hmac
 import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.config import get_settings
+from backend.core.exceptions import NotFoundError
 from backend.core.pagination import Page
 from backend.db.session import get_db
 from backend.modules.admin.dependencies import Admin, get_admin
-from backend.modules.social import images, service
+from backend.modules.social import images, publisher, service
 from backend.modules.social.platforms.base import PostRejectedError
 from backend.modules.social.schemas import (
     ConnectUrl,
     ImageUploaded,
+    PostView,
     Provider,
+    RefreshStarted,
     ScheduleRequest,
     SocialOverview,
     SocialPostRead,
     SocialPostWrite,
+    SocialStats,
+    VideoConfirm,
+    VideoUploaded,
+    VideoUploadRequest,
+    VideoUploadUrl,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,14 +94,56 @@ async def upload_image(file: UploadFile, _: Admin = Depends(get_admin)) -> Image
     return ImageUploaded(url=await service.upload_image(data))
 
 
+@admin_router.post("/videos/upload-url", response_model=VideoUploadUrl)
+async def start_video_upload(
+    payload: VideoUploadRequest, _: Admin = Depends(get_admin)
+) -> VideoUploadUrl:
+    """A link to upload a reel straight to storage. Confirm the key afterwards."""
+    return await service.start_video_upload(payload.size_bytes)
+
+
+@admin_router.post("/videos/confirm", response_model=VideoUploaded)
+async def confirm_video(payload: VideoConfirm, _: Admin = Depends(get_admin)) -> VideoUploaded:
+    """Checks a reel uploaded with an upload link. Returns its key and a preview link."""
+    return await service.confirm_video(payload.key)
+
+
+@admin_router.post("/videos", response_model=VideoUploaded)
+async def upload_video(file: UploadFile, _: Admin = Depends(get_admin)) -> VideoUploaded:
+    """Stores a reel (MP4) sent through the API, when a direct upload is not possible."""
+    return await service.upload_video(file)
+
+
 @admin_router.get("/posts", response_model=Page[SocialPostRead])
 async def list_posts(
     cursor: str | None = None,
     limit: Limit = 25,
+    view: PostView = "all",
     _: Admin = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Page[SocialPostRead]:
-    return await service.list_posts(db, cursor=cursor, limit=limit)
+    """Newest first. `view=queue`: not yet up everywhere; `view=posted`: up somewhere."""
+    return await service.list_posts(db, cursor=cursor, limit=limit, view=view)
+
+
+@admin_router.get("/stats", response_model=SocialStats)
+async def read_stats(
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+    _: Admin = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> SocialStats:
+    """Each platform's totals for posts that went up in the last `days` days."""
+    return await service.stats(db, days=days)
+
+
+@admin_router.post("/stats/refresh", response_model=RefreshStarted, status_code=202)
+async def refresh_stats(
+    background_tasks: BackgroundTasks, _: Admin = Depends(get_admin)
+) -> RefreshStarted:
+    """Reads every recent post's numbers again now. Takes a few seconds; the
+    page reloads the stats afterwards."""
+    background_tasks.add_task(publisher.refresh_numbers, force=True)
+    return RefreshStarted(started=True)
 
 
 @admin_router.post("/posts", response_model=SocialPostRead, status_code=201)
@@ -117,11 +168,19 @@ async def update_post(
 async def schedule_post(
     post_id: uuid.UUID,
     payload: ScheduleRequest,
+    background_tasks: BackgroundTasks,
     admin: Admin = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ) -> SocialPostRead:
-    """Approves a draft to go out at the given time, or within a minute."""
-    return await service.schedule(db, admin=admin, post_id=post_id, at=payload.at)
+    """Approves a draft to go out at the given time, or now. A scheduled post can
+    be given a new time the same way."""
+    post = await service.schedule(db, admin=admin, post_id=post_id, at=payload.at)
+    if payload.at is None:
+        # "Post now" goes out straight away, not at the next check. Saved first,
+        # so the publisher finds it.
+        await db.commit()
+        background_tasks.add_task(publisher.publish_due, only=[post_id])
+    return post
 
 
 @admin_router.post("/posts/{post_id}/unschedule", response_model=SocialPostRead)
@@ -143,6 +202,20 @@ async def delete_post(
     post_id: uuid.UUID, admin: Admin = Depends(get_admin), db: AsyncSession = Depends(get_db)
 ) -> None:
     await service.delete_post(db, admin=admin, post_id=post_id)
+
+
+@router.post("/internal/social/tick", status_code=202, include_in_schema=False)
+async def tick(
+    background_tasks: BackgroundTasks,
+    x_cron_secret: Annotated[str | None, Header()] = None,
+) -> dict[str, bool]:
+    """Called by the outside scheduler to wake the API: posts what is due and
+    refreshes numbers, in the background. Off unless CRON_SECRET is set."""
+    secret = get_settings().cron_secret
+    if not secret or not x_cron_secret or not hmac.compare_digest(secret, x_cron_secret):
+        raise NotFoundError("Not found.")
+    background_tasks.add_task(publisher.tick)
+    return {"started": True}
 
 
 @router.get("/public/social-images/{name}", include_in_schema=False)

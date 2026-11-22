@@ -55,10 +55,25 @@ class ConnectedAccount:
 @dataclass(frozen=True)
 class Published:
     url: str | None
+    # The platform's id for the post, kept to read its numbers later.
+    external_id: str | None = None
 
 
-def make_client() -> httpx.AsyncClient:
-    seconds = get_settings().social_timeout_seconds
+@dataclass(frozen=True)
+class Stats:
+    """A post's numbers. None where the platform does not report one."""
+
+    views: int | None = None
+    reach: int | None = None
+    likes: int | None = None
+    comments: int | None = None
+    shares: int | None = None
+    saves: int | None = None
+    avg_watch_ms: int | None = None
+
+
+def make_client(seconds: float | None = None) -> httpx.AsyncClient:
+    seconds = seconds or get_settings().social_timeout_seconds
     return httpx.AsyncClient(timeout=httpx.Timeout(seconds, connect=5.0))
 
 

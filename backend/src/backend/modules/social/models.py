@@ -34,6 +34,8 @@ class SocialAccount(IdMixin, TimestampMixin, Base):
     connected_by: Mapped[str] = mapped_column(String(320))
     # "active", or "expired" once the platform refuses the token.
     status: Mapped[str] = mapped_column(String(20), default="active")
+    # Last read from the platform with the post numbers (Instagram and YouTube).
+    followers: Mapped[int | None] = mapped_column(Integer, default=None)
 
 
 class SocialPost(IdMixin, TimestampMixin, Base):
@@ -49,8 +51,14 @@ class SocialPost(IdMixin, TimestampMixin, Base):
         Index("ix_social_posts_created", "created_at", "id"),
     )
 
+    # The caption (Instagram, Facebook) or the whole post (LinkedIn).
     text: Mapped[str] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(String(2000), default=None)
+    # A reel: the mp4's key in R2 (social/videos/...). A post has an image or a video.
+    video_key: Mapped[str | None] = mapped_column(String(200), default=None)
+    # YouTube has its own title (100 characters) and description.
+    youtube_title: Mapped[str | None] = mapped_column(String(100), default=None)
+    youtube_description: Mapped[str | None] = mapped_column(Text, default=None)
     # "draft" | "scheduled" | "publishing" | "posted" | "partly_posted" | "failed"
     status: Mapped[str] = mapped_column(String(20), default="draft")
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -62,7 +70,10 @@ class SocialPostTarget(IdMixin, TimestampMixin, Base):
     """Where one post goes, and what happened when it was sent there."""
 
     __tablename__ = "social_post_targets"
-    __table_args__ = (Index("ix_social_post_targets_post", "post_id"),)
+    __table_args__ = (
+        Index("ix_social_post_targets_post", "post_id"),
+        Index("ix_social_post_targets_status_posted", "status", "posted_at"),
+    )
 
     post_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("social_posts.id", ondelete="CASCADE")
@@ -76,3 +87,16 @@ class SocialPostTarget(IdMixin, TimestampMixin, Base):
     external_url: Mapped[str | None] = mapped_column(String(2000), default=None)
     error: Mapped[str | None] = mapped_column(Text, default=None)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # The platform's id for the post, used to read its numbers later.
+    external_id: Mapped[str | None] = mapped_column(String(100), default=None)
+    # The post's numbers, refreshed every few hours for its first 30 days.
+    # None: the platform does not report it (or has not yet).
+    views: Mapped[int | None] = mapped_column(Integer, default=None)
+    reach: Mapped[int | None] = mapped_column(Integer, default=None)
+    likes: Mapped[int | None] = mapped_column(Integer, default=None)
+    comments: Mapped[int | None] = mapped_column(Integer, default=None)
+    shares: Mapped[int | None] = mapped_column(Integer, default=None)
+    saves: Mapped[int | None] = mapped_column(Integer, default=None)
+    # Instagram's average watch time per view, in milliseconds.
+    avg_watch_ms: Mapped[int | None] = mapped_column(Integer, default=None)
+    metrics_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
