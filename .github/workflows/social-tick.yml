@@ -1,9 +1,11 @@
 # Wakes the API so scheduled social posts go out on time, and their numbers are read.
 #
 # Render's free plan puts the API to sleep when nobody uses it, and a sleeping API
-# cannot post at 8 pm. This calls it once an hour while people in India are awake.
-# Not every few minutes: every wake-up also wakes the database, and Neon's free plan
-# counts the hours it is awake.
+# cannot post at 8 pm. This calls it only around the posting times (marketing/src/
+# marketing/config.py `slots`, reel hours, admin's 8 pm default), not every hour:
+# every wake-up also wakes the database, and Neon's free plan counts the hours it is
+# awake. A post scheduled at another time goes out at the next run below, or sooner
+# if someone is using the site. Changing the slots? Change these times too.
 #
 # Needs two repository settings (Settings → Secrets and variables → Actions):
 #   secret   CRON_SECRET  the same value as CRON_SECRET on Render
@@ -16,8 +18,12 @@ name: social-tick
 # :13. Either run posts everything overdue, so one getting through is enough.
 on:
   schedule:
-    # Every hour at :03 from 08:03 to 23:03 India time (UTC+5:30 → :33 UTC).
-    - cron: "33 2-17 * * *"
+    # 09:33 India time (UTC+5:30), for the 09:30 LinkedIn slot.
+    - cron: "3 4 * * *"
+    # 12:03, 14:03, 17:03, 18:03, 19:03, 20:03 and 21:03 India time.
+    - cron: "33 6,8,11,12,13,14,15 * * *"
+    # 20:33 India time, for the 20:30 Reddit slot.
+    - cron: "3 15 * * *"
     # A second chance at 14:13, 17:13 and 20:13 India time.
     - cron: "43 8,11,14 * * *"
   workflow_dispatch: {}
