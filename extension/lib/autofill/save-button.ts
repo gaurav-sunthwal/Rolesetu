@@ -4,9 +4,10 @@
  * - "Use it": on an empty field, an answer from the page scan: the user's answer
  *   to the same question worded differently, or one made for this company. No
  *   request on focus.
- * - "Write with AI" / "Improve with AI": on a written question, the model writes an
- *   answer from the profile and the job, or improves what is in the box, and fills
- *   it in as a draft. Only when the user clicks; free up to a daily allowance.
+ * - "Write with AI" / "Improve with AI": on any box in an application that asks for
+ *   words (not a fact like a phone number or salary), the model writes an answer
+ *   from the profile and the job, or turns what the user typed (rough notes are
+ *   fine) into one, and fills it in as a draft. Only when the user clicks.
  * - "Save answer": on any question whose answer belongs in saved answers, once the
  *   user has typed one. Answers are also learned when the user leaves the field,
  *   so a forgotten click loses nothing. Profile fields (name, links...) get no
@@ -17,6 +18,7 @@
  */
 import { followModalDialogs } from '@/lib/top-layer';
 
+import { asksForWords } from './ai-fit';
 import { type Field, findFields, hasApplicationForm, isSearchLike, keyForQuestion } from './fields';
 import { type JobNames, markDraft, setText, type Suggestion, templateParts } from './fill';
 import { answerName, isLearnedKind, isPrivateQuestion, type Learned } from './learn';
@@ -25,6 +27,10 @@ import { saveSiteProfile } from './site-profiles';
 
 /** Characters typed before "Save answer" is offered. */
 const MIN_LENGTH = 2;
+/** Characters typed before "Improve with AI" is offered: a few words of notes are enough. */
+const MIN_IMPROVE_LENGTH = 3;
+/** The question sent for a multi-line box no words can be read beside. */
+const UNLABELLED_QUESTION = 'Additional information for this job application';
 /** How long "Saved" and "Filled in" stay before the helper goes away. */
 const CONFIRM_MS = 2000;
 /** Grace period on blur, so moving the pointer to the helper does not hide it. */
@@ -35,7 +41,61 @@ const HOST_ATTRIBUTE = 'data-rolesetu-helpers';
 const GENERIC_OR_INVALID_PROMPT =
   /^(?:enter(?:\s+(?:your\s+)?text|\s*\.{3})?|type(?:\s+(?:here|your\s+answer|text)|\s*\.{3})?|write(?:\s+here|\s+your\s+answer)?|your\s+answer|answer(?:\s+here)?|this\s+field\s+is\s+required|required|optional|select|choose|n\/a|none|placeholder|input|text|value|chars?\s+left.*|\d+\/\d+|\bmax\s+\d+.*)$/i;
 
-type TextField = HTMLInputElement | HTMLTextAreaElement;
+// An <input>, a <textarea>, or a rich-text editor (a contenteditable box).
+type TextField = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
+
+const isPlainBox = (el: Element): el is HTMLInputElement | HTMLTextAreaElement =>
+  el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+
+/** The editing host a focus landed in: the outermost contenteditable box around it. */
+function editorOf(target: unknown): HTMLElement | null {
+  if (!(target instanceof HTMLElement) || !target.isContentEditable) return null;
+  let host = target;
+  while (host.parentElement?.isContentEditable) host = host.parentElement;
+  return host;
+}
+
+/** What is in the box now. */
+function textOf(el: TextField): string {
+  return isPlainBox(el) ? el.value : el.innerText;
+}
+
+/** The box's own character limit, when it has one. */
+function limitOf(el: TextField): number {
+  return isPlainBox(el) && el.maxLength > 0 ? el.maxLength : 0;
+}
+
+/** A multi-line box: a <textarea>, or an editor that is more than one line tall. */
+function isMultiLine(el: TextField): boolean {
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (isPlainBox(el)) return false;
+  return el.getAttribute('aria-multiline') !== 'false' && el.getBoundingClientRect().height >= 40;
+}
+
+/**
+ * Puts text in the box the way typing would, so the site's own code sees it. An
+ * editor (Quill, Draft.js, ProseMirror) only notices text inserted as an edit.
+ */
+function putText(el: TextField, text: string): void {
+  if (isPlainBox(el)) {
+    setText(el, text);
+    return;
+  }
+  el.focus();
+  const selection = window.getSelection();
+  if (selection) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+  // execCommand is deprecated but still the one way editors accept an edit from outside.
+  const inserted = document.execCommand('insertText', false, text);
+  if (!inserted || el.innerText.trim() === '') {
+    el.textContent = text;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+  }
+}
 
 function clean(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
@@ -254,23 +314,9 @@ const SAVE_LABELS: Record<SaveState, string> = {
   error: 'Could not save. Try again',
 };
 
-// A single-line box still deserves AI when it asks for words, not a fact.
-const OPEN_QUESTION =
-  /^(?:why|describe|explain|tell|share|what (?:interests|excites|motivates|makes|draws)|how (?:would|did|do) you|introduce|write)\b|\bcover letter\b|\bmessage\b|\bnote to\b/i;
-
-// Facts only the user knows: a model would only guess them.
-const FACT_KINDS = new Set<Field['kind']>([
-  'notice_period',
-  'current_ctc',
-  'expected_ctc',
-  'relocation',
-  'work_authorization',
-  'date_of_birth',
-  'gender',
-  'nationality',
-  'postal_code',
-  'heard_from',
-]);
+// Containers application forms are built from when a site uses no <form>.
+const APPLICATION_BOXES =
+  'form, dialog, [role="dialog"], [role="form"], [aria-modal="true"], fieldset, [class*="application" i], [id*="application" i], [class*="question" i], [data-automation-id]';
 
 /** Saves answers; resolves to whether the server kept them. */
 export type SaveFn = (learned: Learned[]) => Promise<boolean>;
@@ -293,6 +339,8 @@ export function attachSaveButtons(
   writeWithAi: AiFn,
   contextOf: (element: Element) => string,
   jobNames: () => JobNames,
+  // The user asked to fill this page: treat it as an application, whatever it looks like.
+  anyPage: () => boolean,
 ): () => void {
   const { host, bar, suggest: pill, ai, save, note } = makeBar();
   // Inside a modal application form, the bar must live in the dialog to be seen.
@@ -341,27 +389,29 @@ export function attachSaveButtons(
   };
 
   /**
-   * Whether this box has a reason for AI, so no click (and no paid call) is ever
-   * invited for nothing: a written answer (a multi-line box, or an open question
-   * like "Why..." or "Describe..."), in an application (an Apply pop-up, a form,
-   * or a page that is one), and not a fact only the user knows.
+   * Whether this box has a reason for AI: it asks for words (see `asksForWords`)
+   * and sits in an application (an Apply pop-up, a form, or a page that is one),
+   * so a comment box on some other site is never offered a paid call.
    */
-  const aiCanWrite = (el: TextField, info: FieldInfo) => {
-    if (info.field !== null && FACT_KINDS.has(info.field.kind)) return false;
-    const written = el instanceof HTMLTextAreaElement || OPEN_QUESTION.test(info.question);
-    if (!written) return false;
-    return (
-      el.closest('form, dialog, [role="dialog"], [aria-modal="true"], fieldset') !== null ||
-      hasApplicationForm(el.ownerDocument)
-    );
-  };
+  const inApplication = (el: TextField) =>
+    anyPage() ||
+    el.closest(APPLICATION_BOXES) !== null || hasApplicationForm(el.ownerDocument);
+
+  const aiCanWrite = (el: TextField, info: FieldInfo) =>
+    asksForWords(
+      { multiLine: isMultiLine(el), type: el instanceof HTMLInputElement ? el.type : '' },
+      info.question,
+      info.field?.kind ?? null,
+    ) &&
+    inApplication(el);
 
   /** Shows what fits the field as it is now. */
   const update = () => {
     if (!active || saveState === 'busy' || aiBusy) return;
     const { el, info } = active;
-    const value = el.value.trim();
-    const profileField = info.field !== null && !isLearnedKind(info.field.kind);
+    const value = textOf(el).trim();
+    // A profile field, or a box with no question to save under: nothing to save.
+    const unsavable = (info.field !== null && !isLearnedKind(info.field.kind)) || info.key === '';
 
     if (value === '') {
       show(save, false);
@@ -382,16 +432,18 @@ export function attachSaveButtons(
       }
       show(pill, Boolean(answer));
       ai.textContent = '✨ Write with AI';
-      show(ai, !profileField && active.ai);
+      ai.title = 'Tip: type a few words about what you want to say first, and AI turns them into your answer.';
+      show(ai, active.ai);
       reposition();
       return;
     }
 
     show(pill, false);
     ai.textContent = '✨ Improve with AI';
-    show(ai, !profileField && active.ai && value.length >= 10);
+    ai.title = 'Turns what you typed, even rough notes, into a finished answer.';
+    show(ai, active.ai && value.length >= MIN_IMPROVE_LENGTH);
     const savedAlready = known()?.[info.key] === value;
-    if (profileField || value.length < MIN_LENGTH || savedAlready) {
+    if (unsavable || value.length < MIN_LENGTH || savedAlready) {
       if (saveState !== 'saved') show(save, false);
     } else if (save.dataset.shown === undefined || saveState === 'error' || saveState === 'saved') {
       setSaveState('idle');
@@ -401,14 +453,18 @@ export function attachSaveButtons(
   };
 
   const onFocusIn = (event: FocusEvent) => {
-    const target = event.composedPath()[0];
-    if (target instanceof Node && host.contains(target)) return;
+    const focused = event.composedPath()[0];
+    if (focused instanceof Node && host.contains(focused)) return;
     clearTimeout(hideTimer);
+    const editor = editorOf(focused);
+    const target: TextField | null = editor ?? (focused instanceof HTMLElement && isPlainBox(focused) ? focused : null);
     if (
-      !(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) ||
+      !target ||
       (target instanceof HTMLInputElement && !['', 'text', 'number', 'url', 'tel', 'email'].includes(target.type)) ||
       target.closest('rolesetu-root') ||
-      isSearchLike(target)
+      isSearchLike(target) ||
+      // A rich-text editor outside an application (a chat box, a page builder) is none of ours.
+      (editor !== null && !inApplication(editor))
     ) {
       active = null;
       hideAll();
@@ -417,7 +473,10 @@ export function attachSaveButtons(
     if (active?.el !== target) {
       hideAll();
       // Read once per focus: reading the whole form on every keystroke would slow the page.
-      const info = extractFieldInfo(target);
+      // A multi-line box with no readable question can still be written: AI only, no saving.
+      const info =
+        extractFieldInfo(target) ??
+        (isMultiLine(target) ? { key: '', question: UNLABELLED_QUESTION, field: null } : null);
       active = info && !looksPrivate(target, info) ? { el: target, info, ai: aiCanWrite(target, info) } : null;
       const layer = layerFor(target);
       if (active && host.parentElement !== layer) layer.append(host);
@@ -443,8 +502,8 @@ export function attachSaveButtons(
   const onSave = async () => {
     if (!active || saveState === 'busy' || saveState === 'saved') return;
     const { el, info } = active;
-    const value = el.value.trim();
-    if (value.length < MIN_LENGTH) return;
+    const value = textOf(el).trim();
+    if (value.length < MIN_LENGTH || info.key === '') return;
     setSaveState('busy');
     const ok = await saveFn([{ answer: { question_key: info.key, answer: value }, name: info.question }]).catch(
       () => false,
@@ -481,7 +540,7 @@ export function attachSaveButtons(
     if (!active || !offered) return;
     const { el } = active;
     track('suggestion_used', { props: { source: offered.source } });
-    setText(el, offered.answer.slice(0, el.maxLength > 0 ? el.maxLength : undefined));
+    putText(el, offered.answer.slice(0, limitOf(el) || undefined));
     if (offered.draft) markDraft(el);
     el.focus();
     show(pill, false);
@@ -492,7 +551,7 @@ export function attachSaveButtons(
   const onAi = async () => {
     if (!active || aiBusy) return;
     const { el, info } = active;
-    const current = el.value.trim();
+    const current = textOf(el).trim();
     aiBusy = true;
     ai.dataset.state = 'busy';
     const label = ai.textContent;
@@ -503,7 +562,7 @@ export function attachSaveButtons(
       question: info.question,
       context: contextOf(el),
       current,
-      maxLength: el.maxLength > 0 ? el.maxLength : 2000,
+      maxLength: limitOf(el) || 2000,
     }).catch((): AiResult => ({ ok: false, message: 'AI could not answer just now. Try again in a moment.' }));
     aiBusy = false;
     delete ai.dataset.state;
@@ -513,7 +572,7 @@ export function attachSaveButtons(
       say(result.message, 'error');
       return;
     }
-    setText(el, result.text);
+    putText(el, result.text);
     markDraft(el);
     el.focus();
     const left =

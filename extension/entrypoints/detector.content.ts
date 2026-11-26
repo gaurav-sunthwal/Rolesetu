@@ -37,16 +37,15 @@ export default defineContentScript({
       void ask({ type: 'activate', found, frame: found === 'job' && inFrame ? 'top' : undefined });
     };
 
-    // The page around an embedded job board asks its frames for the job on show.
-    if (inFrame) {
-      browser.runtime.onMessage.addListener((message: unknown) => {
-        const asking = message as { type?: unknown; strict?: unknown } | null;
-        if (asking?.type !== 'read-job') return undefined;
-        const job = detectJob(document, window.location.href, asking.strict === true);
-        // Only a frame with a job answers, so the first answer is the job.
-        return job ? Promise.resolve(job) : undefined;
-      });
-    }
+    // The page around an embedded job board asks its frames for the job on show, and an
+    // application form embedded in a frame asks the page around it ("Write with AI" needs
+    // the company and role). Only a frame with a job answers, so the first answer is the job.
+    browser.runtime.onMessage.addListener((message: unknown) => {
+      const asking = message as { type?: unknown; strict?: unknown } | null;
+      if (asking?.type !== 'read-job') return undefined;
+      const job = detectJob(document, window.location.href, asking.strict === true);
+      return job ? Promise.resolve(job) : undefined;
+    });
 
     look();
     // Many pages draw the listing after they load.

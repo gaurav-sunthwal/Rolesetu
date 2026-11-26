@@ -59,8 +59,10 @@ const SITE_PROFILE_SELECT_KINDS: ReadonlySet<Kind> = new Set<Kind>([
 ]);
 
 // Never kept, whatever is typed: identity numbers, money, and secrets.
+// Whole words only: sites name fields with these inside other words (Lever calls every
+// question "cards[...]"), and "Swift" is a language as often as a bank code.
 const PRIVATE =
-  /\bssn\b|social security|aadh?aa?r|\bpan\b|passport|national (?:id|insurance)|\btax\b|\btin\b|bank|account (?:no|number)|iban|ifsc|swift|routing|card|cvv|expiry|security (?:question|answer)|pass ?(?:code|word)|\bpin\b(?! ?code)|signature/;
+  /\bssn\b|social security|aadh?aa?r|\bpan\b|passport|national (?:id|insurance)|\btax\b|\btin\b|\bbank\b|account (?:no|number)|\biban\b|\bifsc\b|\bswift (?:code|bic)\b|\brouting (?:no|number)\b|\b(?:credit|debit|card) (?:card|no|number|holder)\b|\bcvv\b|\bcvc\b|\bexpiry\b|security (?:question|answer)|pass ?(?:code|word)|\bpin\b(?! ?code)|\bsignature\b/;
 // Equal-opportunity and background questions stay on the form. They are not remembered.
 const SENSITIVE =
   /\brace\b|ethnic|disabilit|veteran|religio|\bcaste\b|sexual orientation|criminal|convict|medical|health condition|pregnan|marital/;

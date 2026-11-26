@@ -19,6 +19,7 @@ async function trackNow(name: EventName, payload: TrackPayload = {}, host?: stri
  */
 type Target =
   | 'check_page'
+  | 'fill_page'
   | 'dashboard'
   | 'tracker'
   | 'find_jobs'
@@ -139,6 +140,42 @@ export function App() {
     }
   }
 
+  /** Fills the form on this tab even when Rolesetu did not take the page for one. */
+  async function fillThisPage() {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error('no tab');
+      await clicked('fill_page');
+      // The form may sit in a frame: count each frame's fields and use the frame with the most.
+      const counts = await browser.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        func: () => document.querySelectorAll('input:not([type="hidden"]), textarea, select, [contenteditable="true"]').length,
+      });
+      const best = counts
+        .filter((frame) => (frame.result ?? 0) > 0)
+        .sort((a, b) => (b.result ?? 0) - (a.result ?? 0))[0];
+      if (!best) {
+        setProblem('There is no form on this page to fill.');
+        setBusy(false);
+        return;
+      }
+      const target = { tabId: tab.id, frameIds: [best.frameId] };
+      await browser.scripting.executeScript({
+        target,
+        func: () => {
+          window.__rolesetuFill = true;
+        },
+      });
+      await browser.scripting.executeScript({ target, files: ['/content-scripts/job.js'] });
+      window.close();
+    } catch {
+      setProblem('This page can’t be filled. Browser pages and the web store are off limits.');
+      setBusy(false);
+    }
+  }
+
   const credits = load.name === 'ready' ? load.summary.credits : null;
 
   return (
@@ -217,6 +254,9 @@ export function App() {
 
           <button type="button" className="primary" onClick={() => void checkThisPage()} disabled={busy}>
             {busy ? 'Reading the page…' : 'Check this page'}
+          </button>
+          <button type="button" className="secondary" onClick={() => void fillThisPage()} disabled={busy}>
+            Fill a form on this page
           </button>
           {problem ? <p className="error">{problem}</p> : null}
 

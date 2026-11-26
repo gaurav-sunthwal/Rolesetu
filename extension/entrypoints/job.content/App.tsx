@@ -155,6 +155,23 @@ async function findJob(strict: boolean): Promise<DetectedJob | null> {
   return null;
 }
 
+/**
+ * The job this page's form is for, read from somewhere else: the page around this
+ * frame when the form is embedded (Greenhouse, Lever), or a frame of this page.
+ */
+function jobAroundForm(): Promise<DetectedJob | null> {
+  // Asked once per address: the scan runs again as the form changes.
+  if (aroundForm?.url !== window.location.href) {
+    const asking =
+      window === window.top
+        ? jobInFrames(false)
+        : ask({ type: 'frame-job', strict: false }).then((answer) => (answer.ok ? answer.data : null));
+    aroundForm = { url: window.location.href, job: asking.catch(() => null) };
+  }
+  return aroundForm.job;
+}
+let aroundForm: { url: string; job: Promise<DetectedJob | null> } | null = null;
+
 /** The job shown in an embedded frame on this page, if there is one. */
 async function jobInFrames(strict: boolean): Promise<DetectedJob | null> {
   if (!document.querySelector('iframe')) return null;
@@ -308,6 +325,8 @@ function useAutofill(ctx: ContentScriptContext) {
   const job = useRef<JobNames & { text: string }>({ company: null, role: null, text: '' });
   // Keys already asked about, so a page that keeps changing is not asked again.
   const asked = useRef(new Set<string>());
+  // The user asked to fill this page from the popup: it counts as a form, whatever it looks like.
+  const forced = useRef(false);
 
   const ensureData = useCallback(async (): Promise<AutofillData | 'not-connected' | null> => {
     if (data.current !== null) return data.current;
@@ -331,7 +350,8 @@ function useAutofill(ctx: ContentScriptContext) {
    * answer made for this company. Both requests go out together.
    */
   const findSuggestions = useCallback(async (loaded: AutofillData) => {
-    const detected = detectJob(document, window.location.href);
+    const detected =
+      detectJob(document, window.location.href) ?? (job.current.company === null ? await jobAroundForm() : null);
     job.current = {
       company: companyName(detected?.company) ?? job.current.company,
       role: detected?.title ?? job.current.role,
@@ -387,7 +407,7 @@ function useAutofill(ctx: ContentScriptContext) {
 
   const scan = useCallback(async () => {
     if (ctx.isInvalid || dismissed.current || holding.current) return;
-    if (!hasApplicationForm(document)) return setState({ name: 'none' });
+    if (!forced.current && !hasApplicationForm(document)) return setState({ name: 'none' });
 
     const loaded = await ensureData();
     if (loaded === 'not-connected') return setState({ name: 'connect' });
@@ -497,6 +517,33 @@ function useAutofill(ctx: ContentScriptContext) {
     [remember],
   );
 
+  /** "Fill a form on this page": reads the page as a form and fills it now. */
+  const fillAnyway = useCallback(async () => {
+    forced.current = true;
+    dismissed.current = false;
+    holding.current = false;
+    await scan();
+    // Not connected: the scan already asks the user to connect.
+    if (data.current === null) return;
+    if (planAutofill(document, data.current, suggestions.current, job.current).length > 0) return run();
+    holding.current = true;
+    setState({
+      name: 'failed',
+      message:
+        'Nothing on this page matches your profile yet. For a written question, click into the box and use ✨ Write with AI.',
+    });
+  }, [scan, run]);
+
+  useEffect(() => {
+    if (window.__rolesetuFill) {
+      window.__rolesetuFill = false;
+      void fillAnyway();
+    }
+    const onFill = () => void fillAnyway();
+    window.addEventListener('rolesetu:fill', onFill);
+    return () => window.removeEventListener('rolesetu:fill', onFill);
+  }, [fillAnyway]);
+
   const undo = useCallback(async (changes: LearnedAnswerRead[]) => {
     track('autofill_undone', { count: changes.length });
     setState({ name: 'none' });
@@ -535,7 +582,7 @@ function useAutofill(ctx: ContentScriptContext) {
   /** One answer written or improved by the model, for this job. Only on the user's click. */
   const writeWithAi = useCallback(async (request: AiRequest): Promise<AiResult> => {
     if (job.current.text === '' && job.current.company === null) {
-      const detected = detectJob(document, window.location.href);
+      const detected = detectJob(document, window.location.href) ?? (await jobAroundForm());
       if (detected) {
         job.current = { company: companyName(detected.company), role: detected.title, text: detected.description };
       }
@@ -574,7 +621,7 @@ function useAutofill(ctx: ContentScriptContext) {
     return { ok: true, text: result.data.text, left: result.data.usage.left ?? null, removed: result.data.removed };
   }, []);
 
-  return { state, run, undo, close, data, remember, suggestionFor, writeWithAi, jobNames };
+  return { state, run, undo, close, data, remember, suggestionFor, writeWithAi, jobNames, forced };
 }
 
 export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolean }) {
@@ -810,7 +857,7 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
   // "Save answer" for questions autofill cannot learn by itself (extra-question
   // pop-ups, assessment steps), and "Use your answer" for reworded questions.
   // Runs on any page, not only full application forms: those pop-ups are not one.
-  const { data: autofillData, remember, suggestionFor, writeWithAi, jobNames } = autofill;
+  const { data: autofillData, remember, suggestionFor, writeWithAi, jobNames, forced } = autofill;
   useEffect(
     () =>
       attachSaveButtons(
@@ -820,8 +867,9 @@ export function App({ ctx, manual }: { ctx: ContentScriptContext; manual: boolea
         writeWithAi,
         contextOf,
         jobNames,
+        () => forced.current,
       ),
-    [autofillData, remember, suggestionFor, writeWithAi, jobNames],
+    [autofillData, remember, suggestionFor, writeWithAi, jobNames, forced],
   );
 
   const autofillCard =

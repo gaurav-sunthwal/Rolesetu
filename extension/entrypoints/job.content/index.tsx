@@ -12,6 +12,8 @@ declare global {
   interface Window {
     __rolesetuMounted?: boolean;
     __rolesetuManual?: boolean;
+    // The user pressed "Fill a form on this page" in the popup.
+    __rolesetuFill?: boolean;
   }
 }
 
@@ -27,8 +29,10 @@ export default defineContentScript({
   cssInjectionMode: 'manual',
   async main(ctx) {
     if (window.__rolesetuMounted) {
-      // Already on the page: the popup asked again, so just open the panel.
-      window.dispatchEvent(new Event('rolesetu:open'));
+      // Already on the page: the popup asked again, so just do what it asked.
+      const fill = window.__rolesetuFill === true;
+      window.__rolesetuFill = false;
+      window.dispatchEvent(new Event(fill ? 'rolesetu:fill' : 'rolesetu:open'));
       return;
     }
     window.__rolesetuMounted = true;

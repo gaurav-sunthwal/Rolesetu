@@ -69,6 +69,10 @@ header strong { font-size: 15px; }
   background: var(--brand); color: #fff; font-weight: 600; font-size: 14px; }
 .primary:hover { filter: brightness(1.08); }
 .primary:disabled { opacity: .6; cursor: default; }
+.secondary { width: 100%; height: 40px; margin-top: 8px; border-radius: 999px; border: 1px solid var(--brand);
+  background: transparent; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
+.secondary:hover { background: var(--brand-soft); }
+.secondary:disabled { opacity: .6; cursor: default; }
 
 .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
 .quick button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px;

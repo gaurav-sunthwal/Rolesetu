@@ -26,3 +26,22 @@ describe('isPrivateQuestion', () => {
     },
   );
 });
+
+describe('isPrivateQuestion', () => {
+  it('keeps away from payment and identity fields', () => {
+    for (const words of ['Credit card number', 'Card number', 'CVV', 'Bank account number', 'IFSC', 'PAN', 'SWIFT code', 'Password']) {
+      expect(isPrivateQuestion(words)).toBe(true);
+    }
+  });
+
+  it('does not mistake ordinary questions or site field names for private ones', () => {
+    for (const words of [
+      'What has been your favorite project or proudest accomplishment? Why? cards[ac978161-6f46][field0]',
+      'Years of experience with Swift',
+      'Have you built a scorecard or dashboard?',
+      'Experience in banking domain',
+    ]) {
+      expect(isPrivateQuestion(words)).toBe(false);
+    }
+  });
+});

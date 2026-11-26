@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { APPLY, SUBMIT } from '../lib/apply-controls';
+import { APPLYING_WORDS } from '../lib/autofill/fields';
 import { dialogTitle } from '../lib/job-detect';
 
 describe('dialogTitle', () => {
@@ -29,5 +30,26 @@ describe('SUBMIT', () => {
       expect(SUBMIT.test(label)).toBe(false);
     }
     expect(APPLY.test('Submit')).toBe(false);
+  });
+});
+
+describe('APPLYING_WORDS', () => {
+  it('knows a Google Forms application on any of its pages', () => {
+    for (const text of [
+      'Which work setup are you applying for?',
+      'Have your resume link, repository link and design links ready',
+      'Link to your resume',
+      'Full-Stack Engineer Intern (Frontend)',
+      'Stipend: Rs 6,000 per month',
+      'Apply now',
+    ]) {
+      expect(APPLYING_WORDS.test(text)).toBe(true);
+    }
+  });
+
+  it('does not take a checkout or an internal tool for an application', () => {
+    for (const text of ['Apply coupon', 'Internal notes', 'International shipping', 'Resume playback']) {
+      expect(APPLYING_WORDS.test(text)).toBe(false);
+    }
   });
 });

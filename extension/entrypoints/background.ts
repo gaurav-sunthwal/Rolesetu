@@ -55,6 +55,12 @@ const NOT_CONNECTED: Failure = {
 const RETRY_AFTER_MS = [0, 1500, 4000];
 // What a host answers while the server behind it is still coming up.
 const STARTING_UP = new Set([502, 503, 504]);
+// A host's "not up yet" replies that mean the request never reached the server, so a
+// call that must not run twice (it spends an AI credit) is still safe to send again.
+// Not 504: the server may have done the work after the host stopped waiting.
+const NEVER_ARRIVED = new Set([502, 503]);
+// A call that runs a model may wait on a server waking up and then on the model itself.
+const ONCE_TIMEOUT_MS = 90_000;
 
 /** Calls the API as the connected user. Never throws: failures come back as data. */
 /**
@@ -71,7 +77,7 @@ async function api<T>(path: string, init: RequestInit = {}, once = false): Promi
   // reuses the result), tracker writes (which carry a retry key) and saving
   // learned answers (saving the same answer twice changes nothing).
   let response: Response | null = null;
-  for (const wait of once ? [0] : RETRY_AFTER_MS) {
+  for (const wait of RETRY_AFTER_MS) {
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     try {
       response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
@@ -81,13 +87,15 @@ async function api<T>(path: string, init: RequestInit = {}, once = false): Promi
           Authorization: `Bearer ${key}`,
           ...init.headers,
         },
-        signal: AbortSignal.timeout(once ? 45_000 : 25_000),
+        signal: AbortSignal.timeout(once ? ONCE_TIMEOUT_MS : 25_000),
       });
     } catch {
       response = null;
+      // A call sent once may have been done by the server before the connection dropped.
+      if (once) break;
       continue;
     }
-    if (!STARTING_UP.has(response.status)) break;
+    if (!(once ? NEVER_ARRIVED : STARTING_UP).has(response.status)) break;
   }
   if (response === null) {
     return { ok: false, status: null, message: UNREACHABLE };

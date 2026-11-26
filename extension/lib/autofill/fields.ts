@@ -428,8 +428,9 @@ export function findFields(doc: Document): Field[] {
 const BOXES = '[role="dialog"], dialog[open], [aria-modal="true"], form';
 // Words only an application uses about itself: "Apply to", "Your application",
 // "Send application". Not a bare "apply": a checkout says "Apply coupon".
-const APPLYING_WORDS =
-  /\bapply (?:to|for|now)\b|\b(?:your|send|submit|job) application\b|\bsubmit (?:your )?application\b|\bcover letter\b|\b(?:upload|attach) (?:your )?(?:resume|cv)\b|\breach out to the team\b/i;
+// Google Forms show the form's title on every page: "Frontend Intern" says it on the essay pages too.
+export const APPLYING_WORDS =
+  /\bapply(?:ing)? (?:to|for|now)\b|\b(?:your|send|submit|job) application\b|\bsubmit (?:your )?application\b|\bcover letter\b|\b(?:upload|attach) (?:your )?(?:resume|cv)\b|\b(?:resume|cv) link\b|\blink to (?:your |a )?(?:resume|cv)\b|\bintern(?:ship)?s?\b|\bstipend\b|\breach out to the team\b/i;
 
 /** Whether an open pop-up, or a form, on the page says it is for applying. */
 function boxSaysApply(doc: Document): boolean {
