@@ -1,6 +1,6 @@
 """Sends approved posts when their time comes, and reads back their numbers.
 
-It runs on a timer inside the API (every 10 minutes while the API is awake),
+It runs on a timer inside the API (every hour while the API is awake),
 and when the outside scheduler wakes the API (`tick`, see router.py). Render's
 free plan sleeps the API when idle, so the outside scheduler is what makes a
 post go out on time. The timer is slow on purpose: every check wakes the
@@ -32,7 +32,8 @@ from backend.modules.social.platforms.base import (
 
 logger = logging.getLogger(__name__)
 
-CHECK_EVERY = timedelta(minutes=10)
+# Hourly: each check wakes the database, and Neon's free plan bills the time it is awake.
+CHECK_EVERY = timedelta(hours=1)
 MAX_POSTS_PER_ROUND = 10
 MAX_ATTEMPTS = 3
 RETRY_AFTER = timedelta(minutes=5)
@@ -283,7 +284,7 @@ async def tick(now: datetime | None = None) -> None:
 
 
 async def run_forever() -> None:
-    """Checks for due posts and stale numbers every 10 minutes while the server runs."""
+    """Checks for due posts and stale numbers every hour while the server runs."""
     while True:
         await tick()
         await asyncio.sleep(CHECK_EVERY.total_seconds())

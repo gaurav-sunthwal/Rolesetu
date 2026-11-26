@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 PAYMENT_REMINDER = "payment_reminder"
 AUTOPAY_FAILED = "autopay_failed"
 SENT_BY = "automatic"
-CHECK_EVERY = timedelta(minutes=10)
+# Hourly: each check wakes the database, and Neon's free plan bills the time it is awake.
+CHECK_EVERY = timedelta(hours=1)
 ONCE_PER = timedelta(days=7)
 # Older drop-offs are left alone, so turning this on does not write to everyone
 # who ever opened the payment window.
@@ -226,7 +227,7 @@ async def send_due(now: datetime | None = None) -> int:
 
 
 async def run_forever() -> None:
-    """Checks for due reminders every few minutes, for as long as the server runs."""
+    """Checks for due reminders every hour, for as long as the server runs."""
     while True:
         try:
             if sent := await send_due():

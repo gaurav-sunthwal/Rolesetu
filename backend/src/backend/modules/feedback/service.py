@@ -22,7 +22,8 @@ from backend.modules.feedback import emails, repository
 
 logger = logging.getLogger(__name__)
 
-CHECK_EVERY = timedelta(minutes=10)
+# Hourly: each check wakes the database, and Neon's free plan bills the time it is awake.
+CHECK_EVERY = timedelta(hours=1)
 # People who signed up longer ago than this are left alone, so turning the
 # feature on does not write to everyone who joined weeks ago.
 TOO_OLD_AFTER = timedelta(days=3)
@@ -94,7 +95,7 @@ async def send_due(now: datetime | None = None) -> int:
 
 
 async def run_forever() -> None:
-    """Checks for due emails every few minutes, for as long as the server runs."""
+    """Checks for due emails every hour, for as long as the server runs."""
     while True:
         try:
             sent = await send_due()
