@@ -1,0 +1,59 @@
+# Once a day, makes the main and backup databases equal by copying from whichever one
+# changed (the one the app is running on). Never overwrites newer data; if both changed
+# it stops and fails. Logic: .github/scripts/db-sync.sh. Runbook: docs/runbooks/database-backup.md
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions), plain libpq
+# form postgresql://user:pass@host/db?sslmode=require:
+#   MAIN_DATABASE_URL, BACKUP_DATABASE_URL
+name: db-backup
+
+on:
+  schedule:
+    # 03:00 IST, when almost nobody uses the app.
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto = copy from whichever changed (normal). The others force a direction."
+        type: choice
+        options: [auto, main-to-backup, backup-to-main]
+        default: auto
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # pg_dump must be at least the newest server's major version (backup runs 18).
+    container: postgres:18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Sync the databases
+        env:
+          MAIN_DATABASE_URL: ${{ secrets.MAIN_DATABASE_URL }}
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$MAIN_DATABASE_URL" ] || [ -z "$BACKUP_DATABASE_URL" ]; then
+            echo "MAIN_DATABASE_URL or BACKUP_DATABASE_URL is not set; nothing to do."
+            exit 0
+          fi
+          bash .github/scripts/db-sync.sh "${{ inputs.mode || 'auto' }}"
+      - name: Keep the overwritten copy for 3 days (undo)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: undo-dump
+          path: undo-*.dump
+          retention-days: 3
+          if-no-files-found: ignore
